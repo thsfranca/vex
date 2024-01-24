@@ -1,0 +1,35 @@
+package lang
+
+import (
+	"study-parser/module"
+	"study-parser/parser"
+)
+
+var specialForms = map[string]*SpecialForm{
+	DEF: &SpecialForm{Expr: Def},
+}
+
+type SpecialForm struct {
+	Expr func(*parser.ListContext, module.SymbolTable)
+}
+
+const (
+	DEF     = "def"
+	IMPORT  = "import"
+	PACKAGE = "package"
+)
+
+func IsSpecialForm(ctx *parser.ListContext) bool {
+	return specialForms[ctx.Sym_block(0).SYMBOL().GetText()] != nil
+}
+
+func CallSpecialForm(ctx *parser.ListContext, symTable module.SymbolTable) {
+	specialForms[ctx.Sym_block(0).SYMBOL().GetText()].Expr(ctx, symTable)
+}
+
+func Def(ctx *parser.ListContext, symTable module.SymbolTable) {
+	if IsFunction(ctx) {
+		symTable.Insert(module.Symbol{Name: ctx.Sym_block(1).SYMBOL().GetText(), Value: value})
+	}
+	symTable.Insert(module.Symbol{Name: ctx.Sym_block(1).SYMBOL().GetText(), Value: ctx.Sym_block(2).SYMBOL().GetText()})
+}

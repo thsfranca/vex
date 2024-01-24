@@ -1,0 +1,27 @@
+package main
+
+import (
+	"study-parser/lang"
+	"study-parser/module"
+	"study-parser/parser"
+
+	"github.com/antlr4-go/antlr/v4"
+)
+
+func main() {
+
+	input := antlr.NewInputStream(`(def test 5)(print (test)`)
+
+	lexer := parser.NewSpLexer(input)
+
+	stream := antlr.NewCommonTokenStream(lexer, 0)
+
+	p := parser.NewSpParser(stream)
+	p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
+
+	tree := p.Sp()
+
+	antlr.ParseTreeWalkerDefault.Walk(lang.NewListener(), tree)
+
+	module.Mod.Main.GenerateDataStructures()
+}

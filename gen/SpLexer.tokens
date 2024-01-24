@@ -1,0 +1,13 @@
+T__0=1
+T__1=2
+T__2=3
+T__3=4
+SYMBOL=5
+STRING=6
+LETTER=7
+INTEGER=8
+TRASH=9
+'('=1
+')'=2
+'['=3
+']'=4

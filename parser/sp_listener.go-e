@@ -17,6 +17,9 @@ type SpListener interface {
 	// EnterArray is called when entering the array production.
 	EnterArray(c *ArrayContext)
 
+	// EnterSym_block is called when entering the sym_block production.
+	EnterSym_block(c *Sym_blockContext)
+
 	// ExitSp is called when exiting the sp production.
 	ExitSp(c *SpContext)
 
@@ -25,4 +28,7 @@ type SpListener interface {
 
 	// ExitArray is called when exiting the array production.
 	ExitArray(c *ArrayContext)
+
+	// ExitSym_block is called when exiting the sym_block production.
+	ExitSym_block(c *Sym_blockContext)
 }

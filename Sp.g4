@@ -3,19 +3,15 @@ grammar Sp;
 sp: list+ EOF ;
 
 list
-    : '(' (array | list | sym_block | STRING)+ ')' (SEPARATOR+)?
+    : '(' (array | list | SYMBOL | STRING)+ ')'
     ;
 
 array
-    : '[' (array | list| sym_block | STRING)+ ']' (SEPARATOR+)?
-    ;
-
-sym_block
-    : (SEPARATOR? SYMBOL SEPARATOR?)
+    : '[' (array | list| SYMBOL | STRING)+ ']'
     ;
 
 SYMBOL
-    : (LETTER | INTEGER | STRING | '.')+
+    : (LETTER | INTEGER | '.')+
     ;
 
 STRING

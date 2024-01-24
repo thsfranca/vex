@@ -38,3 +38,9 @@ func (s *BaseSpListener) EnterArray(ctx *ArrayContext) {}
 
 // ExitArray is called when production array is exited.
 func (s *BaseSpListener) ExitArray(ctx *ArrayContext) {}
+
+// EnterSym_block is called when production sym_block is entered.
+func (s *BaseSpListener) EnterSym_block(ctx *Sym_blockContext) {}
+
+// ExitSym_block is called when production sym_block is exited.
+func (s *BaseSpListener) ExitSym_block(ctx *Sym_blockContext) {}

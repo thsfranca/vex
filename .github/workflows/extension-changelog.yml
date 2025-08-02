@@ -113,14 +113,18 @@ jobs:
         # Check if version entry already exists (from previous PR title)
         if grep -q "## \[$CURRENT_VERSION\]" CHANGELOG.md; then
           echo "🔄 Updating existing changelog entry with new PR title..."
-          # Replace the existing entry for this version
-          sed -i "/## \[$CURRENT_VERSION\]/,/^## / {
-            /## \[$CURRENT_VERSION\]/!{/^## /!d;}
-            /## \[$CURRENT_VERSION\]/a\\
+          # Remove the existing version section and its content
+          sed -i "/## \[$CURRENT_VERSION\]/,/^## \[/ {
+            /^## \[/!d;
+            /## \[$CURRENT_VERSION\]/d;
+          }" CHANGELOG.md
+          # Add the updated version section after [Unreleased]
+          sed -i "/## \[Unreleased\]/a\\
+        \\
+        ## [$CURRENT_VERSION] - $DATE\\
         \\
         - $PR_TITLE\\
-        
-          }" CHANGELOG.md
+        " CHANGELOG.md
         else
           echo "➕ Adding new changelog entry..."
           # Add new entry

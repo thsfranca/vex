@@ -1,4 +1,0 @@
-package main
-
-
- var print =  go.print

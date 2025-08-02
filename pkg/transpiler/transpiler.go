@@ -1,8 +1,10 @@
 package transpiler
 
 import (
-	parser "fugo/tools/gen/go"
+	"regexp"
 	"strings"
+
+	parser "fugo/tools/gen/go"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -17,26 +19,49 @@ func New() *Transpiler {
 	return &Transpiler{}
 }
 
-// TranspileToGo converts a Fugo program to Go code
 func (t *Transpiler) TranspileToGo(input string) (string, error) {
-	// Parse the input using ANTLR
 	lexer := parser.NewFugoLexer(antlr.NewInputStream(input))
 	stream := antlr.NewCommonTokenStream(lexer, 0)
 	p := parser.NewFugoParser(stream)
 	
-	// Parse starting from the root rule
 	tree := p.Sp()
 	
-	// For now, just acknowledge we parsed successfully
 	t.output.Reset()
 	t.output.WriteString("package main\n\n")
 	t.output.WriteString("func main() {\n")
-	t.output.WriteString("\t// Transpiled from Fugo: " + input + "\n")
-	t.output.WriteString("\t// Parse tree created successfully\n")
+	
+	t.transpileNode(tree)
+	
 	t.output.WriteString("}\n")
 	
-	// Prevent unused variable warning
-	_ = tree
-	
 	return t.output.String(), nil
+}
+
+// transpileNode walks AST using visitor pattern
+func (t *Transpiler) transpileNode(node antlr.Tree) {
+	switch ctx := node.(type) {
+	case *parser.SpContext:
+		for i := 0; i < ctx.GetChildCount(); i++ {
+			t.transpileNode(ctx.GetChild(i))
+		}
+	case *parser.ListContext:
+		for i := 0; i < ctx.GetChildCount(); i++ {
+			child := ctx.GetChild(i)
+			t.transpileNode(child)
+		}
+	case antlr.TerminalNode:
+		token := ctx.GetSymbol()
+		if token.GetTokenType() == parser.FugoLexerSYMBOL {
+			text := token.GetText()
+			if t.isNumber(text) {
+				t.output.WriteString("\tvar _ int = " + text + "\n")
+			}
+		}
+	}
+}
+
+
+func (t *Transpiler) isNumber(s string) bool {
+	matched, _ := regexp.MatchString("^[0-9]+$", s)
+	return matched
 }

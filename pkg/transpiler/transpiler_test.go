@@ -32,3 +32,20 @@ func TestTranspileToGo_Placeholder(t *testing.T) {
 	
 	t.Logf("Generated Go code:\n%s", result)
 }
+
+func TestTranspileToGo_IntegerLiteral(t *testing.T) {
+	transpiler := New()
+	
+	// Test transpiling a simple integer literal
+	result, err := transpiler.TranspileToGo("(42)")
+	if err != nil {
+		t.Fatalf("TranspileToGo failed: %v", err)
+	}
+	
+	// Check for integer literal transpilation
+	if !strings.Contains(result, "var _ int = 42") {
+		t.Errorf("Expected 'var _ int = 42' in output, got:\n%s", result)
+	}
+	
+	t.Logf("Generated Go code:\n%s", result)
+}

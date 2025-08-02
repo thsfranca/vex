@@ -1,7 +1,7 @@
 {
   "name": "fugo-minimal",
   "displayName": "Fugo Minimal",
-  "description": "Minimal Fugo support",
+  "description": "Minimal Fugo language support",
   "version": "0.1.0",
   "publisher": "fugo-dev",
   "icon": "icon.png",

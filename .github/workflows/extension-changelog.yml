@@ -325,7 +325,7 @@ jobs:
   # Summary job
   changelog-summary:
     runs-on: ubuntu-latest
-    needs: [detect-extension-changes, update-changelog-in-pr, update-changelog-on-merge, generate-release-notes]
+    needs: [detect-extension-changes, check-changelog-in-pr, update-changelog-on-merge, generate-release-notes]
     if: always() && needs.detect-extension-changes.outputs.extension-files == 'true'
     steps:
     - name: Report changelog status

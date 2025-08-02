@@ -7,8 +7,32 @@ on:
     branches: [ main ]
 
 jobs:
+  # Job to detect what files changed
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      go-files: ${{ steps.changes.outputs.go-files }}
+      any-files: ${{ steps.changes.outputs.any-files }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          go-files:
+            - '**/*.go'
+            - 'go.mod'
+            - 'go.sum'
+            - 'tools/grammar/**'
+            - 'Makefile'
+            - '.github/workflows/**'
+          any-files:
+            - '**'
+
   test:
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.go-files == 'true'
     
     steps:
     - uses: actions/checkout@v4
@@ -81,4 +105,41 @@ jobs:
           
           # Lint check (warning only for now)
           golint ./... || echo "⚠️  Linting issues found (not blocking)"
+        fi
+
+  # Job for non-Go changes - provides status without running Go-specific tests
+  non-go-changes:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.go-files == 'false' && needs.detect-changes.outputs.any-files == 'true'
+    
+    steps:
+    - name: Skip Go tests for non-Go changes
+      run: |
+        echo "✅ Skipping Go tests - no Go-related files were changed"
+        echo "Changed files include only:"
+        echo "- VSCode extension files"
+        echo "- Documentation"
+        echo "- Other non-Go assets"
+        echo ""
+        echo "This is expected behavior when only non-Go files are modified."
+
+  # Always run job to ensure CI status is reported
+  ci-status:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, test, non-go-changes]
+    if: always()
+    
+    steps:
+    - name: Report CI Status
+      run: |
+        if [[ "${{ needs.detect-changes.outputs.go-files }}" == "true" ]]; then
+          if [[ "${{ needs.test.result }}" == "success" ]]; then
+            echo "✅ All Go tests passed"
+          else
+            echo "❌ Go tests failed"
+            exit 1
+          fi
+        else
+          echo "✅ CI passed - no Go tests needed for this change"
         fi

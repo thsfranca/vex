@@ -153,13 +153,9 @@ jobs:
           
           git add CHANGELOG.md
           if [[ "${{ github.event.action }}" == "edited" ]]; then
-            git commit -m "docs: update changelog with revised PR title
-
-[automated-changelog-update]"
+            git commit -m $'docs: update changelog with revised PR title\n\n[automated-changelog-update]'
           else
-            git commit -m "docs: auto-update changelog with PR title
-
-[automated-changelog-update]"
+            git commit -m $'docs: auto-update changelog with PR title\n\n[automated-changelog-update]'
           fi
           git push
           

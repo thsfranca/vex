@@ -62,7 +62,7 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Build only
+    - name: Build Go packages only
       if: ${{ inputs.test_type == 'build-only' || inputs.test_type == 'full' }}
       run: |
         if find . -name "main.go" | grep -q .; then
@@ -72,7 +72,7 @@ jobs:
           echo "📝 No main packages found yet"
         fi
         
-    - name: Test only  
+    - name: Run Go tests only  
       if: ${{ inputs.test_type == 'test-only' || inputs.test_type == 'full' }}
       run: |
         if find . -name "*_test.go" | grep -q .; then
@@ -82,7 +82,7 @@ jobs:
           echo "📝 No tests found yet"
         fi
         
-    - name: Lint only
+    - name: Run Go linting only
       if: ${{ inputs.test_type == 'lint-only' || inputs.test_type == 'full' }}
       run: |
         if find . -name "*.go" | grep -q .; then

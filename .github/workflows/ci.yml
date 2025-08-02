@@ -152,7 +152,7 @@ jobs:
           make go || echo "Parser generation failed, continuing..."
         fi
         
-    - name: Run tests
+    - name: Run Go tests
       run: |
         if find . -name "*_test.go" | grep -q .; then
           echo "🧪 Running Go tests..."
@@ -171,7 +171,7 @@ jobs:
           echo "✅ No tests found yet - this is expected for early development"
         fi
         
-    - name: Build project
+    - name: Build Go project
       run: |
         if find . -name "main.go" | grep -q .; then
           echo "🔨 Building Go packages..."
@@ -220,7 +220,7 @@ jobs:
         go install github.com/axw/gocov/gocov@latest
         go install github.com/AlekSi/gocov-xml@latest
         
-    - name: Run tests with coverage
+    - name: Run Go tests with coverage
       run: |
         mkdir -p coverage
         echo "🧪 Running tests with coverage analysis..."
@@ -309,7 +309,7 @@ jobs:
         path: ~/go/bin
         key: ${{ runner.os }}-go-tools-${{ env.GO_VERSION }}-lint
         
-    - name: Install linting tools
+    - name: Install Go linting tools
       run: |
         go install golang.org/x/tools/cmd/goimports@latest
         go install golang.org/x/lint/golint@latest
@@ -354,7 +354,7 @@ jobs:
           echo "✅ No Go files found - skipping formatting check"
         fi
         
-    - name: Run linting (smart failure handling)
+    - name: Run Go linting (smart failure handling)
       run: |
         if find . -name "*.go" | grep -q .; then
           echo "🔍 Running Go linting..."

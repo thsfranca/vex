@@ -73,7 +73,7 @@ jobs:
       run: |
         go mod tidy || echo "No go.mod yet"
     
-    - name: Generate coverage
+    - name: Generate Go coverage
       run: |
         # Create coverage directory
         mkdir -p coverage

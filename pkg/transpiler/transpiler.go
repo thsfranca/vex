@@ -56,6 +56,9 @@ func (t *Transpiler) transpileNode(node antlr.Tree) {
 			if t.isNumber(text) {
 				t.output.WriteString("\tvar _ int = " + text + "\n")
 			}
+		} else if token.GetTokenType() == parser.FugoLexerSTRING {
+			text := token.GetText()
+			t.output.WriteString("\tvar _ string = " + text + "\n")
 		}
 	}
 }

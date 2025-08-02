@@ -49,3 +49,18 @@ func TestTranspileToGo_IntegerLiteral(t *testing.T) {
 	
 	t.Logf("Generated Go code:\n%s", result)
 }
+
+func TestTranspileToGo_StringLiteral(t *testing.T) {
+	transpiler := New()
+	
+	result, err := transpiler.TranspileToGo("(\"hello\")")
+	if err != nil {
+		t.Fatalf("TranspileToGo failed: %v", err)
+	}
+	
+	if !strings.Contains(result, "var _ string = \"hello\"") {
+		t.Errorf("Expected 'var _ string = \"hello\"' in output, got:\n%s", result)
+	}
+	
+	t.Logf("Generated Go code:\n%s", result)
+}

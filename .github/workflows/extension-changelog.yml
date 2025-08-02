@@ -6,10 +6,12 @@ on:
     branches: [ main ]
     paths: 
       - 'vscode-extension/**'
+      - '.github/workflows/extension-changelog.yml'
   push:
     branches: [ main ]
     paths:
       - 'vscode-extension/**'
+      - '.github/workflows/extension-changelog.yml'
 
 env:
   NODE_VERSION: '20'

@@ -25,3 +25,15 @@ Thumbs.db
 *~
 *.bak
 *.backup
+
+# VSCode Extension Build Artifacts
+vscode-extension/*.vsix
+vscode-extension/fugo-*.vsix
+
+# Extension development files
+vscode-extension/node_modules/
+vscode-extension/.vscode-test/
+
+# Temporary extension files
+vscode-extension/package-lock.json
+vscode-extension/yarn.lock

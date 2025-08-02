@@ -1,18 +1,63 @@
-name: Update README Coverage
+name: Coverage
 
 on:
   push:
     branches: [ main ]
   workflow_run:
-    workflows: ["Test Coverage Check"]
+    workflows: ["CI"]
     branches: [ main ]
     types: 
       - completed
 
 jobs:
+  # Job to detect what files changed
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      go-files: ${{ steps.final-decision.outputs.go-files }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          go-files:
+            - '**/*.go'
+            - 'go.mod'
+            - 'go.sum'
+            - 'tools/grammar/**'
+          makefile-changes:
+            - 'Makefile'
+            
+    - name: Analyze Makefile changes for Go relevance
+      id: makefile-analysis
+      if: ${{ steps.changes.outputs.makefile-changes == 'true' }}
+      run: |
+        # Check if Makefile diff contains Go-related patterns
+        GO_RELATED="false"
+        if git diff origin/main...HEAD Makefile | grep -E "(go (build|test|mod|generate)|GOPATH|GOOS|GOARCH|\.go|antlr.*-Dlanguage=Go)" > /dev/null; then
+          GO_RELATED="true"
+        fi
+        echo "go-related=$GO_RELATED" >> $GITHUB_OUTPUT
+        
+    - name: Final Go files decision
+      id: final-decision  
+      run: |
+        BASIC_GO="${{ steps.changes.outputs.go-files }}"
+        MAKEFILE_GO="${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
+        
+        if [[ "$BASIC_GO" == "true" || "$MAKEFILE_GO" == "true" ]]; then
+          echo "go-files=true" >> $GITHUB_OUTPUT
+        else
+          echo "go-files=false" >> $GITHUB_OUTPUT
+        fi
+
   update-coverage:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'push'
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.go-files == 'true' && (github.event.workflow_run.conclusion == 'success' || github.event_name == 'push') }}
+    permissions:
+      contents: write  # Required to commit and push coverage updates
     
     steps:
     - uses: actions/checkout@v4
@@ -28,7 +73,7 @@ jobs:
       run: |
         go mod tidy || echo "No go.mod yet"
     
-    - name: Generate coverage
+    - name: Generate Go coverage
       run: |
         # Create coverage directory
         mkdir -p coverage
@@ -109,23 +154,30 @@ jobs:
     
     - name: Update README with coverage
       run: |
-        # Update the coverage table in README.md
-        sed -i "/| Component | Target | Status | Purpose |/,/> \*\*Quality Philosophy\*\*/ {
-          /| Component | Target | Status | Purpose |/!{
-            /> \*\*Quality Philosophy\*\*/!d
-          }
-        }" README.md
+        # Create coverage table
+        cat > coverage_table.tmp << 'COVERAGE_EOF'
+        | Component | Target | Status | Purpose |
+        |-----------|--------|--------|---------|
+        | **Parser** | 95%+ | PARSER_STATUS_PLACEHOLDER | Critical language component |
+        | **Transpiler** | 90%+ | TRANSPILER_STATUS_PLACEHOLDER | Core functionality |
+        | **Type System** | 85%+ | TYPES_STATUS_PLACEHOLDER | Type safety |
+        | **Standard Library** | 80%+ | STDLIB_STATUS_PLACEHOLDER | User-facing features |
+        | **Overall Project** | 75%+ | TOTAL_STATUS_PLACEHOLDER | Quality baseline |
         
-        # Insert new coverage table
-        sed -i "/| Component | Target | Status | Purpose |/a\\
-|-----------|--------|--------|---------|\\
-| **Parser** | 95%+ | $PARSER_STATUS | Critical language component |\\
-| **Transpiler** | 90%+ | $TRANSPILER_STATUS | Core functionality |\\
-| **Type System** | 85%+ | $TYPES_STATUS | Type safety |\\
-| **Standard Library** | 80%+ | $STDLIB_STATUS | User-facing features |\\
-| **Overall Project** | 75%+ | $TOTAL_STATUS | Quality baseline |\\
-\\
-> **Quality Philosophy**: Higher coverage requirements for more critical components. PRs that reduce coverage below these thresholds are automatically blocked." README.md
+        > **Quality Philosophy**: Higher coverage requirements for more critical components. PRs that reduce coverage below these thresholds are automatically blocked.
+        COVERAGE_EOF
+        
+        # Replace placeholders with actual values
+        sed -i "s/PARSER_STATUS_PLACEHOLDER/$PARSER_STATUS/g" coverage_table.tmp
+        sed -i "s/TRANSPILER_STATUS_PLACEHOLDER/$TRANSPILER_STATUS/g" coverage_table.tmp  
+        sed -i "s/TYPES_STATUS_PLACEHOLDER/$TYPES_STATUS/g" coverage_table.tmp
+        sed -i "s/STDLIB_STATUS_PLACEHOLDER/$STDLIB_STATUS/g" coverage_table.tmp
+        sed -i "s/TOTAL_STATUS_PLACEHOLDER/$TOTAL_STATUS/g" coverage_table.tmp
+        
+        # Replace coverage section in README
+        awk '/Component.*Target.*Status.*Purpose/,/Quality Philosophy/{next} {print}' README.md > README.tmp
+        awk '/## Project Status/{print; print ""; system("cat coverage_table.tmp"); print ""; next} {print}' README.tmp > README.md
+        rm -f README.tmp coverage_table.tmp
     
     - name: Commit updated coverage
       run: |

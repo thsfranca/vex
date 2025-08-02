@@ -1,0 +1,103 @@
+---
+name-template: 'Fugo v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+categories:
+  - title: '🚀 Language Features'
+    labels:
+      - 'feature'
+      - 'enhancement'
+      - 'feat'
+      - 'syntax'
+      - 'parser'
+  - title: '🔧 Transpiler & Compiler'
+    labels:
+      - 'transpiler'
+      - 'compiler'
+      - 'codegen'
+      - 'go'
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'fix'
+      - 'bugfix'
+      - 'bug'
+  - title: '📖 Documentation'
+    labels:
+      - 'documentation'
+      - 'docs'
+      - 'examples'
+  - title: '🔧 Development & Tooling'
+    labels:
+      - 'chore'
+      - 'maintenance'
+      - 'refactor'
+      - 'ci'
+      - 'build'
+  - title: '⚡ Performance'
+    labels:
+      - 'performance'
+      - 'perf'
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - 'major'
+      - 'breaking'
+  minor:
+    labels:
+      - 'minor'
+      - 'feature'
+      - 'enhancement'
+      - 'feat'
+  patch:
+    labels:
+      - 'patch'
+      - 'fix'
+      - 'bugfix'
+      - 'bug'
+      - 'documentation'
+      - 'docs'
+      - 'chore'
+      - 'maintenance'
+  default: patch
+
+template: |
+  ## 🚀 Fugo Programming Language Release
+  
+  $CHANGES
+  
+  **Language Version**: $RESOLVED_VERSION  
+  **Target**: Go transpilation  
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+
+autolabeler:
+  - label: 'documentation'
+    files:
+      - '*.md'
+      - 'docs/**/*'
+  - label: 'parser'
+    files:
+      - 'tools/grammar/**/*'
+      - '**/*parser*'
+  - label: 'transpiler'
+    files:
+      - '**/*transpil*'
+      - '**/*codegen*'
+  - label: 'bug'
+    branch:
+      - '/fix\/.+/'
+    title:
+      - '/fix/i'
+  - label: 'feature'
+    branch:
+      - '/feat\/.+/'
+    title:
+      - '/feat/i'
+  - label: 'chore'
+    branch:
+      - '/chore\/.+/'
+    title:
+      - '/chore/i'

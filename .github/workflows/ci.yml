@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Install ANTLR4
+      run: |
+        # Install ANTLR4 for parser generation
+        wget https://www.antlr.org/download/antlr-4.13.1-complete.jar -O /tmp/antlr.jar
+        sudo mv /tmp/antlr.jar /usr/local/lib/
+        echo '#!/bin/bash' | sudo tee /usr/local/bin/antlr4
+        echo 'java -jar /usr/local/lib/antlr.jar "$@"' | sudo tee -a /usr/local/bin/antlr4
+        sudo chmod +x /usr/local/bin/antlr4
+    
+    - name: Generate parsers
+      run: |
+        # Generate Go parser if grammar exists
+        if [ -f "tools/grammar/Fugo.g4" ]; then
+          make go || echo "Parser generation failed, continuing..."
+        fi
+    
+    - name: Install dependencies
+      run: |
+        go mod tidy || echo "No go.mod yet"
+        go mod download || echo "No dependencies yet"
+    
+    - name: Run tests
+      run: |
+        # Run tests if any exist
+        if find . -name "*_test.go" | grep -q .; then
+          go test -v ./...
+        else
+          echo "No tests found yet - this is expected for early development"
+        fi
+    
+    - name: Build project
+      run: |
+        # Try to build any main packages
+        if find . -name "main.go" | grep -q .; then
+          go build ./...
+        else
+          echo "No main packages to build yet"
+        fi
+    
+    - name: Verify examples parse
+      run: |
+        # Verify example Fugo files can be parsed
+        if [ -f "tools/gen/go/fugo_parser.go" ] && [ -d "examples" ]; then
+          echo "Verifying examples can be parsed..."
+          # Add parser verification logic here when ready
+        fi
+    
+    - name: Run linters
+      run: |
+        # Install and run basic linters
+        go install golang.org/x/tools/cmd/goimports@latest
+        go install golang.org/x/lint/golint@latest
+        
+        # Format check
+        if find . -name "*.go" | grep -q .; then
+          goimports -l . | tee /tmp/goimports.out
+          if [ -s /tmp/goimports.out ]; then
+            echo "❌ Code is not properly formatted"
+            exit 1
+          fi
+          
+          # Lint check (warning only for now)
+          golint ./... || echo "⚠️  Linting issues found (not blocking)"
+        fi

@@ -1,4 +1,4 @@
-name: Update README Coverage
+name: Coverage
 
 on:
   push:

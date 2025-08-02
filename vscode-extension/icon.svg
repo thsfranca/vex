@@ -1,0 +1,18 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Shadow text layer -->
+  <text x="66" y="82" text-anchor="middle" 
+        font-family="-apple-system, BlinkMacSystemFont, 'SF Mono', 'Segoe UI Mono', 'Roboto Mono', Menlo, Monaco, Consolas, 'Ubuntu Mono', monospace" 
+        font-size="72" 
+        font-weight="500" 
+        font-style="normal" 
+        fill="#000000" 
+        opacity="0.15">(λ)</text>
+  
+  <!-- Main text -->
+  <text x="64" y="80" text-anchor="middle" 
+        font-family="-apple-system, BlinkMacSystemFont, 'SF Mono', 'Segoe UI Mono', 'Roboto Mono', Menlo, Monaco, Consolas, 'Ubuntu Mono', monospace" 
+        font-size="72" 
+        font-weight="500" 
+        font-style="normal" 
+        fill="#82AAFF">(λ)</text>
+</svg>

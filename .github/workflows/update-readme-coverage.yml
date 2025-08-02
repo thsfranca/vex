@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   workflow_run:
-    workflows: ["Test Coverage Check"]
+    workflows: ["CI"]
     branches: [ main ]
     types: 
       - completed

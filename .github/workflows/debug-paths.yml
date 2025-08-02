@@ -24,7 +24,6 @@ jobs:
             - 'go.sum'
             - 'tools/grammar/**'
             - 'Makefile'
-            - '.github/workflows/**'
           non-go-files:
             - 'vscode-extension/**'
             - 'fugo/**'

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Fugo",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#symbols"
+    },
+    {
+      "include": "#brackets"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "name": "comment.line.semicolon.fugo",
+      "begin": ";",
+      "end": "$"
+    },
+    "strings": {
+      "name": "string.quoted.double.fugo",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.fugo",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.fugo",
+      "match": "\\b[0-9]+(?:\\.[0-9]+)?\\b"
+    },
+    "keywords": {
+      "name": "keyword.control.fugo",
+      "match": "\\b(def|defn|let|if|do|fn|quote)\\b"
+    },
+    "symbols": {
+      "name": "entity.name.function.fugo",
+      "match": "\\b[a-zA-Z][a-zA-Z0-9_\\-]*\\b"
+    },
+    "brackets": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.group.begin.fugo",
+          "match": "[\\(\\[\\{]"
+        },
+        {
+          "name": "punctuation.definition.group.end.fugo", 
+          "match": "[\\)\\]\\}]"
+        }
+      ]
+    }
+  },
+  "scopeName": "source.fugo"
+}

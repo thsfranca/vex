@@ -1,0 +1,13 @@
+; Fugo test file for VS Code extension
+; Press Ctrl+Shift+T (or Cmd+Shift+T) to transpile to Go
+
+; Integer literals
+(42)
+(123)
+
+; String literals  
+("hello")
+("world")
+
+; Multiple items in list
+(test 1 2 "three")

@@ -1,0 +1,51 @@
+{
+  "name": "fugo-language-support",
+  "displayName": "Fugo Language Support",
+  "description": "Syntax highlighting and transpilation for Fugo language",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": ["Programming Languages"],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "languages": [
+      {
+        "id": "fugo",
+        "aliases": ["Fugo", "fugo"],
+        "extensions": [".fugo"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "fugo",
+        "scopeName": "source.fugo",
+        "path": "./syntaxes/fugo.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "fugo.transpile",
+        "title": "Transpile to Go",
+        "category": "Fugo"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "fugo.transpile",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "editorLangId == fugo"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "echo 'No compilation needed'"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0"
+  }
+}

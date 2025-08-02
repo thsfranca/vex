@@ -64,12 +64,15 @@ jobs:
     - name: Simple changelog preview
       run: |
         echo "📋 Simple changelog preview for PR..."
+        
+        PR_TITLE="${{ github.event.pull_request.title }}"
+        echo "🎯 PR Title: $PR_TITLE"
         echo ""
         echo "## 📝 Will be added to changelog on merge:"
         echo ""
-        echo "- Extension improvements and updates"
+        echo "- $PR_TITLE"
         echo ""
-        echo "✅ Changelog automatically maintained!"
+        echo "✅ Changelog automatically maintained using PR title!"
 
   # Auto-update changelog on merge to main
   update-changelog-on-merge:
@@ -124,12 +127,27 @@ jobs:
           COMMIT_COUNT=$(git rev-list --count HEAD -- "../vscode-extension/" | grep -v "docs: update extension changelog" || echo "0")
         fi
         
-        # Simple entry
-        if [[ "$COMMIT_COUNT" -gt 0 ]]; then
-          ENTRY="Extension improvements and updates"
+        # Get entry from commit message (usually PR title for merges)
+        if [[ -n "${{ github.event.head_commit.message }}" ]]; then
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          
+          # For merge commits, the PR title is typically the last non-empty line
+          if echo "$COMMIT_MSG" | grep -q "Merge pull request"; then
+            ENTRY=$(echo "$COMMIT_MSG" | grep -v "^$" | tail -1 | sed 's/^[[:space:]]*//')
+          else
+            # For direct commits, use the first line
+            ENTRY=$(echo "$COMMIT_MSG" | head -1 | sed 's/^[[:space:]]*//')
+          fi
         else
-          ENTRY="Version bump"
+          ENTRY="Extension improvements and updates"
         fi
+        
+        # Fallback if entry is empty or still contains merge text
+        if [[ -z "$ENTRY" ]] || [[ "$ENTRY" == *"Merge pull request"* ]] || [[ "$ENTRY" == *"from "* ]]; then
+          ENTRY="Extension improvements and updates"
+        fi
+        
+        echo "📝 Changelog entry: $ENTRY"
         
         # Update changelog with simple format
         if grep -q "## \[Unreleased\]" CHANGELOG.md; then

@@ -57,7 +57,7 @@ jobs:
   update-changelog-in-pr:
     runs-on: ubuntu-latest
     needs: detect-extension-changes
-    if: ${{ needs.detect-extension-changes.outputs.extension-files == 'true' && github.event_name == 'pull_request' && !contains(github.event.head_commit.message, '[automated-changelog-update]') }}
+    if: ${{ needs.detect-extension-changes.outputs.extension-files == 'true' && github.event_name == 'pull_request' }}
     permissions:
       contents: write
       pull-requests: write
@@ -73,7 +73,25 @@ jobs:
       with:
         node-version: ${{ env.NODE_VERSION }}
         
+    - name: Check for automation recursion
+      id: recursion-check
+      run: |
+        echo "🔍 Checking for automation recursion..."
+        
+        # Check if the latest commit is from automation
+        LATEST_COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+        echo "Latest commit: $LATEST_COMMIT_MSG"
+        
+        if [[ "$LATEST_COMMIT_MSG" == *"[automated-changelog-update]"* ]]; then
+          echo "🛑 Detected automation commit - skipping to prevent recursion"
+          echo "skip=true" >> $GITHUB_OUTPUT
+        else
+          echo "✅ Not an automation commit - proceeding"
+          echo "skip=false" >> $GITHUB_OUTPUT
+        fi
+        
     - name: Update changelog with PR title
+      if: steps.recursion-check.outputs.skip == 'false'
       run: |
         cd vscode-extension
         echo "🤖 Auto-updating changelog with PR title..."
@@ -116,6 +134,7 @@ jobs:
         echo "✅ Changelog updated with latest PR title"
         
     - name: Commit changelog to PR
+      if: steps.recursion-check.outputs.skip == 'false'
       run: |
         cd vscode-extension
         

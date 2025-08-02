@@ -27,7 +27,7 @@ jobs:
         fetch-depth: 0
         
     - name: Detect extension file changes
-      uses: dorny/paths-filter@v3
+      uses: dorny/paths-filter@v2
       id: changes
       with:
         filters: |

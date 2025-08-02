@@ -66,11 +66,11 @@ version-resolver:
 
 template: |
   ## 🚀 Fugo Programming Language Release
-  
+
   $CHANGES
-  
-  **Language Version**: $RESOLVED_VERSION  
-  **Target**: Go transpilation  
+
+  **Language Version**: $RESOLVED_VERSION
+  **Target**: Go transpilation
   **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
 
 autolabeler:

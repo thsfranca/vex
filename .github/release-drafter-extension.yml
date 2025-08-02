@@ -58,11 +58,11 @@ version-resolver:
 
 template: |
   ## 📦 Fugo VSCode Extension Changes
-  
+
   $CHANGES
-  
-  **Extension Version**: $RESOLVED_VERSION  
-  **Compatible with**: VSCode 1.74.0+  
+
+  **Extension Version**: $RESOLVED_VERSION
+  **Compatible with**: VSCode 1.74.0+
   **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...extension-v$RESOLVED_VERSION
 
 autolabeler:

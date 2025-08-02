@@ -10,9 +10,31 @@ on:
       - completed
 
 jobs:
+  # Job to detect what files changed
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      go-files: ${{ steps.changes.outputs.go-files }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          go-files:
+            - '**/*.go'
+            - 'go.mod'
+            - 'go.sum'
+            - 'tools/grammar/**'
+            - 'Makefile'
+            - '.github/workflows/**'
+
   update-coverage:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'push'
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.go-files == 'true' && 
+      (github.event.workflow_run.conclusion == 'success' || github.event_name == 'push')
     
     steps:
     - uses: actions/checkout@v4

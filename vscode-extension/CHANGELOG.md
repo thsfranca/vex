@@ -6,4 +6,5 @@ Simple changelog for the Fugo VSCode Extension.
 
 ## [0.1.0] - 2024-12-19
 
-- Initial Fugo VSCode Extension release
+- feat: add fully automated changelog system for VSCode extension
+

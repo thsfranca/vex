@@ -27,7 +27,6 @@ jobs:
             - 'go.sum'
             - 'tools/grammar/**'
             - 'Makefile'
-            - '.github/workflows/**'
 
   update-coverage:
     runs-on: ubuntu-latest

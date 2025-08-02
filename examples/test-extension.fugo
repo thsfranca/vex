@@ -1,13 +1,20 @@
-; Fugo test file for VS Code extension
+; This comment should be GREEN/GRAY
 ; Press Ctrl+Shift+T (or Cmd+Shift+T) to transpile to Go
 
-; Integer literals
+; Numbers should be ORANGE/BLUE
 (42)
-(123)
+(123.456)
 
-; String literals  
-("hello")
-("world")
+; Strings should be RED/GREEN  
+("hello world")
+("with \"escaped\" quotes")
 
-; Multiple items in list
+; Keywords should be PURPLE/BLUE
+(def x 10)
+(defn add [a b] (+ a b))
+(let [y 20] y)
+
+; Function names should be YELLOW/CYAN
 (test 1 2 "three")
+(add-numbers 5 10)
+(some-function "arg")

@@ -221,11 +221,7 @@ jobs:
         
         # Commit changelog changes
         git add CHANGELOG.md
-        git commit -m "docs: update extension changelog for v${CURRENT_VERSION}
-
-Automatically generated changelog update after merge to main.
-
-[skip ci]"
+        git commit -m $'docs: update extension changelog for v${CURRENT_VERSION}\n\nAutomatically generated changelog update after merge to main.\n\n[skip ci]'
         
         # Push branch
         git push origin "$BRANCH_NAME"
@@ -259,14 +255,7 @@ Automatically generated changelog update after merge to main.
             title: `docs: update extension changelog for v${version}`,
             head: branchName,
             base: 'main',
-            body: `🤖 **Automated changelog update**
-
-This PR updates the extension changelog after a merge to main.
-
-**Changes:**
-- Updates \`vscode-extension/CHANGELOG.md\` with version ${version}
-
-**Auto-generated** - This PR can be safely merged.`
+            body: `🤖 **Automated changelog update**\n\nThis PR updates the extension changelog after a merge to main.\n\n**Changes:**\n- Updates \`vscode-extension/CHANGELOG.md\` with version ${version}\n\n**Auto-generated** - This PR can be safely merged.`
           });
           
           console.log(`✅ Created PR #${pr.data.number}: ${pr.data.html_url}`);

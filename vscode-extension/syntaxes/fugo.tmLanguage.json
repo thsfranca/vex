@@ -12,35 +12,23 @@
       "include": "#numbers"
     },
     {
-      "include": "#special-forms"
-    },
-    {
-      "include": "#function-calls"
-    },
-    {
       "include": "#keywords"
     },
     {
       "include": "#operators"
     },
     {
-      "include": "#symbols"
+      "include": "#brackets"
     },
     {
-      "include": "#brackets"
+      "include": "#symbols"
     }
   ],
   "repository": {
     "comments": {
       "name": "comment.line.semicolon.fugo",
       "begin": ";",
-      "end": "$",
-      "patterns": [
-        {
-          "name": "markup.italic.comment.fugo",
-          "match": "\\b(TODO|FIXME|NOTE|BUG)\\b"
-        }
-      ]
+      "end": "$"
     },
     "strings": {
       "name": "string.quoted.double.fugo",
@@ -49,10 +37,6 @@
       "patterns": [
         {
           "name": "constant.character.escape.fugo",
-          "match": "\\\\[\"\\\\nrtbf]"
-        },
-        {
-          "name": "invalid.illegal.escape.fugo",
           "match": "\\\\."
         }
       ]
@@ -61,89 +45,41 @@
       "patterns": [
         {
           "name": "constant.numeric.float.fugo",
-          "match": "\\b[0-9]+\\.[0-9]+\\b"
+          "match": "\\b\\d+\\.\\d+\\b"
         },
         {
           "name": "constant.numeric.integer.fugo",
-          "match": "\\b[0-9]+\\b"
-        }
-      ]
-    },
-    "special-forms": {
-      "name": "keyword.control.fugo",
-      "match": "\\b(def|defn|let|if|do|fn|quote|lambda|cond|case|when|unless)\\b"
-    },
-    "function-calls": {
-      "begin": "(\\()\\s*([a-zA-Z][a-zA-Z0-9_\\-]*)",
-      "beginCaptures": {
-        "1": {
-          "name": "punctuation.definition.group.begin.fugo"
-        },
-        "2": {
-          "name": "entity.name.function.fugo"
-        }
-      },
-      "end": "\\)",
-      "endCaptures": {
-        "0": {
-          "name": "punctuation.definition.group.end.fugo"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#comments"
-        },
-        {
-          "include": "#strings"
-        },
-        {
-          "include": "#numbers"
-        },
-        {
-          "include": "#keywords"
-        },
-        {
-          "include": "#operators"
-        },
-        {
-          "include": "#symbols"
-        },
-        {
-          "include": "#function-calls"
+          "match": "\\b\\d+\\b"
         }
       ]
     },
     "keywords": {
-      "name": "storage.type.fugo",
-      "match": "\\b(true|false|nil)\\b"
+      "name": "keyword.control.fugo",
+      "match": "\\b(def|defn|let|if|do|fn|quote|lambda|true|false|nil)\\b"
     },
     "operators": {
       "name": "keyword.operator.fugo",
-      "match": "[\\+\\-\\*\\/\\=\\<\\>\\!\\&\\|]+"
-    },
-    "symbols": {
-      "name": "variable.other.fugo",
-      "match": "\\b[a-zA-Z][a-zA-Z0-9_\\-]*\\b"
+      "match": "[+\\-*/=<>!&|]+"
     },
     "brackets": {
       "patterns": [
         {
-          "name": "punctuation.definition.array.begin.fugo",
-          "match": "\\["
+          "name": "punctuation.section.parens.fugo",
+          "match": "[()]"
         },
         {
-          "name": "punctuation.definition.array.end.fugo",
-          "match": "\\]"
+          "name": "punctuation.section.brackets.fugo",
+          "match": "[\\[\\]]"
         },
         {
-          "name": "punctuation.definition.map.begin.fugo",
-          "match": "\\{"
-        },
-        {
-          "name": "punctuation.definition.map.end.fugo",
-          "match": "\\}"
+          "name": "punctuation.section.braces.fugo",
+          "match": "[{}]"
         }
       ]
+    },
+    "symbols": {
+      "name": "entity.name.function.fugo",
+      "match": "\\b[a-zA-Z][a-zA-Z0-9_-]*\\b"
     }
   },
   "scopeName": "source.fugo"

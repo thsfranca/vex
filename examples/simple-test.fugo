@@ -1,0 +1,10 @@
+; This is a comment
+"hello world"
+42
+123.456
+def
+defn
+let
+(test function)
+[array]
+{map}

@@ -1,8 +1,8 @@
 {
   "name": "fugo-minimal",
   "displayName": "Fugo Minimal",
-  "description": "Minimal Fugo support",
-  "version": "0.1.0",
+  "description": "Minimal Fugo language support",
+  "version": "0.1.1",
   "publisher": "fugo-dev",
   "icon": "icon.png",
   "engines": {

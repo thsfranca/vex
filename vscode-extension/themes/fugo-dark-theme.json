@@ -1,0 +1,116 @@
+{
+  "$schema": "vscode://schemas/color-theme",
+  "name": "Fugo Dark",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#0f1419",
+    "editor.foreground": "#bfbdb6",
+    "editorLineNumber.foreground": "#5c6773",
+    "editorLineNumber.activeForeground": "#73d0ff",
+    "editor.selectionBackground": "#253340",
+    "editor.lineHighlightBackground": "#191f26",
+    "editorCursor.foreground": "#73d0ff",
+    "editor.findMatchBackground": "#204a87",
+    "editor.findMatchHighlightBackground": "#153f5c"
+  },
+  "tokenColors": [
+    {
+      "name": "Comments",
+      "scope": [
+        "comment",
+        "comment.line.semicolon.fugo"
+      ],
+      "settings": {
+        "foreground": "#6A9955",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "name": "Strings",
+      "scope": [
+        "string",
+        "string.quoted.double.fugo"
+      ],
+      "settings": {
+        "foreground": "#CE9178"
+      }
+    },
+    {
+      "name": "String Escapes",
+      "scope": [
+        "constant.character.escape.fugo"
+      ],
+      "settings": {
+        "foreground": "#D7BA7D"
+      }
+    },
+    {
+      "name": "Numbers",
+      "scope": [
+        "constant.numeric",
+        "constant.numeric.integer.fugo",
+        "constant.numeric.float.fugo"
+      ],
+      "settings": {
+        "foreground": "#B5CEA8"
+      }
+    },
+    {
+      "name": "Keywords",
+      "scope": [
+        "keyword.control.fugo"
+      ],
+      "settings": {
+        "foreground": "#C586C0",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Operators",
+      "scope": [
+        "keyword.operator.fugo"
+      ],
+      "settings": {
+        "foreground": "#D4D4D4"
+      }
+    },
+    {
+      "name": "Function Names",
+      "scope": [
+        "entity.name.function.fugo"
+      ],
+      "settings": {
+        "foreground": "#DCDCAA"
+      }
+    },
+    {
+      "name": "Variables",
+      "scope": [
+        "variable.other.fugo"
+      ],
+      "settings": {
+        "foreground": "#9CDCFE"
+      }
+    },
+    {
+      "name": "Parentheses and Brackets",
+      "scope": [
+        "punctuation.section.parens.fugo",
+        "punctuation.section.brackets.fugo",
+        "punctuation.section.braces.fugo"
+      ],
+      "settings": {
+        "foreground": "#D4D4D4"
+      }
+    },
+    {
+      "name": "Boolean Values",
+      "scope": [
+        "constant.language.boolean"
+      ],
+      "settings": {
+        "foreground": "#569CD6"
+      }
+    }
+  ]
+}

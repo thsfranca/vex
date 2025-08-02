@@ -1,61 +1,36 @@
-.PHONY: generate clean help java go python cpp javascript
+# Fugo Language Development Makefile
 
-# Default target
-help:
-	@echo "Fugo Grammar - ANTLR Parser Generator"
+.PHONY: help install-extension auto-install build-transpiler test clean dev watch
+
+help: ## Show this help message
+	@echo "Fugo Development Commands:"
 	@echo ""
-	@echo "Available targets:"
-	@echo "  generate     - Generate parsers for all languages"
-	@echo "  java         - Generate Java parser"
-	@echo "  go           - Generate Go parser"
-	@echo "  python       - Generate Python parser"
-	@echo "  cpp          - Generate C++ parser"
-	@echo "  javascript   - Generate JavaScript parser"
-	@echo "  clean        - Clean generated files"
-	@echo "  help         - Show this help message"
-	@echo ""
-	@echo "Requirements:"
-	@echo "  - ANTLR4 installed and available in PATH"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 
-# Generate parsers for all supported languages
-generate: java go python cpp javascript
+install-extension: ## Quick reinstall VSCode extension
+	@echo "🚀 Reinstalling Fugo VSCode Extension..."
+	@cd vscode-extension && ./quick-install.sh
 
-# Generate Java parser
-java:
-	@echo "Generating Java parser..."
-	@mkdir -p tools/gen/java
-	antlr -Dlanguage=Java -o tools/gen/java tools/grammar/Fugo.g4
+auto-install: ## Watch for changes and auto-reinstall extension
+	@echo "👀 Starting auto-install watcher..."
+	@cd vscode-extension && ./auto-install.sh
 
-# Generate Go parser
-go:
-	@echo "Generating Go parser..."
-	@mkdir -p tools/gen/go
-	antlr -Dlanguage=Go -o tools/gen/go tools/grammar/Fugo.g4
+watch: auto-install ## Alias for auto-install
 
-# Generate Python parser
-python:
-	@echo "Generating Python parser..."
-	@mkdir -p tools/gen/python
-	antlr -Dlanguage=Python3 -o tools/gen/python tools/grammar/Fugo.g4
+build-transpiler: ## Build the Go transpiler
+	@echo "🔨 Building Fugo transpiler..."
+	@go build -o bin/fugo ./cmd/fugo
 
-# Generate C++ parser
-cpp:
-	@echo "Generating C++ parser..."
-	@mkdir -p tools/gen/cpp
-	antlr -Dlanguage=Cpp -o tools/gen/cpp tools/grammar/Fugo.g4
+test: ## Run all tests
+	@echo "🧪 Running tests..."
+	@go test ./...
 
-# Generate JavaScript parser
-javascript:
-	@echo "Generating JavaScript parser..."
-	@mkdir -p tools/gen/javascript
-	antlr -Dlanguage=JavaScript -o tools/gen/javascript tools/grammar/Fugo.g4
+clean: ## Clean build artifacts
+	@echo "🧹 Cleaning up..."
+	@rm -rf bin/
+	@rm -f vscode-extension/*.vsix
+	@rm -f vscode-extension/fugo-minimal-latest.vsix
 
-# Clean all generated files
-clean:
-	@echo "Cleaning generated files..."
-	rm -rf tools/gen/
-
-# Check if ANTLR4 is available
-check-antlr:
-	@which antlr > /dev/null || (echo "Error: antlr not found in PATH. Please install ANTLR4." && exit 1)
+dev: install-extension ## Quick development setup (reinstall extension)
+	@echo "✅ Development environment ready!"

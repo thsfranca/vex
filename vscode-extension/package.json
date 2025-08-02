@@ -1,0 +1,60 @@
+{
+  "name": "fugo-minimal",
+  "displayName": "Fugo Minimal",
+  "description": "Minimal Fugo support",
+  "version": "0.1.0",
+  "publisher": "fugo-dev",
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "fugo",
+        "aliases": [
+          "Fugo"
+        ],
+        "extensions": [".fugo"],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icon.png",
+          "dark": "./icon.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "fugo",
+        "scopeName": "source.fugo",
+        "path": "./syntaxes/fugo-minimal.tmLanguage.json"
+      }
+    ],
+    "themes": [
+      {
+        "id": "fugo-dark",
+        "label": "Fugo Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/fugo-dark-theme.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "fugo-icons",
+        "label": "Fugo File Icons",
+        "path": "./icons/fugo-icon-theme.json"
+      }
+    ],
+    "icons": {
+      "fugo-file": {
+        "description": "Fugo file icon",
+        "default": {
+          "iconPath": "./icon.png"
+        }
+      }
+    }
+  }
+}

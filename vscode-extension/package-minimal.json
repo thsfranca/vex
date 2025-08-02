@@ -1,0 +1,27 @@
+{
+  "name": "fugo-minimal",
+  "displayName": "Fugo Minimal",
+  "description": "Minimal Fugo support",
+  "version": "0.1.0",
+  "publisher": "fugo-dev",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "fugo",
+        "aliases": ["Fugo"],
+        "extensions": [".fugo"]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "fugo",
+        "scopeName": "source.fugo",
+        "path": "./syntaxes/fugo-minimal.tmLanguage.json"
+      }
+    ]
+  }
+}

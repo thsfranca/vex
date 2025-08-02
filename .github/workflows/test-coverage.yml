@@ -29,25 +29,35 @@ jobs:
   test-coverage:
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
     
     steps:
+    - name: Skip coverage analysis for non-Go changes
+      if: ${{ needs.detect-changes.outputs.go-files == 'false' }}
+      run: |
+        echo "✅ Skipping test coverage analysis - no Go-related files were changed"
+        echo "This workflow completed successfully without running coverage analysis"
+        exit 0
+        
     - uses: actions/checkout@v4
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       with:
         fetch-depth: 0 # Fetch full history for accurate coverage comparison
     
     - name: Set up Go
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
     
     - name: Install dependencies
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
         go mod tidy
         go install github.com/axw/gocov/gocov@latest
         go install github.com/AlekSi/gocov-xml@latest
     
     - name: Run tests with coverage
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
         # Create coverage directory
         mkdir -p coverage
@@ -63,6 +73,7 @@ jobs:
         go test -v -coverprofile=coverage/total.out -coverpkg=./... ./...
     
     - name: Calculate coverage percentages
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       id: coverage
       run: |
         # Function to calculate coverage from profile
@@ -98,6 +109,7 @@ jobs:
         echo "Total: $TOTAL_COV%"
     
     - name: Check coverage thresholds
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
         # Define minimum coverage thresholds
         MIN_PARSER=95
@@ -273,7 +285,7 @@ jobs:
         echo "- **Total Project (75%+)**: Overall quality baseline" >> coverage/summary.md
     
     - name: Comment PR with coverage report
-      if: github.event_name == 'pull_request'
+      if: ${{ github.event_name == 'pull_request' && needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/github-script@v7
       with:
         script: |
@@ -293,6 +305,7 @@ jobs:
           }
     
     - name: Upload coverage artifacts
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/upload-artifact@v3
       with:
         name: coverage-report
@@ -300,14 +313,3 @@ jobs:
           coverage/
           !coverage/*.out
 
-  # Job for non-Go changes - skips coverage analysis
-  skip-coverage:
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.go-files == 'false' }}
-    
-    steps:
-    - name: Skip coverage analysis for non-Go changes
-      run: |
-        echo "✅ Skipping test coverage analysis - no Go-related files were changed"
-        echo "Coverage analysis only runs when Go code, grammar, or build files are modified."

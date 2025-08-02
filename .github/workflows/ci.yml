@@ -40,17 +40,26 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
     
     steps:
+    - name: Skip Go tests for non-Go changes
+      if: ${{ needs.detect-changes.outputs.go-files == 'false' }}
+      run: |
+        echo "✅ Skipping Go tests - no Go-related files were changed"
+        echo "This workflow completed successfully without running tests"
+        exit 0
+        
     - uses: actions/checkout@v4
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
     
     - name: Set up Go
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
     
     - name: Install ANTLR4
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
         # Install ANTLR4 for parser generation
         wget https://www.antlr.org/download/antlr-4.13.1-complete.jar -O /tmp/antlr.jar
@@ -60,6 +69,7 @@ jobs:
         sudo chmod +x /usr/local/bin/antlr4
     
     - name: Generate parsers
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
         # Generate Go parser if grammar exists
         if [ -f "tools/grammar/Fugo.g4" ]; then
@@ -67,11 +77,13 @@ jobs:
         fi
     
     - name: Install dependencies
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
         go mod tidy || echo "No go.mod yet"
         go mod download || echo "No dependencies yet"
     
     - name: Run tests
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
         # Run tests if any exist
         if find . -name "*_test.go" | grep -q .; then
@@ -81,6 +93,7 @@ jobs:
         fi
     
     - name: Build project
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
         # Try to build any main packages
         if find . -name "main.go" | grep -q .; then
@@ -90,6 +103,7 @@ jobs:
         fi
     
     - name: Verify examples parse
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
         # Verify example Fugo files can be parsed
         if [ -f "tools/gen/go/fugo_parser.go" ] && [ -d "examples" ]; then
@@ -98,6 +112,7 @@ jobs:
         fi
     
     - name: Run linters
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
         # Install and run basic linters
         go install golang.org/x/tools/cmd/goimports@latest
@@ -115,39 +130,3 @@ jobs:
           golint ./... || echo "⚠️  Linting issues found (not blocking)"
         fi
 
-  # Job for non-Go changes - provides status without running Go-specific tests
-  non-go-changes:
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.go-files == 'false' && needs.detect-changes.outputs.any-files == 'true' }}
-    
-    steps:
-    - name: Skip Go tests for non-Go changes
-      run: |
-        echo "✅ Skipping Go tests - no Go-related files were changed"
-        echo "Changed files include only:"
-        echo "- VSCode extension files"
-        echo "- Documentation"
-        echo "- Other non-Go assets"
-        echo ""
-        echo "This is expected behavior when only non-Go files are modified."
-
-  # Always run job to ensure CI status is reported
-  ci-status:
-    runs-on: ubuntu-latest
-    needs: [detect-changes, test, non-go-changes]
-    if: always()
-    
-    steps:
-    - name: Report CI Status
-      run: |
-        if [[ "${{ needs.detect-changes.outputs.go-files }}" == "true" ]]; then
-          if [[ "${{ needs.test.result }}" == "success" ]]; then
-            echo "✅ All Go tests passed"
-          else
-            echo "❌ Go tests failed"
-            exit 1
-          fi
-        else
-          echo "✅ CI passed - no Go tests needed for this change"
-        fi

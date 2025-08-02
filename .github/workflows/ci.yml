@@ -32,7 +32,6 @@ jobs:
             - 'go.sum'
             - 'tools/grammar/**'
             - 'Makefile'
-            - '.github/workflows/**'
           has-changes:
             - '**'
 

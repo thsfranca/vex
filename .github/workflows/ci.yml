@@ -6,16 +6,23 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  GO_VERSION: '1.21'
+  ANTLR_VERSION: '4.13.1'
+
 jobs:
-  # Job to detect what files changed
+  # Single change detection job for all workflows
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
       go-files: ${{ steps.changes.outputs.go-files }}
-      any-files: ${{ steps.changes.outputs.any-files }}
+      has-changes: ${{ steps.changes.outputs.has-changes }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: dorny/paths-filter@v2
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Detect file changes
+      uses: dorny/paths-filter@v2
       id: changes
       with:
         filters: |
@@ -26,107 +33,272 @@ jobs:
             - 'tools/grammar/**'
             - 'Makefile'
             - '.github/workflows/**'
-          any-files:
+          has-changes:
             - '**'
-    
-    - name: Debug path detection
-      run: |
-        echo "🔍 PATH DETECTION DEBUG"
-        echo "Go files changed: ${{ steps.changes.outputs.go-files }}"
-        echo "Any files changed: ${{ steps.changes.outputs.any-files }}"
-        echo "Event: ${{ github.event_name }}"
-        echo "Ref: ${{ github.ref }}"
 
-  test:
+  # Setup job with caching
+  setup:
     runs-on: ubuntu-latest
     needs: detect-changes
-    
+    if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
+    outputs:
+      go-cache-hit: ${{ steps.go-cache.outputs.cache-hit }}
+      antlr-cache-hit: ${{ steps.antlr-cache.outputs.cache-hit }}
     steps:
-    - name: Skip Go tests for non-Go changes
-      if: ${{ needs.detect-changes.outputs.go-files == 'false' }}
-      run: |
-        echo "✅ Skipping Go tests - no Go-related files were changed"
-        echo "This workflow completed successfully without running tests"
-        exit 0
-        
-    - uses: actions/checkout@v4
-      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-    
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
     - name: Set up Go
-      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
-    
-    - name: Install ANTLR4
-      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
+        go-version: ${{ env.GO_VERSION }}
+        
+    # Cache Go modules
+    - name: Cache Go modules
+      id: go-cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', '**/go.mod') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+          
+    # Cache ANTLR installation
+    - name: Cache ANTLR
+      id: antlr-cache
+      uses: actions/cache@v4
+      with:
+        path: /usr/local/lib/antlr.jar
+        key: ${{ runner.os }}-antlr-${{ env.ANTLR_VERSION }}
+        
+    - name: Install ANTLR
+      if: steps.antlr-cache.outputs.cache-hit != 'true'
       run: |
-        # Install ANTLR4 for parser generation
-        wget https://www.antlr.org/download/antlr-4.13.1-complete.jar -O /tmp/antlr.jar
+        wget https://www.antlr.org/download/antlr-${{ env.ANTLR_VERSION }}-complete.jar -O /tmp/antlr.jar
         sudo mv /tmp/antlr.jar /usr/local/lib/
+        
+    - name: Setup ANTLR binary
+      run: |
         echo '#!/bin/bash' | sudo tee /usr/local/bin/antlr4
         echo 'java -jar /usr/local/lib/antlr.jar "$@"' | sudo tee -a /usr/local/bin/antlr4
         sudo chmod +x /usr/local/bin/antlr4
-    
-    - name: Generate parsers
-      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
+        
+    - name: Install Go dependencies
+      if: steps.go-cache.outputs.cache-hit != 'true'
       run: |
-        # Generate Go parser if grammar exists
+        go mod download
+        go mod tidy
+
+  # Fast skip job for non-Go changes  
+  skip-build:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.go-files == 'false' }}
+    steps:
+    - name: Skip Go workflows
+      run: |
+        echo "✅ Skipping Go builds and tests - no Go-related files changed"
+        echo "Changed files are only: documentation, VSCode extension, examples, etc."
+
+  # Parallel job: Build & Basic Tests
+  build-and-test:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, setup]
+    if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Restore Go cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', '**/go.mod') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+          
+    - name: Restore ANTLR cache
+      uses: actions/cache@v4
+      with:
+        path: /usr/local/lib/antlr.jar
+        key: ${{ runner.os }}-antlr-${{ env.ANTLR_VERSION }}
+        
+    - name: Setup ANTLR binary
+      run: |
+        echo '#!/bin/bash' | sudo tee /usr/local/bin/antlr4
+        echo 'java -jar /usr/local/lib/antlr.jar "$@"' | sudo tee -a /usr/local/bin/antlr4
+        sudo chmod +x /usr/local/bin/antlr4
+        
+    # Cache parser generation
+    - name: Cache generated parsers
+      id: parser-cache
+      uses: actions/cache@v4
+      with:
+        path: tools/gen/
+        key: ${{ runner.os }}-parser-${{ hashFiles('tools/grammar/**') }}
+        
+    - name: Generate parsers
+      if: steps.parser-cache.outputs.cache-hit != 'true'
+      run: |
         if [ -f "tools/grammar/Fugo.g4" ]; then
           make go || echo "Parser generation failed, continuing..."
         fi
-    
-    - name: Install dependencies
-      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-      run: |
-        go mod tidy || echo "No go.mod yet"
-        go mod download || echo "No dependencies yet"
-    
+        
     - name: Run tests
-      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
-        # Run tests if any exist
         if find . -name "*_test.go" | grep -q .; then
           go test -v ./...
         else
           echo "No tests found yet - this is expected for early development"
         fi
-    
+        
     - name: Build project
-      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: |
-        # Try to build any main packages
         if find . -name "main.go" | grep -q .; then
           go build ./...
         else
           echo "No main packages to build yet"
         fi
-    
-    - name: Verify examples parse
-      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
+
+  # Parallel job: Coverage Analysis
+  test-coverage:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, setup]
+    if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
+    steps:
+    - name: Checkout code with history
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Restore Go cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', '**/go.mod') }}
+        
+    - name: Install coverage tools
       run: |
-        # Verify example Fugo files can be parsed
-        if [ -f "tools/gen/go/fugo_parser.go" ] && [ -d "examples" ]; then
-          echo "Verifying examples can be parsed..."
-          # Add parser verification logic here when ready
+        go install github.com/axw/gocov/gocov@latest
+        go install github.com/AlekSi/gocov-xml@latest
+        
+    - name: Run tests with coverage
+      run: |
+        mkdir -p coverage
+        go test -v -coverprofile=coverage/total.out -coverpkg=./... ./... || echo "No tests yet"
+        
+    - name: Calculate coverage
+      id: coverage
+      run: |
+        if [ -f "coverage/total.out" ]; then
+          TOTAL_COV=$(go tool cover -func=coverage/total.out | grep "total:" | awk '{print $3}' | sed 's/%//')
+          echo "total-coverage=$TOTAL_COV" >> $GITHUB_OUTPUT
+          echo "Coverage: $TOTAL_COV%"
+        else
+          echo "total-coverage=0" >> $GITHUB_OUTPUT
+          echo "No coverage data available"
         fi
-    
-    - name: Run linters
-      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
+        
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-report
+        path: coverage/
+        retention-days: 30
+
+  # Parallel job: Linting & Quality
+  lint-and-quality:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, setup]
+    if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Restore Go cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', '**/go.mod') }}
+        
+    # Cache linting tools
+    - name: Cache linting tools
+      uses: actions/cache@v4
+      with:
+        path: ~/go/bin
+        key: ${{ runner.os }}-go-tools-${{ env.GO_VERSION }}-lint
+        
+    - name: Install linting tools
       run: |
-        # Install and run basic linters
         go install golang.org/x/tools/cmd/goimports@latest
         go install golang.org/x/lint/golint@latest
         
-        # Format check
+    - name: Check formatting
+      run: |
         if find . -name "*.go" | grep -q .; then
           goimports -l . | tee /tmp/goimports.out
           if [ -s /tmp/goimports.out ]; then
             echo "❌ Code is not properly formatted"
+            echo "Run: goimports -w ."
             exit 1
           fi
-          
-          # Lint check (warning only for now)
-          golint ./... || echo "⚠️  Linting issues found (not blocking)"
+        fi
+        
+    - name: Run linting
+      run: |
+        if find . -name "*.go" | grep -q .; then
+          golint ./... || echo "⚠️ Linting issues found (not blocking)"
         fi
 
+  # Summary job that depends on all parallel jobs
+  ci-summary:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, skip-build, build-and-test, test-coverage, lint-and-quality]
+    if: always()
+    steps:
+    - name: Report CI Results
+      run: |
+        echo "## 📊 CI Summary" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ needs.detect-changes.outputs.go-files }}" == "false" ]]; then
+          echo "✅ **Fast skip**: No Go-related files changed" >> $GITHUB_STEP_SUMMARY
+          echo "⚡ **Time saved**: ~5-8 minutes" >> $GITHUB_STEP_SUMMARY
+          echo "- Skip Build: ${{ needs.skip-build.result }}" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🔄 **Full CI**: Go-related files changed" >> $GITHUB_STEP_SUMMARY
+          echo "- Build & Test: ${{ needs.build-and-test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Coverage: ${{ needs.test-coverage.result }}" >> $GITHUB_STEP_SUMMARY  
+          echo "- Linting: ${{ needs.lint-and-quality.result }}" >> $GITHUB_STEP_SUMMARY
+          
+          # Fail if any required job failed (but not if skipped)
+          if [[ "${{ needs.build-and-test.result }}" == "failure" || 
+                "${{ needs.test-coverage.result }}" == "failure" || 
+                "${{ needs.lint-and-quality.result }}" == "failure" ]]; then
+            echo "❌ CI failed - check individual jobs for details" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+        fi

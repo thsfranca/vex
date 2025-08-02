@@ -1,0 +1,95 @@
+---
+name-template: 'Extension v$RESOLVED_VERSION'
+tag-template: 'extension-v$RESOLVED_VERSION'
+
+categories:
+  - title: '🎨 Syntax & Themes'
+    labels:
+      - 'syntax'
+      - 'theme'
+      - 'highlighting'
+  - title: '🚀 Editor Features'
+    labels:
+      - 'feature'
+      - 'enhancement'
+      - 'completion'
+      - 'snippets'
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'fix'
+      - 'bugfix'
+      - 'bug'
+  - title: '📖 Documentation'
+    labels:
+      - 'documentation'
+      - 'docs'
+      - 'readme'
+  - title: '🔧 Extension Maintenance'
+    labels:
+      - 'chore'
+      - 'maintenance'
+      - 'dependencies'
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - 'major'
+      - 'breaking'
+  minor:
+    labels:
+      - 'minor'
+      - 'feature'
+      - 'enhancement'
+      - 'syntax'
+      - 'theme'
+  patch:
+    labels:
+      - 'patch'
+      - 'fix'
+      - 'bugfix'
+      - 'bug'
+      - 'documentation'
+      - 'docs'
+      - 'chore'
+  default: patch
+
+template: |
+  ## 📦 Fugo VSCode Extension Changes
+
+  $CHANGES
+
+  **Extension Version**: $RESOLVED_VERSION
+  **Compatible with**: VSCode 1.74.0+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...extension-v$RESOLVED_VERSION
+
+autolabeler:
+  - label: 'syntax'
+    files:
+      - 'vscode-extension/syntaxes/**/*'
+      - 'vscode-extension/**/*.tmLanguage.json'
+  - label: 'theme'
+    files:
+      - 'vscode-extension/themes/**/*'
+  - label: 'documentation'
+    files:
+      - 'vscode-extension/README.md'
+      - 'vscode-extension/CHANGELOG.md'
+      - 'vscode-extension/**/*.md'
+  - label: 'feature'
+    branch:
+      - '/feat\/.+/'
+    title:
+      - '/feat.*extension/i'
+  - label: 'fix'
+    branch:
+      - '/fix\/.+/'
+    title:
+      - '/fix.*extension/i'
+  - label: 'chore'
+    files:
+      - 'vscode-extension/package.json'
+    branch:
+      - '/chore\/.+/'

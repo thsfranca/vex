@@ -1,0 +1,30 @@
+---
+name: Extension Release Drafter
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'vscode-extension/**'
+      - '!vscode-extension/CHANGELOG.md'
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - 'vscode-extension/**'
+      - '!vscode-extension/CHANGELOG.md'
+
+permissions:
+  contents: read
+
+jobs:
+  update_extension_release_draft:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: release-drafter/release-drafter@v6
+        with:
+          config-name: release-drafter-extension.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

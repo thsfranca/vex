@@ -1,0 +1,42 @@
+---
+name: VSCode Extension Changelog
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'vscode-extension/**'
+      - '!vscode-extension/CHANGELOG.md'
+
+jobs:
+  remind-changelog:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Add changelog reminder
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo, number } = context.issue;
+
+            // Check if we already commented
+            const comments = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: number,
+            });
+
+            const botComment = comments.data.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('📦 VSCode Extension Changes Detected')
+            );
+
+            if (!botComment) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: number,
+                body: `📦 **VSCode Extension Changes Detected**\n\nYour PR modifies VSCode extension files. A **separate extension changelog** will be automatically generated from your PR title.\n\n💡 **Tip**: Make sure your PR title is descriptive as it will appear in the **Extension Release Notes**!\n\n🏷️ **Extension Labels**: Consider adding appropriate labels:\n- \`syntax\` - Syntax highlighting improvements\n- \`theme\` - Color theme updates\n- \`feature\` - New editor features (completion, snippets)\n- \`fix\` - Extension bug fixes\n- \`documentation\` - Extension documentation\n\n📋 **Two Separate Changelogs:**\n- 🚀 **Main Fugo** (language/compiler): \`v1.0.0\`\n- 📦 **VSCode Extension**: \`extension-v0.1.3\`\n\nExtension Release Drafter will create a draft release with tag \`extension-v*\`! 🎯`
+              });
+            }

@@ -1,4 +1,4 @@
-name: VSCode Extension Validation
+name: Fugo Extension
 
 on:
   push:
@@ -11,7 +11,7 @@ env:
 
 jobs:
   # Detect changes to extension files
-  detect-vscode-extension-changes:
+  detect-changes:
     runs-on: ubuntu-latest
     outputs:
       extension-files: ${{ steps.changes.outputs.extension-files }}
@@ -29,10 +29,10 @@ jobs:
             - 'examples/**/*.fugo'
 
   # Skip job for non-extension changes
-  skip-vscode-extension-validation:
+  skip-validation:
     runs-on: ubuntu-latest
-    needs: detect-vscode-extension-changes
-    if: ${{ needs.detect-vscode-extension-changes.outputs.extension-files == 'false' }}
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.extension-files == 'false' }}
     steps:
     - name: Skip VSCode extension validation
       run: |
@@ -40,10 +40,10 @@ jobs:
         echo "Changed files are only: Go code, CI workflows, docs, etc."
 
   # Main extension validation
-  validate-vscode-extension:
+  validate:
     runs-on: ubuntu-latest
-    needs: detect-vscode-extension-changes
-    if: ${{ needs.detect-vscode-extension-changes.outputs.extension-files == 'true' }}
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -276,22 +276,22 @@ jobs:
         retention-days: 7
 
   # Summary job
-  vscode-extension-summary:
+  summary:
     runs-on: ubuntu-latest
-    needs: [detect-vscode-extension-changes, skip-vscode-extension-validation, validate-vscode-extension]
+    needs: [detect-changes, skip-validation, validate]
     if: always()
     steps:
     - name: Report VSCode extension validation results
       run: |
         echo "## 📦 VSCode Extension Validation Summary" >> $GITHUB_STEP_SUMMARY
         
-        if [[ "${{ needs.detect-vscode-extension-changes.outputs.extension-files }}" == "false" ]]; then
+        if [[ "${{ needs.detect-changes.outputs.extension-files }}" == "false" ]]; then
           echo "✅ **Fast skip**: No extension files changed" >> $GITHUB_STEP_SUMMARY
           echo "⚡ **Time saved**: ~3-4 minutes" >> $GITHUB_STEP_SUMMARY
-          echo "- Skip Validation: ${{ needs.skip-vscode-extension-validation.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Skip Validation: ${{ needs.skip-validation.result }}" >> $GITHUB_STEP_SUMMARY
         else
           echo "🔄 **Full validation**: Extension files changed" >> $GITHUB_STEP_SUMMARY
-          echo "- Extension Validation: ${{ needs.validate-vscode-extension.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Extension Validation: ${{ needs.validate.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## 🧪 Validation Steps" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **JavaScript linting**: Code quality checks" >> $GITHUB_STEP_SUMMARY
@@ -302,7 +302,7 @@ jobs:
           echo "- ✅ **Sample testing**: Fugo code syntax validation" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Package creation**: .vsix build and verification" >> $GITHUB_STEP_SUMMARY
           
-          if [[ "${{ needs.validate-vscode-extension.result }}" == "failure" ]]; then
+          if [[ "${{ needs.validate.result }}" == "failure" ]]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "❌ **Extension validation failed** - Check logs for details" >> $GITHUB_STEP_SUMMARY
             exit 1

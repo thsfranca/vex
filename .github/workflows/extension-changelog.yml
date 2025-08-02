@@ -88,7 +88,7 @@ jobs:
         LATEST_COMMIT_MSG=$(git log -1 --pretty=format:"%s")
         echo "Latest commit: $LATEST_COMMIT_MSG"
         
-        if [[ "$LATEST_COMMIT_MSG" == *"[automated-changelog-update]"* ]]; then
+        if [[ "$LATEST_COMMIT_MSG" == *"[skip ci]"* ]]; then
           echo "🛑 Detected automation commit - skipping to prevent recursion"
           echo "skip=true" >> $GITHUB_OUTPUT
         else
@@ -157,9 +157,9 @@ jobs:
           
           git add CHANGELOG.md
           if [[ "${{ github.event.action }}" == "edited" ]]; then
-            git commit -m $'docs: update changelog with revised PR title\n\n[automated-changelog-update]'
+            git commit -m $'docs: update changelog with revised PR title\n\n[skip ci]'
           else
-            git commit -m $'docs: auto-update changelog with PR title\n\n[automated-changelog-update]'
+            git commit -m $'docs: auto-update changelog with PR title\n\n[skip ci]'
           fi
           git push
           

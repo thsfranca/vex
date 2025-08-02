@@ -70,6 +70,15 @@ jobs:
       with:
         node-version: ${{ env.NODE_VERSION }}
         
+    - name: Debug workflow trigger
+      run: |
+        echo "🔍 Debugging workflow trigger information..."
+        echo "Event name: ${{ github.event_name }}"
+        echo "Event action: ${{ github.event.action }}"
+        echo "Extension files changed: ${{ needs.detect-extension-changes.outputs.extension-files }}"
+        echo "PR title: ${{ github.event.pull_request.title }}"
+        echo "Should run condition: ${{ github.event_name == 'pull_request' && (needs.detect-extension-changes.outputs.extension-files == 'true' || github.event.action == 'edited') }}"
+        
     - name: Check for automation recursion
       id: recursion-check
       run: |

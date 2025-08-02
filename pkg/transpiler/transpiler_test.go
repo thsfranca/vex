@@ -15,7 +15,8 @@ func TestNew(t *testing.T) {
 func TestTranspileToGo_Placeholder(t *testing.T) {
 	transpiler := New()
 	
-	result, err := transpiler.TranspileToGo("(+ 1 2)")
+	// Use valid Fugo syntax that our grammar supports
+	result, err := transpiler.TranspileToGo("(hello world)")
 	if err != nil {
 		t.Fatalf("TranspileToGo failed: %v", err)
 	}

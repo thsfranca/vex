@@ -32,9 +32,7 @@ jobs:
   update-coverage:
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: |
-      needs.detect-changes.outputs.go-files == 'true' && 
-      (github.event.workflow_run.conclusion == 'success' || github.event_name == 'push')
+    if: ${{ needs.detect-changes.outputs.go-files == 'true' && (github.event.workflow_run.conclusion == 'success' || github.event_name == 'push') }}
     
     steps:
     - uses: actions/checkout@v4

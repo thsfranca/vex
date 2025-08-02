@@ -28,11 +28,19 @@ jobs:
             - '.github/workflows/**'
           any-files:
             - '**'
+    
+    - name: Debug path detection
+      run: |
+        echo "🔍 PATH DETECTION DEBUG"
+        echo "Go files changed: ${{ steps.changes.outputs.go-files }}"
+        echo "Any files changed: ${{ steps.changes.outputs.any-files }}"
+        echo "Event: ${{ github.event_name }}"
+        echo "Ref: ${{ github.ref }}"
 
   test:
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.go-files == 'true'
+    if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
     
     steps:
     - uses: actions/checkout@v4
@@ -111,7 +119,7 @@ jobs:
   non-go-changes:
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.go-files == 'false' && needs.detect-changes.outputs.any-files == 'true'
+    if: ${{ needs.detect-changes.outputs.go-files == 'false' && needs.detect-changes.outputs.any-files == 'true' }}
     
     steps:
     - name: Skip Go tests for non-Go changes

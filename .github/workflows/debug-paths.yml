@@ -1,0 +1,54 @@
+name: Debug Path Changes
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  debug-what-changed:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Debug changed files with paths-filter
+      uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          go-files:
+            - '**/*.go'
+            - 'go.mod'
+            - 'go.sum'
+            - 'tools/grammar/**'
+            - 'Makefile'
+            - '.github/workflows/**'
+          non-go-files:
+            - 'vscode-extension/**'
+            - 'fugo/**'
+            - 'docs/**'
+            - 'examples/**/*.fugo'
+            - '**/*.md'
+          all-files:
+            - '**'
+    
+    - name: Print debug information
+      run: |
+        echo "=== PATHS FILTER DEBUG ==="
+        echo "Go files changed: ${{ steps.changes.outputs.go-files }}"
+        echo "Non-Go files changed: ${{ steps.changes.outputs.non-go-files }}"
+        echo "Any files changed: ${{ steps.changes.outputs.all-files }}"
+        echo ""
+        echo "=== FILES THAT MATCH GO FILTER ==="
+        echo "Go files list: ${{ steps.changes.outputs.go-files_files }}"
+        echo ""
+        echo "=== FILES THAT MATCH NON-GO FILTER ==="
+        echo "Non-Go files list: ${{ steps.changes.outputs.non-go-files_files }}"
+        echo ""
+        echo "=== GITHUB EVENT CONTEXT ==="
+        echo "Event name: ${{ github.event_name }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "Base ref: ${{ github.base_ref }}"
+        echo "Head ref: ${{ github.head_ref }}"

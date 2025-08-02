@@ -306,7 +306,7 @@ jobs:
     
     - name: Upload coverage artifacts
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage-report
         path: |

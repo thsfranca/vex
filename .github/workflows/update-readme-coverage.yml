@@ -129,23 +129,30 @@ jobs:
     
     - name: Update README with coverage
       run: |
-        # Update the coverage table in README.md
-        sed -i "/| Component | Target | Status | Purpose |/,/> \*\*Quality Philosophy\*\*/ {
-          /| Component | Target | Status | Purpose |/!{
-            /> \*\*Quality Philosophy\*\*/!d
-          }
-        }" README.md
+        # Create coverage table
+        cat > coverage_table.tmp << 'COVERAGE_EOF'
+        | Component | Target | Status | Purpose |
+        |-----------|--------|--------|---------|
+        | **Parser** | 95%+ | PARSER_STATUS_PLACEHOLDER | Critical language component |
+        | **Transpiler** | 90%+ | TRANSPILER_STATUS_PLACEHOLDER | Core functionality |
+        | **Type System** | 85%+ | TYPES_STATUS_PLACEHOLDER | Type safety |
+        | **Standard Library** | 80%+ | STDLIB_STATUS_PLACEHOLDER | User-facing features |
+        | **Overall Project** | 75%+ | TOTAL_STATUS_PLACEHOLDER | Quality baseline |
         
-        # Insert new coverage table
-        sed -i "/| Component | Target | Status | Purpose |/a\\
-|-----------|--------|--------|---------|\\
-| **Parser** | 95%+ | $PARSER_STATUS | Critical language component |\\
-| **Transpiler** | 90%+ | $TRANSPILER_STATUS | Core functionality |\\
-| **Type System** | 85%+ | $TYPES_STATUS | Type safety |\\
-| **Standard Library** | 80%+ | $STDLIB_STATUS | User-facing features |\\
-| **Overall Project** | 75%+ | $TOTAL_STATUS | Quality baseline |\\
-\\
-> **Quality Philosophy**: Higher coverage requirements for more critical components. PRs that reduce coverage below these thresholds are automatically blocked." README.md
+        > **Quality Philosophy**: Higher coverage requirements for more critical components. PRs that reduce coverage below these thresholds are automatically blocked.
+        COVERAGE_EOF
+        
+        # Replace placeholders with actual values
+        sed -i "s/PARSER_STATUS_PLACEHOLDER/$PARSER_STATUS/g" coverage_table.tmp
+        sed -i "s/TRANSPILER_STATUS_PLACEHOLDER/$TRANSPILER_STATUS/g" coverage_table.tmp  
+        sed -i "s/TYPES_STATUS_PLACEHOLDER/$TYPES_STATUS/g" coverage_table.tmp
+        sed -i "s/STDLIB_STATUS_PLACEHOLDER/$STDLIB_STATUS/g" coverage_table.tmp
+        sed -i "s/TOTAL_STATUS_PLACEHOLDER/$TOTAL_STATUS/g" coverage_table.tmp
+        
+        # Replace coverage section in README
+        awk '/Component.*Target.*Status.*Purpose/,/Quality Philosophy/{next} {print}' README.md > README.tmp
+        awk '/## Project Status/{print; print ""; system("cat coverage_table.tmp"); print ""; next} {print}' README.tmp > README.md
+        rm -f README.tmp coverage_table.tmp
     
     - name: Commit updated coverage
       run: |

@@ -1,0 +1,9 @@
+# act configuration for Fugo project
+# Use GitHub's ubuntu-latest runner image
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Set default platform
+--platform ubuntu-latest
+
+# Use host networking (helps with Docker)
+--use-gitignore=false

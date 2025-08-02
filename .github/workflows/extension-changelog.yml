@@ -221,11 +221,7 @@ jobs:
         
         # Commit changelog changes
         git add CHANGELOG.md
-        git commit -m "docs: update extension changelog for v${CURRENT_VERSION}
-
-Automatically generated changelog update after merge to main.
-
-[skip ci]"
+        git commit -m $'docs: update extension changelog for v${CURRENT_VERSION}\n\nAutomatically generated changelog update after merge to main.\n\n[skip ci]'
         
         # Push branch
         git push origin "$BRANCH_NAME"

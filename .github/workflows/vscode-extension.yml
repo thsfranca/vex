@@ -11,7 +11,7 @@ env:
 
 jobs:
   # Detect changes to extension files
-  detect-extension-changes:
+  detect-vscode-extension-changes:
     runs-on: ubuntu-latest
     outputs:
       extension-files: ${{ steps.changes.outputs.extension-files }}
@@ -19,7 +19,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Detect extension file changes
+    - name: Detect VSCode extension file changes
       uses: dorny/paths-filter@v2
       id: changes
       with:
@@ -29,21 +29,21 @@ jobs:
             - 'examples/**/*.fugo'
 
   # Skip job for non-extension changes
-  skip-extension-validation:
+  skip-vscode-extension-validation:
     runs-on: ubuntu-latest
-    needs: detect-extension-changes
-    if: ${{ needs.detect-extension-changes.outputs.extension-files == 'false' }}
+    needs: detect-vscode-extension-changes
+    if: ${{ needs.detect-vscode-extension-changes.outputs.extension-files == 'false' }}
     steps:
-    - name: Skip extension validation
+    - name: Skip VSCode extension validation
       run: |
         echo "✅ Skipping VSCode extension validation - no extension files changed"
         echo "Changed files are only: Go code, CI workflows, docs, etc."
 
   # Main extension validation
-  validate-extension:
+  validate-vscode-extension:
     runs-on: ubuntu-latest
-    needs: detect-extension-changes
-    if: ${{ needs.detect-extension-changes.outputs.extension-files == 'true' }}
+    needs: detect-vscode-extension-changes
+    if: ${{ needs.detect-vscode-extension-changes.outputs.extension-files == 'true' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -55,16 +55,16 @@ jobs:
         cache: 'npm'
         cache-dependency-path: 'vscode-extension/package.json'
         
-    - name: Install extension dependencies
+    - name: Install VSCode extension dependencies
       run: |
         cd vscode-extension
         npm install
         
-    - name: Install global tools
+    - name: Install extension development tools
       run: |
         npm install -g eslint prettier vsce
         
-    - name: Lint extension JavaScript
+    - name: Lint VSCode extension JavaScript
       run: |
         cd vscode-extension
         echo "🔍 Linting JavaScript files..."
@@ -96,7 +96,7 @@ jobs:
           exit 0
         }
         
-    - name: Check extension code formatting
+    - name: Check VSCode extension code formatting
       run: |
         cd vscode-extension
         echo "🎨 Checking code formatting..."
@@ -121,7 +121,7 @@ jobs:
           exit 0
         }
         
-    - name: Validate extension manifest
+    - name: Validate VSCode extension manifest
       run: |
         cd vscode-extension
         echo "📋 Validating package.json structure..."
@@ -143,7 +143,7 @@ jobs:
           console.log('📦 Extension:', pkg.name, 'v' + pkg.version);
         "
         
-    - name: Validate TextMate grammar
+    - name: Validate Fugo syntax highlighting grammar
       run: |
         cd vscode-extension
         echo "🎨 Validating syntax highlighting grammar..."
@@ -168,7 +168,7 @@ jobs:
           echo "⚠️ No TextMate grammar found - skipping validation"
         fi
         
-    - name: Validate color themes
+    - name: Validate Fugo color themes
       run: |
         cd vscode-extension
         echo "🌈 Validating color themes..."
@@ -190,7 +190,7 @@ jobs:
           fi
         done
         
-    - name: Test against sample Fugo code
+    - name: Test syntax highlighting with sample Fugo code
       run: |
         cd vscode-extension
         echo "🧪 Testing syntax highlighting against sample code..."
@@ -222,7 +222,7 @@ jobs:
         echo "📁 Test files:"
         ls -la test-samples/
         
-    - name: Package extension
+    - name: Package VSCode extension (.vsix)
       run: |
         cd vscode-extension
         echo "📦 Packaging VSCode extension..."
@@ -233,7 +233,7 @@ jobs:
         echo "✅ Extension packaged successfully"
         ls -la *.vsix
         
-    - name: Verify packaged extension
+    - name: Verify VSCode extension package integrity
       run: |
         cd vscode-extension
         echo "🔍 Verifying packaged extension..."
@@ -260,30 +260,30 @@ jobs:
         
         echo "✅ Extension package verified successfully"
         
-    - name: Upload extension artifact
+    - name: Upload VSCode extension artifact
       uses: actions/upload-artifact@v4
       with:
-        name: fugo-vscode-extension
+        name: fugo-vscode-extension-build
         path: vscode-extension/fugo-test-build.vsix
         retention-days: 7
 
   # Summary job
-  extension-summary:
+  vscode-extension-summary:
     runs-on: ubuntu-latest
-    needs: [detect-extension-changes, skip-extension-validation, validate-extension]
+    needs: [detect-vscode-extension-changes, skip-vscode-extension-validation, validate-vscode-extension]
     if: always()
     steps:
-    - name: Report extension validation results
+    - name: Report VSCode extension validation results
       run: |
         echo "## 📦 VSCode Extension Validation Summary" >> $GITHUB_STEP_SUMMARY
         
-        if [[ "${{ needs.detect-extension-changes.outputs.extension-files }}" == "false" ]]; then
+        if [[ "${{ needs.detect-vscode-extension-changes.outputs.extension-files }}" == "false" ]]; then
           echo "✅ **Fast skip**: No extension files changed" >> $GITHUB_STEP_SUMMARY
           echo "⚡ **Time saved**: ~3-4 minutes" >> $GITHUB_STEP_SUMMARY
-          echo "- Skip Validation: ${{ needs.skip-extension-validation.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Skip Validation: ${{ needs.skip-vscode-extension-validation.result }}" >> $GITHUB_STEP_SUMMARY
         else
           echo "🔄 **Full validation**: Extension files changed" >> $GITHUB_STEP_SUMMARY
-          echo "- Extension Validation: ${{ needs.validate-extension.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Extension Validation: ${{ needs.validate-vscode-extension.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## 🧪 Validation Steps" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **JavaScript linting**: Code quality checks" >> $GITHUB_STEP_SUMMARY
@@ -294,7 +294,7 @@ jobs:
           echo "- ✅ **Sample testing**: Fugo code syntax validation" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ **Package creation**: .vsix build and verification" >> $GITHUB_STEP_SUMMARY
           
-          if [[ "${{ needs.validate-extension.result }}" == "failure" ]]; then
+          if [[ "${{ needs.validate-vscode-extension.result }}" == "failure" ]]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "❌ **Extension validation failed** - Check logs for details" >> $GITHUB_STEP_SUMMARY
             exit 1

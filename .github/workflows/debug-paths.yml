@@ -23,6 +23,7 @@ jobs:
             - 'go.mod'
             - 'go.sum'
             - 'tools/grammar/**'
+          makefile-changes:
             - 'Makefile'
           non-go-files:
             - 'vscode-extension/**'
@@ -37,14 +38,28 @@ jobs:
       run: |
         echo "=== PATHS FILTER DEBUG ==="
         echo "Go files changed: ${{ steps.changes.outputs.go-files }}"
+        echo "Makefile changed: ${{ steps.changes.outputs.makefile-changes }}"
         echo "Non-Go files changed: ${{ steps.changes.outputs.non-go-files }}"
         echo "Any files changed: ${{ steps.changes.outputs.all-files }}"
         echo ""
-        echo "=== FILES THAT MATCH GO FILTER ==="
+        echo "=== FILES THAT MATCH FILTERS ==="
         echo "Go files list: ${{ steps.changes.outputs.go-files_files }}"
-        echo ""
-        echo "=== FILES THAT MATCH NON-GO FILTER ==="
+        echo "Makefile files: ${{ steps.changes.outputs.makefile-changes_files }}"
         echo "Non-Go files list: ${{ steps.changes.outputs.non-go-files_files }}"
+        echo ""
+        echo "=== SMART MAKEFILE ANALYSIS ==="
+        if [[ "${{ steps.changes.outputs.makefile-changes }}" == "true" ]]; then
+          echo "Makefile was changed, analyzing for Go relevance..."
+          if git diff origin/main...HEAD Makefile | grep -E "(go (build|test|mod|generate)|GOPATH|GOOS|GOARCH|\.go|antlr.*-Dlanguage=Go)" > /dev/null; then
+            echo "✅ Makefile changes are Go-related"
+            echo "Go-related patterns found:"
+            git diff origin/main...HEAD Makefile | grep -E "(go (build|test|mod|generate)|GOPATH|GOOS|GOARCH|\.go|antlr.*-Dlanguage=Go)" || true
+          else
+            echo "⚠️ Makefile changes appear to be non-Go related"
+          fi
+        else
+          echo "No Makefile changes detected"
+        fi
         echo ""
         echo "=== GITHUB EVENT CONTEXT ==="
         echo "Event name: ${{ github.event_name }}"

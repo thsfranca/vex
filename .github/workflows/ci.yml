@@ -15,7 +15,7 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      go-files: ${{ steps.changes.outputs.go-files }}
+      go-files: ${{ steps.final-decision.outputs.go-files }}
       has-changes: ${{ steps.changes.outputs.has-changes }}
     steps:
     - name: Checkout code
@@ -31,9 +31,50 @@ jobs:
             - 'go.mod'
             - 'go.sum'
             - 'tools/grammar/**'
+          makefile-changes:
             - 'Makefile'
           has-changes:
             - '**'
+            
+    - name: Analyze Makefile changes for Go relevance
+      id: makefile-analysis
+      if: ${{ steps.changes.outputs.makefile-changes == 'true' }}
+      run: |
+        echo "🔍 Analyzing Makefile changes for Go relevance..."
+        
+        # Check if Makefile diff contains Go-related patterns
+        GO_RELATED="false"
+        
+        if git diff origin/main...HEAD Makefile | grep -E "(go (build|test|mod|generate)|GOPATH|GOOS|GOARCH|\.go|antlr.*-Dlanguage=Go)" > /dev/null; then
+          echo "✅ Found Go-related Makefile changes:"
+          git diff origin/main...HEAD Makefile | grep -E "(go (build|test|mod|generate)|GOPATH|GOOS|GOARCH|\.go|antlr.*-Dlanguage=Go)" || true
+          GO_RELATED="true"
+        else
+          echo "⚠️ Makefile changes appear to be non-Go related (tooling, documentation, etc.)"
+          echo "Changed lines preview:"
+          git diff origin/main...HEAD Makefile | head -20 || true
+        fi
+        
+        echo "go-related=$GO_RELATED" >> $GITHUB_OUTPUT
+        
+    - name: Final Go files decision
+      id: final-decision  
+      run: |
+        # Combine basic go-files detection with smart Makefile analysis
+        BASIC_GO="${{ steps.changes.outputs.go-files }}"
+        MAKEFILE_GO="${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
+        
+        if [[ "$BASIC_GO" == "true" || "$MAKEFILE_GO" == "true" ]]; then
+          echo "🎯 Final decision: GO TESTS NEEDED"
+          echo "  - Basic Go files: $BASIC_GO"  
+          echo "  - Go-related Makefile: $MAKEFILE_GO"
+          echo "go-files=true" >> $GITHUB_OUTPUT
+        else
+          echo "⚡ Final decision: SKIP GO TESTS"
+          echo "  - Basic Go files: $BASIC_GO"
+          echo "  - Go-related Makefile: $MAKEFILE_GO"  
+          echo "go-files=false" >> $GITHUB_OUTPUT
+        fi
 
   # Fast skip job for non-Go changes  
   skip-build:

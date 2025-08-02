@@ -14,7 +14,7 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      go-files: ${{ steps.changes.outputs.go-files }}
+      go-files: ${{ steps.final-decision.outputs.go-files }}
     steps:
     - uses: actions/checkout@v4
     - uses: dorny/paths-filter@v2
@@ -26,7 +26,31 @@ jobs:
             - 'go.mod'
             - 'go.sum'
             - 'tools/grammar/**'
+          makefile-changes:
             - 'Makefile'
+            
+    - name: Analyze Makefile changes for Go relevance
+      id: makefile-analysis
+      if: ${{ steps.changes.outputs.makefile-changes == 'true' }}
+      run: |
+        # Check if Makefile diff contains Go-related patterns
+        GO_RELATED="false"
+        if git diff origin/main...HEAD Makefile | grep -E "(go (build|test|mod|generate)|GOPATH|GOOS|GOARCH|\.go|antlr.*-Dlanguage=Go)" > /dev/null; then
+          GO_RELATED="true"
+        fi
+        echo "go-related=$GO_RELATED" >> $GITHUB_OUTPUT
+        
+    - name: Final Go files decision
+      id: final-decision  
+      run: |
+        BASIC_GO="${{ steps.changes.outputs.go-files }}"
+        MAKEFILE_GO="${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
+        
+        if [[ "$BASIC_GO" == "true" || "$MAKEFILE_GO" == "true" ]]; then
+          echo "go-files=true" >> $GITHUB_OUTPUT
+        else
+          echo "go-files=false" >> $GITHUB_OUTPUT
+        fi
 
   update-coverage:
     runs-on: ubuntu-latest

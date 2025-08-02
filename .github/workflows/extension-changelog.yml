@@ -94,6 +94,7 @@ If you want to customize the changelog entry, please update the PR title before 
     if: ${{ needs.detect-extension-changes.outputs.extension-files == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     permissions:
       contents: write
+      pull-requests: write
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -182,22 +183,111 @@ If you want to customize the changelog entry, please update the PR title before 
         
         echo "✅ Simple changelog updated for v$CURRENT_VERSION"
         
-    - name: Commit changelog updates
+    - name: Check for changelog changes
+      id: check-changes
       run: |
         cd vscode-extension
         
         if git diff --quiet CHANGELOG.md; then
-          echo "ℹ️ No changelog changes to commit"
+          echo "ℹ️ No changelog changes to create PR for"
+          echo "has-changes=false" >> $GITHUB_OUTPUT
         else
-          echo "📝 Committing changelog updates..."
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          CURRENT_VERSION=$(node -e "console.log(require('./package.json').version)")
+          BRANCH_NAME="changelog-update-v${CURRENT_VERSION}-$(date +%s)"
           
-          git add CHANGELOG.md
-          git commit -m "docs: update extension changelog for v$(node -e "console.log(require('./package.json').version)") [skip ci]"
-          echo "⚠️ Skipping push to protected main branch"
-          echo "✅ Changelog updated in PR instead"
+          echo "📝 Changelog changes detected"
+          echo "🌿 Branch: $BRANCH_NAME"
+          echo "📦 Version: $CURRENT_VERSION"
+          
+          echo "has-changes=true" >> $GITHUB_OUTPUT
+          echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
         fi
+        
+    - name: Create changelog update PR
+      if: steps.check-changes.outputs.has-changes == 'true'
+      run: |
+        cd vscode-extension
+        
+        BRANCH_NAME="${{ steps.check-changes.outputs.branch-name }}"
+        CURRENT_VERSION="${{ steps.check-changes.outputs.version }}"
+        
+        echo "📝 Creating changelog update PR..."
+        echo "🌿 Branch: $BRANCH_NAME"
+        echo "📦 Version: $CURRENT_VERSION"
+        
+        # Configure git
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Create and switch to new branch
+        git checkout -b "$BRANCH_NAME"
+        
+        # Commit changelog changes
+        git add CHANGELOG.md
+        git commit -m "docs: update extension changelog for v${CURRENT_VERSION}
+
+Automatically generated changelog update after merge to main.
+
+[skip ci]"
+        
+        # Push branch
+        git push origin "$BRANCH_NAME"
+        
+        echo "✅ Changelog committed to branch $BRANCH_NAME"
+        
+    - name: Create pull request
+      if: steps.check-changes.outputs.has-changes == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const branchName = '${{ steps.check-changes.outputs.branch-name }}';
+          const version = '${{ steps.check-changes.outputs.version }}';
+          
+          // Check if branch exists (if we just created it)
+          try {
+            await github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: branchName
+            });
+          } catch (error) {
+            console.log('❌ Branch not found, skipping PR creation');
+            return;
+          }
+          
+          // Create PR
+          const pr = await github.rest.pulls.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `docs: update extension changelog for v${version}`,
+            head: branchName,
+            base: 'main',
+            body: `🤖 **Automated changelog update**
+
+This PR updates the extension changelog after a merge to main.
+
+**Changes:**
+- Updates \`vscode-extension/CHANGELOG.md\` with version ${version}
+
+**Auto-generated** - This PR can be safely merged.`
+          });
+          
+          console.log(`✅ Created PR #${pr.data.number}: ${pr.data.html_url}`);
+          
+          // Enable auto-merge
+          try {
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.data.number,
+              merge_method: 'squash'
+            });
+            console.log('🎯 PR auto-merged successfully');
+          } catch (error) {
+            console.log('ℹ️ Could not auto-merge (likely due to branch protection) - manual merge required');
+            console.log('Error:', error.message);
+          }
 
   # Generate release notes
   generate-release-notes:

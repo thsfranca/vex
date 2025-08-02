@@ -79,11 +79,7 @@ jobs:
               owner,
               repo,
               issue_number: number,
-              body: `📝 **Changelog will be updated automatically** when this PR is merged to main.
-              
-The changelog entry will use this PR's title: "${context.payload.pull_request.title}"
-
-If you want to customize the changelog entry, please update the PR title before merging.`
+              body: `📝 **Changelog will be updated automatically** when this PR is merged to main.\n\nThe changelog entry will use this PR's title: "${context.payload.pull_request.title}"\n\nIf you want to customize the changelog entry, please update the PR title before merging.`
             });
           }
 

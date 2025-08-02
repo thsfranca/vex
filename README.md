@@ -4,7 +4,7 @@
 [![Test Coverage](https://github.com/thsfranca/fugo/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/thsfranca/fugo/actions/workflows/test-coverage.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/thsfranca/fugo)](https://goreportcard.com/report/github.com/thsfranca/fugo)
 
-A statically-typed functional programming language study project, designed for learning language implementation concepts.
+A statically-typed functional programming language that transpiles to Go, designed for learning language implementation concepts and exploring functional programming paradigms.
 
 ## Overview
 

@@ -1,0 +1,141 @@
+name: Update README Coverage
+
+on:
+  push:
+    branches: [ main ]
+  workflow_run:
+    workflows: ["Test Coverage Check"]
+    branches: [ main ]
+    types: 
+      - completed
+
+jobs:
+  update-coverage:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Install dependencies
+      run: |
+        go mod tidy || echo "No go.mod yet"
+    
+    - name: Generate coverage
+      run: |
+        # Create coverage directory
+        mkdir -p coverage
+        
+        # Run coverage analysis
+        go test -v -coverprofile=coverage/total.out -coverpkg=./... ./... 2>/dev/null || echo "0" > coverage/total_coverage.txt
+        
+        # Calculate coverage percentages
+        calculate_coverage() {
+          local file=$1
+          if [ -f "$file" ]; then
+            go tool cover -func="$file" | grep "total:" | awk '{print $3}' | sed 's/%//'
+          else
+            echo "0"
+          fi
+        }
+        
+        # Generate component coverage files (these will be 0 until implemented)
+        go test -v -coverprofile=coverage/parser.out ./internal/frontend/parser/... 2>/dev/null || echo "0" > coverage/parser_coverage.txt
+        go test -v -coverprofile=coverage/transpiler.out ./internal/transpiler/... 2>/dev/null || echo "0" > coverage/transpiler_coverage.txt
+        go test -v -coverprofile=coverage/types.out ./internal/types/... 2>/dev/null || echo "0" > coverage/types_coverage.txt
+        go test -v -coverprofile=coverage/stdlib.out ./stdlib/... 2>/dev/null || echo "0" > coverage/stdlib_coverage.txt
+        
+        # Calculate actual coverage
+        PARSER_COV=$(calculate_coverage "coverage/parser.out")
+        TRANSPILER_COV=$(calculate_coverage "coverage/transpiler.out") 
+        TYPES_COV=$(calculate_coverage "coverage/types.out")
+        STDLIB_COV=$(calculate_coverage "coverage/stdlib.out")
+        TOTAL_COV=$(calculate_coverage "coverage/total.out")
+        
+        # Generate coverage status for each component
+        generate_status() {
+          local coverage=$1
+          local target=$2
+          local implemented=$3
+          
+          if [ "$implemented" = "false" ]; then
+            echo "⏳ *Not implemented yet*"
+          elif [ $(echo "$coverage >= $target" | bc -l) -eq 1 ]; then
+            echo "✅ $coverage%"
+          else
+            echo "❌ $coverage% (below $target%)"
+          fi
+        }
+        
+        # Check if components are implemented
+        PARSER_IMPL="false"
+        TRANSPILER_IMPL="false" 
+        TYPES_IMPL="false"
+        STDLIB_IMPL="false"
+        
+        [ -d "internal/frontend/parser" ] && [ -f "coverage/parser.out" ] && PARSER_IMPL="true"
+        [ -d "internal/transpiler" ] && [ -f "coverage/transpiler.out" ] && TRANSPILER_IMPL="true"
+        [ -d "internal/types" ] && [ -f "coverage/types.out" ] && TYPES_IMPL="true"
+        [ -d "stdlib" ] && [ -f "coverage/stdlib.out" ] && STDLIB_IMPL="true"
+        
+        # Generate status strings
+        PARSER_STATUS=$(generate_status "$PARSER_COV" "95" "$PARSER_IMPL")
+        TRANSPILER_STATUS=$(generate_status "$TRANSPILER_COV" "90" "$TRANSPILER_IMPL")
+        TYPES_STATUS=$(generate_status "$TYPES_COV" "85" "$TYPES_IMPL")
+        STDLIB_STATUS=$(generate_status "$STDLIB_COV" "80" "$STDLIB_IMPL")
+        
+        # Handle total coverage
+        if [ "$TOTAL_COV" = "0" ]; then
+          TOTAL_STATUS="⏳ *No tests yet*"
+        elif [ $(echo "$TOTAL_COV >= 75" | bc -l) -eq 1 ]; then
+          TOTAL_STATUS="✅ $TOTAL_COV%"
+        else
+          TOTAL_STATUS="❌ $TOTAL_COV% (below 75%)"
+        fi
+        
+        # Save to environment
+        echo "PARSER_STATUS=$PARSER_STATUS" >> $GITHUB_ENV
+        echo "TRANSPILER_STATUS=$TRANSPILER_STATUS" >> $GITHUB_ENV
+        echo "TYPES_STATUS=$TYPES_STATUS" >> $GITHUB_ENV
+        echo "STDLIB_STATUS=$STDLIB_STATUS" >> $GITHUB_ENV
+        echo "TOTAL_STATUS=$TOTAL_STATUS" >> $GITHUB_ENV
+    
+    - name: Update README with coverage
+      run: |
+        # Update the coverage table in README.md
+        sed -i "/| Component | Target | Status | Purpose |/,/> \*\*Quality Philosophy\*\*/ {
+          /| Component | Target | Status | Purpose |/!{
+            /> \*\*Quality Philosophy\*\*/!d
+          }
+        }" README.md
+        
+        # Insert new coverage table
+        sed -i "/| Component | Target | Status | Purpose |/a\\
+|-----------|--------|--------|---------|\\
+| **Parser** | 95%+ | $PARSER_STATUS | Critical language component |\\
+| **Transpiler** | 90%+ | $TRANSPILER_STATUS | Core functionality |\\
+| **Type System** | 85%+ | $TYPES_STATUS | Type safety |\\
+| **Standard Library** | 80%+ | $STDLIB_STATUS | User-facing features |\\
+| **Overall Project** | 75%+ | $TOTAL_STATUS | Quality baseline |\\
+\\
+> **Quality Philosophy**: Higher coverage requirements for more critical components. PRs that reduce coverage below these thresholds are automatically blocked." README.md
+    
+    - name: Commit updated coverage
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        if git diff --quiet; then
+          echo "No coverage changes to commit"
+        else
+          git add README.md
+          git commit -m "Update test coverage status in README [skip ci]"
+          git push
+        fi

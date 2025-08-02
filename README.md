@@ -1,5 +1,9 @@
 # Fugo Language
 
+[![CI](https://github.com/thsfranca/fugo/actions/workflows/ci.yml/badge.svg)](https://github.com/thsfranca/fugo/actions/workflows/ci.yml)
+[![Test Coverage](https://github.com/thsfranca/fugo/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/thsfranca/fugo/actions/workflows/test-coverage.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/thsfranca/fugo)](https://goreportcard.com/report/github.com/thsfranca/fugo)
+
 A statically-typed functional programming language study project, designed for learning language implementation concepts.
 
 ## Overview
@@ -42,6 +46,8 @@ The project currently includes:
 - **ANTLR4 grammar** for S-expressions, arrays, symbols, and strings
 - **Multi-language parser generation** (Go, Java, Python, C++, JavaScript)
 - **Example programs** demonstrating the syntax
+- **Test coverage enforcement** with quality gates
+- **CI/CD pipeline** with automated quality checks
 
 ### Planned Features 🚧
 
@@ -127,9 +133,23 @@ See [docs/fugo-implementation-requirements.md](docs/fugo-implementation-requirem
 
 ## Project Status
 
-**Current Phase**: Parser and Grammar (✅ Complete)
-**Next Phase**: Type System and Transpiler
+**Current Phase**: Parser and Grammar (✅ Complete)  
+**Next Phase**: Type System and Transpiler  
 **Timeline**: Personal learning project, developed for fun in spare time
+
+### Test Coverage Standards
+
+This project maintains high code quality through automated testing:
+
+| Component | Target | Status | Purpose |
+|-----------|--------|--------|---------|
+| **Parser** | 95%+ | ⏳ *Not implemented yet* | Critical language component |
+| **Transpiler** | 90%+ | ⏳ *Not implemented yet* | Core functionality |
+| **Type System** | 85%+ | ⏳ *Not implemented yet* | Type safety |
+| **Standard Library** | 80%+ | ⏳ *Not implemented yet* | User-facing features |
+| **Overall Project** | 75%+ | ⏳ *Not implemented yet* | Quality baseline |
+
+> **Quality Philosophy**: Higher coverage requirements for more critical components. PRs that reduce coverage below these thresholds are automatically blocked.
 
 ## Contributing
 

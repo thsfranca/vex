@@ -1,7 +1,7 @@
 {
   "name": "fugo-minimal",
   "displayName": "Fugo Minimal",
-  "description": "Minimal Fugo language support with automated changelog",
+  "description": "Minimal Fugo language support with automated changelog - testing automation",
   "version": "0.1.2",
   "publisher": "fugo-dev",
   "icon": "icon.png",

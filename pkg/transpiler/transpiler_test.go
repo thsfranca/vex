@@ -64,3 +64,21 @@ func TestTranspileToGo_StringLiteral(t *testing.T) {
 	
 	t.Logf("Generated Go code:\n%s", result)
 }
+
+func TestTranspileToGo_SimpleAddition(t *testing.T) {
+	transpiler := New()
+	
+	// For now, test that we handle multiple literals correctly
+	// TODO: Add arithmetic when grammar supports operators
+	result, err := transpiler.TranspileToGo("(add 1 2)")
+	if err != nil {
+		t.Fatalf("TranspileToGo failed: %v", err)
+	}
+	
+	// Should parse as symbols, not arithmetic yet
+	if !strings.Contains(result, "package main") {
+		t.Error("Expected valid Go package")
+	}
+	
+	t.Logf("Generated Go code:\n%s", result)
+}

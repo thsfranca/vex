@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 jobs:
   # Detect changes to extension files
@@ -62,7 +62,9 @@ jobs:
         
     - name: Install extension development tools
       run: |
-        npm install -g eslint prettier vsce
+        npm install -g eslint prettier
+        # Install specific vsce version that's compatible with Node 20
+        npm install -g @vscode/vsce@latest
         
     - name: Lint VSCode extension JavaScript
       run: |
@@ -227,8 +229,14 @@ jobs:
         cd vscode-extension
         echo "📦 Packaging VSCode extension..."
         
-        # Package the extension
-        vsce package --out fugo-test-build.vsix --no-git-tag-version
+        # Verify required files exist
+        echo "📋 Checking extension structure..."
+        ls -la
+        test -f package.json || { echo "❌ package.json not found"; exit 1; }
+        
+        # Package the extension (using new @vscode/vsce package)
+        echo "🔧 Using @vscode/vsce to package extension..."
+        npx @vscode/vsce package --out fugo-test-build.vsix --no-git-tag-version --allow-missing-repository
         
         echo "✅ Extension packaged successfully"
         ls -la *.vsix

@@ -1,0 +1,22 @@
+; Transpiler Demo - Working Features
+; This file demonstrates what the Vex transpiler currently supports
+
+; Variable definitions with numbers
+(def x 42)
+(def y 10)
+
+; Variable definitions with strings  
+(def message "Hello, World!")
+(def name "Vex")
+
+; Arithmetic expressions
+(def sum (+ 15 25))
+(def difference (- 100 30))
+(def product (* 6 7))
+(def quotient (/ 84 12))
+
+; Nested arithmetic
+(def complex (+ (* 2 3) (- 8 4)))
+
+; Variables with expressions
+(def result (+ x y))

@@ -8,7 +8,7 @@ The Vex grammar defines a Lisp-like programming language with support for S-expr
 
 ### Root Rule
 ```antlr
-sp: list+ EOF ;
+program: list+ EOF ;
 ```
 A program consists of one or more lists followed by end-of-file.
 
@@ -28,9 +28,9 @@ An array is surrounded by square brackets and contains one or more elements.
 
 #### SYMBOL
 ```antlr
-SYMBOL: (LETTER | INTEGER | '.')+ ;
+SYMBOL: (LETTER | INTEGER | '.' | '+' | '-' | '*' | '/' | '=' | '!' | '<' | '>' | '?' | '_')+ ;
 ```
-Symbols can contain letters, numbers, and dots.
+Symbols can contain letters, numbers, dots, and various operators including arithmetic operators (+, -, *, /), comparison operators (=, !, <, >), and other special characters (?, _).
 
 #### STRING
 ```antlr
@@ -59,21 +59,34 @@ Whitespace (spaces, tabs, newlines) and commas are ignored.
 
 ### Valid Programs
 
+#### Working Today (Transpiler Support)
 ```lisp
-; Simple list
-(hello world)
+; Variable definitions
+(def x 42)
+(def message "Hello, World!")
 
-; Function call with arguments
+; Arithmetic expressions  
+(def sum (+ 10 20))
+(def product (* 6 7))
+(def result (+ x (- 100 5)))
+```
+
+#### Planned Features (Grammar Ready)
+```lisp
+; Function definitions (planned)
+(defn add [x y] (+ x y))
+
+; Function calls (planned)  
 (print "Hello, World!")
 
-; Nested expressions
+; Conditional expressions (planned)
 (if (> x 0) (print "positive") (print "negative"))
 
-; Arrays
+; Arrays (grammar ready)
 [1 2 3 4]
 ["hello" "world"]
 
-; Mixed structures
+; Mixed structures (grammar ready)
 (function [arg1 arg2] (body goes here))
 ```
 

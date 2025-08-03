@@ -1,7 +1,6 @@
 package transpiler
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -107,10 +106,10 @@ func (v *ASTVisitor) handleArithmetic(operator string, operands []antlr.Tree) {
 
 // handleExpression handles general expressions
 func (v *ASTVisitor) handleExpression(content []antlr.Tree) {
-	// For now, just evaluate each element
+	// For now, just evaluate each element as a standalone expression
 	for _, element := range content {
 		value := v.evaluateExpression(element)
-		v.codeGen.writeIndented(fmt.Sprintf("_ = %s\n", value))
+		v.codeGen.EmitExpressionStatement(value)
 	}
 }
 

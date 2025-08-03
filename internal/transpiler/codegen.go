@@ -35,10 +35,17 @@ func (cg *CodeGenerator) EmitSymbol(symbol string) {
 }
 
 // EmitVariableDefinition generates Go code for variable definition
-// (def x 10) -> x := 10; _ = x (to avoid unused variable error)
+// (def x 10) -> x := 10 
+// TODO: This should only be called if semantic analysis determines the variable is used later
+// Otherwise, Go will produce "declared and not used" errors, which is correct behavior
 func (cg *CodeGenerator) EmitVariableDefinition(name, value string) {
 	cg.writeIndented(fmt.Sprintf("%s := %s\n", name, value))
-	cg.writeIndented(fmt.Sprintf("_ = %s\n", name)) // Mark as used to avoid Go error
+}
+
+// EmitExpressionStatement generates Go code for standalone expressions
+// (42) or (+ 1 2) -> _ = 42 or _ = 1 + 2 (discarded result)
+func (cg *CodeGenerator) EmitExpressionStatement(expression string) {
+	cg.writeIndented(fmt.Sprintf("_ = %s\n", expression))
 }
 
 // EmitArithmeticExpression generates Go code for arithmetic operations

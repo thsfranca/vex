@@ -1,0 +1,53 @@
+---
+name: Auto Release (Tag-based)
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on tags like v1.0.0, v2.1.0
+
+permissions:
+  contents: write
+
+jobs:
+  auto-release-main:
+    if: "!startsWith(github.ref_name, 'extension-')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get latest draft release
+        id: get-draft
+        run: |
+          # Get the latest draft release
+          DRAFT_RELEASE=$(gh release list --draft --limit 1 --json tagName,body,name | jq -r '.[0]')
+          
+          if [ "$DRAFT_RELEASE" = "null" ]; then
+            echo "No draft release found, creating new release"
+            RELEASE_BODY="Automated release for ${{ github.ref_name }}"
+            RELEASE_NAME="Fugo ${{ github.ref_name }}"
+          else
+            RELEASE_BODY=$(echo "$DRAFT_RELEASE" | jq -r '.body')
+            RELEASE_NAME=$(echo "$DRAFT_RELEASE" | jq -r '.name')
+            DRAFT_TAG=$(echo "$DRAFT_RELEASE" | jq -r '.tagName')
+            
+            # Delete the draft to replace with published release
+            gh release delete "$DRAFT_TAG" --yes || true
+          fi
+          
+          echo "release-body<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "release-name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and publish release
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ steps.get-draft.outputs.release-name }}" \
+            --notes "${{ steps.get-draft.outputs.release-body }}" \
+            --latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

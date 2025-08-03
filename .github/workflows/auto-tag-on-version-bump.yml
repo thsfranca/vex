@@ -1,0 +1,88 @@
+---
+name: Auto Tag on Version Bump
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'vscode-extension/package.json'
+      - 'go.mod'
+      - 'VERSION'  # If you create a VERSION file
+
+permissions:
+  contents: write
+
+jobs:
+  auto-tag-extension:
+    if: contains(github.event.head_commit.modified, 'vscode-extension/package.json')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get extension version from package.json
+        id: get-version
+        run: |
+          VERSION=$(jq -r '.version' vscode-extension/package.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=extension-v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if tag already exists
+        id: check-tag
+        run: |
+          if git rev-parse "extension-v${{ steps.get-version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push extension tag
+        if: steps.check-tag.outputs.exists == 'false'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag "extension-v${{ steps.get-version.outputs.version }}"
+          git push origin "extension-v${{ steps.get-version.outputs.version }}"
+
+  auto-tag-main:
+    if: contains(github.event.head_commit.modified, 'go.mod') || contains(github.event.head_commit.modified, 'VERSION')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get main version
+        id: get-version
+        run: |
+          # Try VERSION file first, then go.mod, then default
+          if [ -f "VERSION" ]; then
+            VERSION=$(cat VERSION | tr -d '\n')
+          elif [ -f "go.mod" ]; then
+            # Extract version from go.mod module line or use date-based
+            VERSION="0.1.$(date +%Y%m%d)"
+          else
+            VERSION="0.1.0"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if tag already exists
+        id: check-tag
+        run: |
+          if git rev-parse "v${{ steps.get-version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push main tag
+        if: steps.check-tag.outputs.exists == 'false'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag "v${{ steps.get-version.outputs.version }}"
+          git push origin "v${{ steps.get-version.outputs.version }}"

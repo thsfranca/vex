@@ -1,0 +1,38 @@
+---
+name: Simple Auto Tag
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'VERSION'
+      - 'vscode-extension/package.json'
+
+permissions:
+  contents: write
+
+jobs:
+  auto-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create tags based on changed files
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Main project version
+          if git diff --name-only HEAD~1 HEAD | grep -q "VERSION"; then
+            VERSION=$(cat VERSION | tr -d '\n')
+            git tag "v$VERSION" || echo "Tag v$VERSION already exists"
+            git push origin "v$VERSION" || echo "Tag v$VERSION already pushed"
+          fi
+          
+          # Extension version  
+          if git diff --name-only HEAD~1 HEAD | grep -q "vscode-extension/package.json"; then
+            EXT_VERSION=$(jq -r '.version' vscode-extension/package.json)
+            git tag "extension-v$EXT_VERSION" || echo "Tag extension-v$EXT_VERSION already exists"
+            git push origin "extension-v$EXT_VERSION" || echo "Tag extension-v$EXT_VERSION already pushed"
+          fi

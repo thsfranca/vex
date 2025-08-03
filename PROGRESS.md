@@ -171,6 +171,3 @@ Update this section each week with:
 - Clojure design principles
 
 ---
-
-*Last Updated: [DATE TO BE FILLED]*
-*Next Update: [DATE TO BE FILLED]*

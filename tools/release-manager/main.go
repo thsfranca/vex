@@ -73,8 +73,8 @@ func checkLabels(labelsJSON string) {
 }
 
 func bumpVersion(releaseType string) {
-	// Read current version
-	versionBytes, err := os.ReadFile("VERSION")
+	// Read current version from project root
+	versionBytes, err := os.ReadFile("../../VERSION")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading VERSION file: %v\n", err)
 		os.Exit(1)
@@ -131,8 +131,8 @@ func bumpVersion(releaseType string) {
 
 	fmt.Printf("New version: %s\n", newVersion)
 
-	// Write new version
-	if err := os.WriteFile("VERSION", []byte(newVersion), 0644); err != nil {
+	// Write new version to project root
+	if err := os.WriteFile("../../VERSION", []byte(newVersion), 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing VERSION file: %v\n", err)
 		os.Exit(1)
 	}

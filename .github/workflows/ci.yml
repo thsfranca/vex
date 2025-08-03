@@ -231,14 +231,14 @@ jobs:
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       env:
         GITHUB_EVENT_NAME: ${{ github.event_name }}
-        GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        GITHUB_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
       run: .github/scripts/ci/check-formatting.sh
         
     - name: Run Go linting (smart failure handling)
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       env:
         GITHUB_EVENT_NAME: ${{ github.event_name }}
-        GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        GITHUB_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
       run: .github/scripts/ci/run-linting.sh
 
   # Summary job that depends on all parallel jobs

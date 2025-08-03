@@ -20,6 +20,14 @@ The goal is to explore language design concepts including parsing, type systems,
 
 ```
 vex/
+├── cmd/                            # Command-line tools
+│   └── fugo-transpiler/            # Main transpiler CLI application
+├── internal/                       # Core implementation packages
+│   └── transpiler/                 # Vex to Go transpiler engine
+│       ├── parser/                 # Generated ANTLR parser files
+│       ├── transpiler.go           # Main transpiler logic
+│       ├── ast_visitor.go          # AST traversal and code generation
+│       └── codegen.go              # Go code generation utilities
 ├── docs/                           # Documentation
 │   ├── grammar-reference.md        # Language grammar documentation
 │   ├── vex-implementation-requirements.md # Development roadmap
@@ -50,22 +58,45 @@ Vex aims to be a functional programming language with:
 - **Concurrent programming** leveraging Go's goroutines and channels
 - **Backend service focus** with built-in HTTP and concurrency primitives
 
-### Current Status: Robust Development Infrastructure ✅
+### Current Status: Basic Transpiler Working ✅
 
 The project currently includes:
 - **ANTLR4 grammar** for S-expressions, arrays, symbols, and strings
-- **Go parser validation** with comprehensive test suite
-- **Grammar validation system** testing both valid and invalid syntax
+- **Working transpiler** that converts Vex to executable Go code
+- **CLI tool** (`fugo-transpiler`) for command-line transpilation
+- **Basic language features**:
+  - Variable definitions: `(def x 10)` → `x := 10`
+  - Arithmetic expressions: `(+ 1 2)` → `1 + 2`
+  - String and number literals with proper Go output
 - **Comprehensive CI/CD pipeline** with automated quality checks
 - **Automated release process** with PR label-based version management
-- **Modular tooling architecture** with dedicated Go tools for each workflow
-- **Example programs** organized into valid/invalid test cases
-- **Editor support** for development convenience
+- **Grammar validation system** testing both valid and invalid syntax
+- **Example programs** demonstrating working features
 
-### Planned Features 🚧
+### Working Today 🚀
+
+You can transpile basic Vex programs to Go:
+
+```bash
+# Install and use the transpiler
+go build -o fugo-transpiler cmd/fugo-transpiler/main.go
+echo '(def x (+ 5 3))' > example.vex
+./fugo-transpiler -input example.vex -output example.go
+```
+
+Outputs valid Go code:
+```go
+package main
+
+func main() {
+    x := 5 + 3
+}
+```
+
+### Next Phase 🚧
 
 - **Type system** (string, int, float, symbol, list, map)
-- **Go transpilation engine** for native performance
+- **Function definitions** and calls with proper Go function generation
 - **Immutable data structures** with structural sharing
 - **Standard library** for HTTP services and data processing
 - **IDE support** with Language Server Protocol
@@ -124,10 +155,11 @@ Here's what Vex programs might look like when fully implemented:
 
 The main grammar rules are:
 
-- `sp`: The root rule, matches one or more lists followed by EOF
+- `program`: The root rule, matches one or more lists followed by EOF
 - `list`: Matches `(` followed by elements followed by `)`
 - `array`: Matches `[` followed by elements followed by `]`
 - Elements can be: arrays, lists, symbols, or strings
+- Supports arithmetic operators: `+`, `-`, `*`, `/`, and other symbols
 
 ## Learning Goals
 
@@ -146,8 +178,8 @@ See [docs/vex-implementation-requirements.md](docs/vex-implementation-requiremen
 
 ## Project Status
 
-**Current Phase**: Development Infrastructure (✅ Complete)  
-**Next Phase**: Type System and Go Transpilation Engine  
+**Current Phase**: Basic Go Transpilation (🚧 In Progress)  
+**Next Phase**: Advanced Language Features and Type System  
 **Timeline**: Personal learning project, developed for fun in spare time
 
 ### Infrastructure Achievements

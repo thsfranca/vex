@@ -55,7 +55,7 @@ tokenStream := antlr.NewCommonTokenStream(lexer, 0)
 p := parser.NewVexParser(tokenStream)
 
 // Parse
-tree := p.Sp()
+tree := p.Program()
 ```
 
 ### Tree Walking

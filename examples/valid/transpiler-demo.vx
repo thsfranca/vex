@@ -1,0 +1,10 @@
+; Transpiler Demo - Working Features
+; This file demonstrates what the Vex transpiler currently supports
+
+; Simple standalone expressions (evaluated and discarded)
+(+ 10 20)
+(* 6 7)
+
+; Nested arithmetic expressions
+(+ (* 2 3) (- 8 4))
+(/ (+ 100 50) (- 10 5))

@@ -19,7 +19,7 @@
 
 ## Phase 1: Parser Foundation ✅ **COMPLETED**
 
-**Completed**: December 2024
+**Completed**
 
 ### What Was Built
 - [x] ANTLR4 grammar for Vex syntax (`tools/grammar/Vex.g4`)

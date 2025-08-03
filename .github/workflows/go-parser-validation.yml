@@ -90,6 +90,9 @@ jobs:
     needs: test-go-parser-generation
     if: always()
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
       - name: Check results
         run: .github/scripts/parser/generate-summary.sh "${{ needs.test-go-parser-generation.result }}"
 

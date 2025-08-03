@@ -37,12 +37,12 @@ func main() {
 }
 
 func createSamples() {
-	fmt.Println("🧪 Testing syntax highlighting against sample code...")
+	fmt.Println("[TEST] Testing syntax highlighting against sample code...")
 
 	// Create test-samples directory
 	err := os.MkdirAll("test-samples", 0755)
 	if err != nil {
-		fmt.Printf("❌ Failed to create test-samples directory: %v\n", err)
+		fmt.Printf("[ERROR] Failed to create test-samples directory: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -58,7 +58,7 @@ func createSamples() {
 
 	err = os.WriteFile("test-samples/factorial.vx", []byte(factorialContent), 0644)
 	if err != nil {
-		fmt.Printf("❌ Failed to create factorial.vx: %v\n", err)
+		fmt.Printf("[ERROR] Failed to create factorial.vx: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -72,17 +72,17 @@ func createSamples() {
 
 	err = os.WriteFile("test-samples/fibonacci.vx", []byte(fibonacciContent), 0644)
 	if err != nil {
-		fmt.Printf("❌ Failed to create fibonacci.vx: %v\n", err)
+		fmt.Printf("[ERROR] Failed to create fibonacci.vx: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("✅ Sample Vex files created successfully")
+	fmt.Println("[SUCCESS] Sample Vex files created successfully")
 	fmt.Println("📁 Test files:")
 	
 	// List test files
 	files, err := os.ReadDir("test-samples")
 	if err != nil {
-		fmt.Printf("❌ Failed to list test files: %v\n", err)
+		fmt.Printf("[ERROR] Failed to list test files: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -98,7 +98,7 @@ func packageExtension() {
 	fmt.Println("📋 Checking extension structure...")
 	
 	if _, err := os.Stat("package.json"); err != nil {
-		fmt.Println("❌ package.json not found")
+		fmt.Println("[ERROR] package.json not found")
 		os.Exit(1)
 	}
 
@@ -114,11 +114,11 @@ func packageExtension() {
 	
 	err := cmd.Run()
 	if err != nil {
-		fmt.Printf("❌ Failed to package extension: %v\n", err)
+		fmt.Printf("[ERROR] Failed to package extension: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("✅ Extension packaged successfully")
+	fmt.Println("[SUCCESS] Extension packaged successfully")
 	
 	// List .vsix files
 	files, err := filepath.Glob("*.vsix")
@@ -130,11 +130,11 @@ func packageExtension() {
 }
 
 func verifyPackage() {
-	fmt.Println("🔍 Verifying packaged extension...")
+	fmt.Println("[CHECK] Verifying packaged extension...")
 
 	// Check .vsix was created and is valid
 	if _, err := os.Stat("vex-test-build.vsix"); err != nil {
-		fmt.Println("❌ Extension package not found")
+		fmt.Println("[ERROR] Extension package not found")
 		os.Exit(1)
 	}
 
@@ -143,7 +143,7 @@ func verifyPackage() {
 	cmd := exec.Command("unzip", "-t", "vex-test-build.vsix")
 	err := cmd.Run()
 	if err != nil {
-		fmt.Println("❌ Extension package is corrupted")
+		fmt.Println("[ERROR] Extension package is corrupted")
 		os.Exit(1)
 	}
 
@@ -167,7 +167,7 @@ func verifyPackage() {
 		fmt.Printf("📏 Package size: %d bytes\n", fileInfo.Size())
 	}
 
-	fmt.Println("✅ Extension package verified successfully")
+	fmt.Println("[SUCCESS] Extension package verified successfully")
 }
 
 func generateSummary() {
@@ -178,29 +178,29 @@ func generateSummary() {
 	fmt.Println("## 📦 VSCode Extension Validation Summary")
 
 	if extensionFiles == "false" {
-		fmt.Println("✅ **Fast skip**: No extension files changed")
-		fmt.Println("⚡ **Time saved**: ~3-4 minutes")
+		fmt.Println("[SUCCESS] **Fast skip**: No extension files changed")
+		fmt.Println("[INFO] **Time saved**: ~3-4 minutes")
 		fmt.Printf("- Skip Validation: %s\n", skipResult)
 	} else {
 		fmt.Println("🔄 **Full validation**: Extension files changed")
 		fmt.Printf("- Extension Validation: %s\n", validateResult)
 		fmt.Println("")
-		fmt.Println("## 🧪 Validation Steps")
-		fmt.Println("- ✅ **JavaScript linting**: Code quality checks")
-		fmt.Println("- ✅ **Code formatting**: Prettier validation")
-		fmt.Println("- ✅ **Manifest validation**: package.json structure")
-		fmt.Println("- ✅ **Grammar validation**: TextMate syntax highlighting")
-		fmt.Println("- ✅ **Theme validation**: Color scheme definitions")
-		fmt.Println("- ✅ **Sample testing**: Vex code syntax validation")
-		fmt.Println("- ✅ **Package creation**: .vsix build and verification")
+		fmt.Println("## [TEST] Validation Steps")
+		fmt.Println("- [SUCCESS] **JavaScript linting**: Code quality checks")
+		fmt.Println("- [SUCCESS] **Code formatting**: Prettier validation")
+		fmt.Println("- [SUCCESS] **Manifest validation**: package.json structure")
+		fmt.Println("- [SUCCESS] **Grammar validation**: TextMate syntax highlighting")
+		fmt.Println("- [SUCCESS] **Theme validation**: Color scheme definitions")
+		fmt.Println("- [SUCCESS] **Sample testing**: Vex code syntax validation")
+		fmt.Println("- [SUCCESS] **Package creation**: .vsix build and verification")
 
 		if validateResult == "failure" {
 			fmt.Println("")
-			fmt.Println("❌ **Extension validation failed** - Check logs for details")
+			fmt.Println("[ERROR] **Extension validation failed** - Check logs for details")
 			os.Exit(1)
 		} else {
 			fmt.Println("")
-			fmt.Println("✅ **Extension validation passed** - Ready for distribution!")
+			fmt.Println("[SUCCESS] **Extension validation passed** - Ready for distribution!")
 		}
 	}
 }

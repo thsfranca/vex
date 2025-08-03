@@ -83,11 +83,11 @@ jobs:
         
     - name: Performance summary
       run: |
-        echo "## 📊 Performance Summary" >> $GITHUB_STEP_SUMMARY
+        echo "## [SUMMARY] Performance Summary" >> $GITHUB_STEP_SUMMARY
         echo "Test type: **${{ inputs.test_type }}**" >> $GITHUB_STEP_SUMMARY
         echo "Completed in: **$(date)**" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### ⚡ Performance Benefits" >> $GITHUB_STEP_SUMMARY
+        echo "### [INFO] Performance Benefits" >> $GITHUB_STEP_SUMMARY
         echo "- **Caching**: Go modules, ANTLR, tools cached" >> $GITHUB_STEP_SUMMARY
         echo "- **Parallel execution**: Build, test, lint run simultaneously" >> $GITHUB_STEP_SUMMARY
         echo "- **Smart skipping**: Non-Go changes complete in seconds" >> $GITHUB_STEP_SUMMARY

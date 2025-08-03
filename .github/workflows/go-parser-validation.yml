@@ -39,29 +39,16 @@ jobs:
       # Platform-specific ANTLR setup
       - name: Install ANTLR (Linux/macOS)
         if: runner.os != 'Windows'
-        run: |
-          wget https://www.antlr.org/download/antlr-${{ env.ANTLR_VERSION }}-complete.jar -O /tmp/antlr.jar
-          sudo mkdir -p /usr/local/lib
-          sudo mv /tmp/antlr.jar /usr/local/lib/
-          echo '#!/bin/bash' | sudo tee /usr/local/bin/antlr4
-          echo 'java -jar /usr/local/lib/antlr.jar "$@"' | sudo tee -a /usr/local/bin/antlr4
-          sudo chmod +x /usr/local/bin/antlr4
+        env:
+          ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
+        run: .github/scripts/parser/install-antlr-unix.sh
 
       - name: Install ANTLR (Windows)
         if: runner.os == 'Windows'
         shell: powershell
-        run: |
-          $url = "https://www.antlr.org/download/antlr-${{ env.ANTLR_VERSION }}-complete.jar"
-          $output = "$env:USERPROFILE\antlr.jar"
-          Invoke-WebRequest -Uri $url -OutFile $output
-          
-          # Create batch file for antlr4 command
-          $batchContent = "@echo off`njava -jar `"$output`" %*"
-          $batchFile = "$env:USERPROFILE\antlr4.bat"
-          $batchContent | Out-File -FilePath $batchFile -Encoding ASCII
-          
-          # Add to PATH
-          echo "$env:USERPROFILE" >> $env:GITHUB_PATH
+        env:
+          ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
+        run: .github/scripts/parser/install-antlr-windows.ps1
 
       # Go runtime setup
       - name: Set up Go
@@ -72,48 +59,21 @@ jobs:
       # Generate Go parser
       - name: Generate Go parser (Linux/macOS)
         if: runner.os != 'Windows'
-        run: |
-          echo "[BUILD] Generating Go parser on ${{ matrix.os }}..."
-          cd tools/grammar
-          antlr4 -Dlanguage=Go -listener -visitor Vex.g4 -o ../gen/go/
-          echo "[SUCCESS] Go parser generation completed"
+        run: .github/scripts/parser/generate-go-parser-unix.sh
 
       - name: Generate Go parser (Windows)
         if: runner.os == 'Windows'
         shell: powershell
-        run: |
-          Write-Host "[BUILD] Generating Go parser on ${{ matrix.os }}..."
-          cd tools/grammar
-          antlr4.bat -Dlanguage=Go -listener -visitor Vex.g4 -o ../gen/go/
-          Write-Host "[SUCCESS] Go parser generation completed"
+        run: .github/scripts/parser/generate-go-parser-windows.ps1
 
       # Verify generated Go files
       - name: Verify generated Go files
-        run: |
-          echo "[CHECK] Verifying generated Go parser files..."
-          
-          if [ -f "tools/gen/go/vex_lexer.go" ] && [ -f "tools/gen/go/vex_parser.go" ]; then
-            echo "[SUCCESS] Go parser files generated successfully"
-          else
-            echo "[ERROR] Missing Go parser files"
-            ls -la tools/gen/go/ || echo "Directory doesn't exist"
-            exit 1
-          fi
+        run: .github/scripts/parser/verify-generated-files.sh
         shell: bash
 
       # Test Go compilation
       - name: Test Go compilation
-        run: |
-          echo "[TEST] Testing Go parser compilation..."
-          cd tools/gen/go
-          go mod init vex-parser-test || true
-          go mod tidy || true
-          if go build .; then
-            echo "[SUCCESS] Go parser compiles successfully"
-          else
-            echo "[ERROR] Go parser compilation failed"
-            exit 1
-          fi
+        run: .github/scripts/parser/test-compilation.sh
 
       # Upload artifacts for debugging
       - name: Upload generated Go parser
@@ -131,15 +91,5 @@ jobs:
     if: always()
     steps:
       - name: Check results
-        run: |
-          echo "[SUMMARY] Go parser generation summary:"
-          
-          if [ "${{ needs.test-go-parser-generation.result }}" = "success" ]; then
-            echo "[SUCCESS] Go parser generated successfully on all platforms"
-            echo "[INFO] Vex grammar is ready for Go transpilation!"
-          else
-            echo "[ERROR] Go parser generation failed on some platforms"
-            echo "[INFO] Check the job logs and artifacts for debugging"
-            exit 1
-          fi
+        run: .github/scripts/parser/generate-summary.sh "${{ needs.test-go-parser-generation.result }}"
 

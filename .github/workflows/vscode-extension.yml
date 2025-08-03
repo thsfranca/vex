@@ -36,7 +36,7 @@ jobs:
     steps:
     - name: Skip VSCode extension validation
       run: |
-        echo "✅ Skipping VSCode extension validation - no extension files changed"
+        echo "[SKIP] Skipping VSCode extension validation - no extension files changed"
         echo "Changed files are only: Go code, CI workflows, docs, etc."
 
   # Main extension validation
@@ -67,130 +67,19 @@ jobs:
         npm install -g @vscode/vsce@latest
         
     - name: Lint VSCode extension JavaScript
-      run: |
-        cd vscode-extension
-        echo "🔍 Linting JavaScript files..."
-        
-        # Create basic .eslintrc.json if it doesn't exist
-        if [ ! -f .eslintrc.json ]; then
-          cat > .eslintrc.json << 'EOF'
-        {
-          "env": {
-            "node": true,
-            "es2021": true
-          },
-          "extends": ["eslint:recommended"],
-          "parserOptions": {
-            "ecmaVersion": 12,
-            "sourceType": "module"
-          },
-          "rules": {
-            "no-unused-vars": "warn",
-            "no-console": "off"
-          }
-        }
-        EOF
-        fi
-        
-        # Lint JavaScript files
-        eslint *.js --format=stylish || {
-          echo "⚠️ Linting issues found - treating as warnings for VSCode extension"
-          exit 0
-        }
+      run: .github/scripts/extension/lint-javascript.sh
         
     - name: Check VSCode extension code formatting
-      run: |
-        cd vscode-extension
-        echo "🎨 Checking code formatting..."
-        
-        # Create basic .prettierrc if it doesn't exist
-        if [ ! -f .prettierrc ]; then
-          cat > .prettierrc << 'EOF'
-        {
-          "semi": true,
-          "trailingComma": "es5",
-          "singleQuote": true,
-          "printWidth": 100,
-          "tabWidth": 2
-        }
-        EOF
-        fi
-        
-        prettier --check *.js *.json || {
-          echo "⚠️ Formatting issues found - showing diff:"
-          prettier --list-different *.js *.json || true
-          echo "💡 Run 'prettier --write *.js *.json' to fix formatting"
-          exit 0
-        }
+      run: .github/scripts/extension/check-formatting.sh
         
     - name: Validate VSCode extension manifest
-      run: |
-        cd vscode-extension
-        echo "📋 Validating package.json structure..."
-        
-        # Validate JSON syntax
-        node -e "
-          const pkg = JSON.parse(require('fs').readFileSync('package.json'));
-          console.log('✅ package.json is valid JSON');
-          
-          // Check required fields for VSCode extension
-          const required = ['name', 'version', 'engines', 'contributes'];
-          const missing = required.filter(field => !pkg[field]);
-          if (missing.length > 0) {
-            console.log('❌ Missing required fields:', missing);
-            process.exit(1);
-          }
-          
-          console.log('✅ Required extension fields present');
-          console.log('📦 Extension:', pkg.name, 'v' + pkg.version);
-        "
+      run: .github/scripts/extension/validate-manifest.js
         
     - name: Validate Vex syntax highlighting grammar
-      run: |
-        cd vscode-extension
-        echo "🎨 Validating syntax highlighting grammar..."
-        
-        if [ -f "syntaxes/vex-minimal.tmLanguage.json" ]; then
-          node -e "
-            const grammar = JSON.parse(require('fs').readFileSync('syntaxes/vex-minimal.tmLanguage.json'));
-            console.log('✅ TextMate grammar is valid JSON');
-            
-            // Check required grammar fields
-            const required = ['name', 'scopeName', 'patterns'];
-            const missing = required.filter(field => !grammar[field]);
-            if (missing.length > 0) {
-              console.log('❌ Missing required grammar fields:', missing);
-              process.exit(1);
-            }
-            
-            console.log('✅ TextMate grammar structure valid');
-            console.log('🎯 Scope:', grammar.scopeName);
-          "
-        else
-          echo "⚠️ No TextMate grammar found - skipping validation"
-        fi
+      run: .github/scripts/extension/validate-grammar.js
         
     - name: Validate Vex color themes
-      run: |
-        cd vscode-extension
-        echo "🌈 Validating color themes..."
-        
-        for theme in themes/*.json; do
-          if [ -f "$theme" ]; then
-            echo "Validating: $theme"
-            node -e "
-              const theme = JSON.parse(require('fs').readFileSync('$theme'));
-              console.log('✅ Theme JSON valid:', '$theme');
-              
-              if (theme.colors) {
-                console.log('🎨 Color definitions found:', Object.keys(theme.colors).length);
-              }
-              if (theme.tokenColors) {
-                console.log('🔤 Token color rules found:', theme.tokenColors.length);
-              }
-            "
-          fi
-        done
+      run: .github/scripts/extension/validate-themes.js
         
     - name: Set up Go (for extension testing)
       uses: actions/setup-go@v5

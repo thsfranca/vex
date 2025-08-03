@@ -6,8 +6,8 @@
 set -e
 
 echo "👀 Starting Fugo Extension Auto-Install Watcher..."
-echo "🔍 Watching for changes in extension files..."
-echo "💡 Press Ctrl+C to stop"
+echo "[WATCH] Watching for changes in extension files..."
+echo "[INFO] Press Ctrl+C to stop"
 echo ""
 
 # Check if fswatch is available (macOS)
@@ -16,17 +16,17 @@ if command -v fswatch &> /dev/null; then
 elif command -v inotifywait &> /dev/null; then
     WATCHER="inotifywait"
 else
-    echo "❌ No file watcher available. Installing fswatch..."
+    echo "[ERROR] No file watcher available. Installing fswatch..."
     if [[ "$OSTYPE" == "darwin"* ]]; then
         if command -v brew &> /dev/null; then
             brew install fswatch
             WATCHER="fswatch"
         else
-            echo "❌ Homebrew not found. Please install fswatch: brew install fswatch"
+            echo "[ERROR] Homebrew not found. Please install fswatch: brew install fswatch"
             exit 1
         fi
     else
-        echo "❌ Please install inotify-tools: sudo apt-get install inotify-tools"
+        echo "[ERROR] Please install inotify-tools: sudo apt-get install inotify-tools"
         exit 1
     fi
 fi

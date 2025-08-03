@@ -42,7 +42,7 @@ func main() {
 }
 
 func generateCoverage() {
-	fmt.Println("📊 Generating Go coverage reports...")
+	fmt.Println("[COVERAGE] Generating Go coverage reports...")
 
 	// Create coverage directory
 	os.MkdirAll("coverage", 0755)
@@ -88,15 +88,15 @@ func generateCoverage() {
 	if totalCoverage == 0 {
 		totalStatus = "⏳ *No tests yet*"
 	} else if totalCoverage >= 75 {
-		totalStatus = fmt.Sprintf("✅ %.1f%%", totalCoverage)
+		totalStatus = fmt.Sprintf("[SUCCESS] %.1f%%", totalCoverage)
 	} else {
-		totalStatus = fmt.Sprintf("❌ %.1f%% (below 75%%)", totalCoverage)
+		totalStatus = fmt.Sprintf("[ERROR] %.1f%% (below 75%%)", totalCoverage)
 	}
 	fmt.Printf("TOTAL_STATUS=%s\n", totalStatus)
 }
 
 func updateReadme() {
-	fmt.Println("📝 Updating README with coverage table...")
+	fmt.Println("[UPDATE] Updating README with coverage table...")
 
 	// Read environment variables for coverage status
 	parserStatus := getEnv("PARSER_STATUS", "⏳ *Not implemented yet*")
@@ -139,7 +139,7 @@ func updateReadme() {
 		os.Exit(1)
 	}
 
-	fmt.Println("✅ README.md updated successfully")
+	fmt.Println("[SUCCESS] README.md updated successfully")
 }
 
 func runCommand(name string, args ...string) {
@@ -182,10 +182,10 @@ func generateStatus(coverage float64, target int, implemented bool) string {
 	}
 	
 	if coverage >= float64(target) {
-		return fmt.Sprintf("✅ %.1f%%", coverage)
+		return fmt.Sprintf("[SUCCESS] %.1f%%", coverage)
 	}
 	
-	return fmt.Sprintf("❌ %.1f%% (below %d%%)", coverage, target)
+			return fmt.Sprintf("[ERROR] %.1f%% (below %d%%)", coverage, target)
 }
 
 func getEnv(key, defaultValue string) string {

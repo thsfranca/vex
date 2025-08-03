@@ -76,9 +76,7 @@ jobs:
     if: ${{ needs.detect-changes.outputs.go-files == 'false' }}
     steps:
     - name: Skip Go workflows
-      run: |
-        echo "✅ Skipping Go builds and tests - no Go-related files changed"
-        echo "Changed files are only: documentation, VSCode extension, examples, etc."
+      run: .github/scripts/ci/skip-build.sh
 
   # Parallel job: Build & Basic Tests
   build-and-test:
@@ -146,35 +144,10 @@ jobs:
         fi
         
     - name: Run Go tests
-      run: |
-        if find . -name "*_test.go" | grep -q .; then
-          echo "🧪 Running Go tests..."
-          go test -v ./... || {
-            echo "❌ Tests failed, but checking if this should block..."
-            # In early development, test failures are warnings only
-            if [ $(find . -name "*.go" -not -name "*_test.go" | wc -l) -lt 5 ]; then
-              echo "⚠️ Early development detected - treating test failures as warnings"
-              exit 0
-            else
-              echo "💥 Sufficient codebase exists - test failures are blocking"
-              exit 1
-            fi
-          }
-        else
-          echo "✅ No tests found yet - this is expected for early development"
-        fi
+      run: .github/scripts/ci/run-tests.sh
         
     - name: Build Go project
-      run: |
-        if find . -name "main.go" | grep -q .; then
-          echo "🔨 Building Go packages..."
-          go build ./... || {
-            echo "❌ Build failed"
-            exit 1
-          }
-        else
-          echo "✅ No main packages to build yet - this is expected"
-        fi
+      run: .github/scripts/ci/build-project.sh
 
   # Parallel job: Coverage Analysis
   test-coverage:
@@ -216,24 +189,7 @@ jobs:
     - name: Run Go tests with coverage
       run: |
         mkdir -p coverage
-        echo "🧪 Running tests with coverage analysis..."
-        
-        if find . -name "*_test.go" | grep -q .; then
-          # Tests exist, run with coverage
-          go test -v -coverprofile=coverage/total.out -coverpkg=./... ./... || {
-            echo "❌ Tests failed during coverage analysis"
-            # In early development, still generate coverage even if tests fail
-            if [ $(find . -name "*.go" -not -name "*_test.go" | wc -l) -lt 5 ]; then
-              echo "⚠️ Early development - generating coverage despite test failures"
-              go test -coverprofile=coverage/total.out -coverpkg=./... ./... || true
-            else
-              exit 1
-            fi
-          }
-        else
-          echo "✅ No tests found - skipping coverage analysis"
-          echo "0" > coverage/total.out
-        fi
+        .github/scripts/ci/run-coverage.sh
         
     - name: Calculate coverage
       id: coverage
@@ -241,7 +197,7 @@ jobs:
         if [ -f "coverage/total.out" ] && [ -s "coverage/total.out" ]; then
           TOTAL_COV=$(go tool cover -func=coverage/total.out | grep "total:" | awk '{print $3}' | sed 's/%//' || echo "0")
           echo "total-coverage=$TOTAL_COV" >> $GITHUB_OUTPUT
-          echo "📊 Coverage: $TOTAL_COV%"
+          echo "[COVERAGE] Coverage: $TOTAL_COV%"
           
           # Coverage requirements based on project maturity
           GO_FILE_COUNT=$(find . -name "*.go" -not -name "*_test.go" | wc -l)
@@ -254,7 +210,7 @@ jobs:
           fi
         else
           echo "total-coverage=0" >> $GITHUB_OUTPUT
-          echo "📊 No coverage data available"
+          echo "[COVERAGE] No coverage data available"
         fi
         
     - name: Upload coverage artifacts
@@ -308,92 +264,16 @@ jobs:
         go install golang.org/x/lint/golint@latest
         
     - name: Check formatting (changed files only)
-      run: |
-        if find . -name "*.go" | grep -q .; then
-          echo "🔍 Checking Go code formatting..."
-          
-          # Get list of changed Go files in this PR
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            CHANGED_GO_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD | grep '\.go$' || true)
-          else
-            CHANGED_GO_FILES=$(find . -name "*.go")
-          fi
-          
-          if [ -n "$CHANGED_GO_FILES" ]; then
-            echo "Changed Go files: $CHANGED_GO_FILES"
-            echo "$CHANGED_GO_FILES" | xargs goimports -l > /tmp/goimports.out || true
-            
-            if [ -s /tmp/goimports.out ]; then
-              echo "❌ Formatting issues found in changed files:"
-              cat /tmp/goimports.out
-              echo ""
-              echo "🔧 Run: goimports -w $(echo $CHANGED_GO_FILES | tr '\n' ' ')"
-              exit 1
-            else
-              echo "✅ All changed Go files are properly formatted"
-            fi
-            
-            # Check all files but only warn for unchanged ones
-            goimports -l . > /tmp/all_goimports.out || true
-            if [ -s /tmp/all_goimports.out ]; then
-              echo ""
-              echo "⚠️ Additional formatting issues found in unchanged files (not blocking):"
-              cat /tmp/all_goimports.out
-            fi
-          else
-            echo "✅ No Go files changed in this PR"
-          fi
-        else
-          echo "✅ No Go files found - skipping formatting check"
-        fi
+      env:
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      run: .github/scripts/ci/check-formatting.sh
         
     - name: Run Go linting (smart failure handling)
-      run: |
-        if find . -name "*.go" | grep -q .; then
-          echo "🔍 Running Go linting..."
-          
-          # Get changed files for strict checking
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            CHANGED_GO_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD | grep '\.go$' || true)
-          else
-            CHANGED_GO_FILES=$(find . -name "*.go")
-          fi
-          
-          LINT_FAILED=false
-          
-          if [ -n "$CHANGED_GO_FILES" ]; then
-            echo "Linting changed files strictly..."
-            for file in $CHANGED_GO_FILES; do
-              if [ -f "$file" ]; then
-                echo "Checking: $file"
-                if ! golint "$file"; then
-                  echo "❌ Linting issues in changed file: $file"
-                  LINT_FAILED=true
-                fi
-              fi
-            done
-          fi
-          
-          # Check all files but only warn for issues in unchanged files
-          echo ""
-          echo "🔍 Checking all files (warnings for unchanged files)..."
-          golint ./... > /tmp/all_lint.out 2>&1 || true
-          
-          if [ -s /tmp/all_lint.out ]; then
-            echo "⚠️ All linting issues found:"
-            cat /tmp/all_lint.out
-          fi
-          
-          if [ "$LINT_FAILED" = "true" ]; then
-            echo ""
-            echo "💥 Linting failed for changed files - this blocks merging"
-            exit 1
-          else
-            echo "✅ No blocking linting issues in changed files"
-          fi
-        else
-          echo "✅ No Go files found - skipping linting"
-        fi
+      env:
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      run: .github/scripts/ci/run-linting.sh
 
   # Summary job that depends on all parallel jobs
   ci-summary:
@@ -402,36 +282,4 @@ jobs:
     if: always()
     steps:
     - name: Report CI Results
-      run: |
-        echo "## 📊 CI Summary" >> $GITHUB_STEP_SUMMARY
-        
-        if [[ "${{ needs.detect-changes.outputs.go-files }}" == "false" ]]; then
-          echo "✅ **Fast skip**: No Go-related files changed" >> $GITHUB_STEP_SUMMARY
-          echo "⚡ **Time saved**: ~5-8 minutes" >> $GITHUB_STEP_SUMMARY
-          echo "- Skip Build: ${{ needs.skip-build.result }}" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "🔄 **Full CI**: Go-related files changed" >> $GITHUB_STEP_SUMMARY
-          echo "- Build & Test: ${{ needs.build-and-test.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Coverage: ${{ needs.test-coverage.result }}" >> $GITHUB_STEP_SUMMARY  
-          echo "- Linting: ${{ needs.lint-and-quality.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 🧠 Smart Failure Handling" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ **Changed files**: Strict error checking" >> $GITHUB_STEP_SUMMARY
-          echo "- ⚠️  **Unchanged files**: Warning-only for legacy issues" >> $GITHUB_STEP_SUMMARY
-          echo "- 🚀 **Early development**: Graceful failure handling" >> $GITHUB_STEP_SUMMARY
-          echo "- 📊 **Coverage**: Adaptive requirements based on project size" >> $GITHUB_STEP_SUMMARY
-          
-          # Intelligent failure handling - only fail if jobs actually failed
-          # (not if they succeeded with warnings)
-          if [[ "${{ needs.build-and-test.result }}" == "failure" || 
-                "${{ needs.test-coverage.result }}" == "failure" || 
-                "${{ needs.lint-and-quality.result }}" == "failure" ]]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "❌ **CI blocked** - Issues found in changed files" >> $GITHUB_STEP_SUMMARY
-            echo "Check individual jobs for specific issues that need fixing." >> $GITHUB_STEP_SUMMARY
-            exit 1
-          else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ **All checks passed** - Ready to merge!" >> $GITHUB_STEP_SUMMARY
-          fi
-        fi
+      run: .github/scripts/ci/generate-summary.sh "${{ needs.detect-changes.outputs.go-files }}" "${{ needs.skip-build.result }}" "${{ needs.build-and-test.result }}" "${{ needs.test-coverage.result }}" "${{ needs.lint-and-quality.result }}"

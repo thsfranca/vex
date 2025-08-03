@@ -35,9 +35,10 @@ func (cg *CodeGenerator) EmitSymbol(symbol string) {
 }
 
 // EmitVariableDefinition generates Go code for variable definition
-// (def x 10) -> x := 10
+// (def x 10) -> x := 10; _ = x (to avoid unused variable error)
 func (cg *CodeGenerator) EmitVariableDefinition(name, value string) {
 	cg.writeIndented(fmt.Sprintf("%s := %s\n", name, value))
+	cg.writeIndented(fmt.Sprintf("_ = %s\n", name)) // Mark as used to avoid Go error
 }
 
 // EmitArithmeticExpression generates Go code for arithmetic operations

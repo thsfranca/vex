@@ -1,3 +1,4 @@
+// Package transpiler provides the core Vex to Go transpiler functionality
 package transpiler
 
 import (

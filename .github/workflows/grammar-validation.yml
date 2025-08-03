@@ -32,14 +32,7 @@ jobs:
               
       - name: Decide if validation needed
         id: decision
-        run: |
-          if [ "${{ steps.changes.outputs.grammar-changed }}" == "true" ]; then
-            echo "needs-validation=true" >> $GITHUB_OUTPUT
-            echo "🧪 Validation will run: Grammar or examples changed"
-          else
-            echo "needs-validation=false" >> $GITHUB_OUTPUT
-            echo "⏭️ Validation will be skipped: No relevant changes"
-          fi
+        run: .github/scripts/validation/decide-validation-needed.sh "${{ steps.changes.outputs.grammar-changed }}"
 
   validate-grammar:
     runs-on: ubuntu-latest
@@ -95,24 +88,9 @@ jobs:
     needs: [detect-changes, validate-grammar]
     if: always()
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
       - name: Evaluate results
-        run: |
-          echo "📊 Grammar Validation Summary:"
-          echo "  - Grammar changed: ${{ needs.detect-changes.outputs.grammar-changed }}"
-          echo "  - Validation needed: ${{ needs.detect-changes.outputs.needs-validation }}"
-          echo "  - Validation result: ${{ needs.validate-grammar.result }}"
-          
-          if [ "${{ needs.detect-changes.outputs.needs-validation }}" == "true" ]; then
-            echo "🧪 Grammar validation was required and ran"
-            if [ "${{ needs.validate-grammar.result }}" == "success" ]; then
-              echo "✅ Grammar validation passed!"
-              exit 0
-            else
-              echo "❌ Grammar validation failed!"
-              exit 1
-            fi
-          else
-            echo "✅ No grammar/example changes detected - validation skipped (OK)"
-            exit 0
-          fi
+        run: .github/scripts/validation/evaluate-grammar-results.sh "${{ needs.detect-changes.outputs.grammar-changed }}" "${{ needs.detect-changes.outputs.needs-validation }}" "${{ needs.validate-grammar.result }}"
 

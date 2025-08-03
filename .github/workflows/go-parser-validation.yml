@@ -35,14 +35,7 @@ jobs:
               
       - name: Decide if testing needed
         id: decision
-        run: |
-          if [ "${{ steps.changes.outputs.grammar-changed }}" == "true" ] || [ "${{ github.event_name }}" == "schedule" ]; then
-            echo "needs-testing=true" >> $GITHUB_OUTPUT
-            echo "🧪 Tests will run: Grammar changes or scheduled run"
-          else
-            echo "needs-testing=false" >> $GITHUB_OUTPUT
-            echo "⏭️ Tests will be skipped: No relevant changes"
-          fi
+        run: .github/scripts/validation/decide-testing-needed.sh "${{ steps.changes.outputs.grammar-changed }}" "${{ github.event_name }}"
 
   test-go-parser-generation:
     runs-on: ${{ matrix.os }}
@@ -65,13 +58,13 @@ jobs:
 
       # Platform-specific ANTLR setup
       - name: Install ANTLR (Linux/macOS)
-        if: runner.os != 'Windows'
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' && runner.os != 'Windows' }}
         env:
           ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
         run: .github/scripts/parser/install-antlr-unix.sh
 
       - name: Install ANTLR (Windows)
-        if: runner.os == 'Windows'
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' && runner.os == 'Windows' }}
         shell: powershell
         env:
           ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
@@ -79,32 +72,35 @@ jobs:
 
       # Go runtime setup
       - name: Set up Go
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' }}
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
       # Generate Go parser
       - name: Generate Go parser (Linux/macOS)
-        if: runner.os != 'Windows'
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' && runner.os != 'Windows' }}
         run: .github/scripts/parser/generate-go-parser-unix.sh
 
       - name: Generate Go parser (Windows)
-        if: runner.os == 'Windows'
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' && runner.os == 'Windows' }}
         shell: powershell
         run: .github/scripts/parser/generate-go-parser-windows.ps1
 
       # Verify generated Go files
       - name: Verify generated Go files
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' }}
         run: .github/scripts/parser/verify-generated-files.sh
         shell: bash
 
       # Test Go compilation
       - name: Test Go compilation
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' }}
         run: .github/scripts/parser/test-compilation.sh
 
       # Upload artifacts for debugging
       - name: Upload generated Go parser
-        if: always()
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: go-parser-${{ matrix.os }}
@@ -117,24 +113,9 @@ jobs:
     needs: [detect-changes, test-go-parser-generation]
     if: always()
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
       - name: Evaluate results
-        run: |
-          echo "📊 Evaluation Summary:"
-          echo "  - Grammar changed: ${{ needs.detect-changes.outputs.grammar-changed }}"
-          echo "  - Tests needed: ${{ needs.detect-changes.outputs.needs-testing }}"
-          echo "  - Tests result: ${{ needs.test-go-parser-generation.result }}"
-          
-          if [ "${{ needs.detect-changes.outputs.needs-testing }}" == "true" ]; then
-            echo "🧪 Grammar tests were required and ran"
-            if [ "${{ needs.test-go-parser-generation.result }}" == "success" ]; then
-              echo "✅ All parser generation tests passed!"
-              exit 0
-            else
-              echo "❌ Parser generation tests failed!"
-              exit 1
-            fi
-          else
-            echo "✅ No grammar changes detected - parser generation tests skipped (OK)"
-            exit 0
-          fi
+        run: .github/scripts/validation/evaluate-parser-results.sh "${{ needs.detect-changes.outputs.grammar-changed }}" "${{ needs.detect-changes.outputs.needs-testing }}" "${{ needs.test-go-parser-generation.result }}"
 

@@ -51,23 +51,10 @@ jobs:
       id: final-decision  
       run: .github/scripts/ci/final-go-decision.sh "${{ steps.changes.outputs.go-files }}" "${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
 
-  # Fast skip job for non-Go changes  
-  skip-build:
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.go-files == 'false' }}
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Skip Go workflows
-      run: .github/scripts/ci/skip-build.sh
-
   # Parallel job: Build & Basic Tests
   build-and-test:
     runs-on: ubuntu-latest
     needs: [detect-changes]
-    if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -79,6 +66,7 @@ jobs:
         
     # Cache Go modules
     - name: Cache Go modules
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/cache@v4
       with:
         path: |
@@ -90,6 +78,7 @@ jobs:
           
     # Cache ANTLR installation
     - name: Cache ANTLR
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       id: antlr-cache
       uses: actions/cache@v4
       with:
@@ -97,19 +86,22 @@ jobs:
         key: ${{ runner.os }}-antlr-${{ env.ANTLR_VERSION }}
         
     - name: Install ANTLR
-      if: steps.antlr-cache.outputs.cache-hit != 'true'
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' && steps.antlr-cache.outputs.cache-hit != 'true' }}
       env:
         ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
       run: .github/scripts/ci/install-antlr.sh
         
     - name: Setup ANTLR binary
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: .github/scripts/ci/setup-antlr-binary.sh
         
     - name: Install Go dependencies
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: .github/scripts/ci/install-go-deps.sh
         
     # Cache parser generation
     - name: Cache generated parsers
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       id: parser-cache
       uses: actions/cache@v4
       with:
@@ -117,33 +109,42 @@ jobs:
         key: ${{ runner.os }}-parser-${{ hashFiles('tools/grammar/**') }}
         
     - name: Generate parsers
-      if: steps.parser-cache.outputs.cache-hit != 'true'
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' && steps.parser-cache.outputs.cache-hit != 'true' }}
       run: .github/scripts/ci/generate-parsers.sh
         
     - name: Run Go tests
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: .github/scripts/ci/run-tests.sh
         
     - name: Build Go project
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: .github/scripts/ci/build-project.sh
 
   # Parallel job: Coverage Analysis
   test-coverage:
     runs-on: ubuntu-latest
     needs: [detect-changes]
-    if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
     steps:
     - name: Checkout code with history
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
         
+    - name: Skip when no Go changes
+      if: ${{ needs.detect-changes.outputs.go-files == 'false' }}
+      run: |
+        echo "⏭️ Skipping coverage analysis - no Go file changes detected"
+        echo "Changes detected: ${{ needs.detect-changes.outputs.has-changes }}"
+        
     - name: Set up Go
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
         
     # Cache Go modules
     - name: Cache Go modules
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/cache@v4
       with:
         path: |
@@ -154,21 +155,25 @@ jobs:
           ${{ runner.os }}-go-${{ env.GO_VERSION }}-
           
     - name: Install Go dependencies
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: .github/scripts/ci/install-go-deps.sh
         
     - name: Install coverage tools
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: .github/scripts/ci/install-coverage-tools.sh
         
     - name: Run Go tests with coverage
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: .github/scripts/ci/run-coverage-full.sh
         
     - name: Calculate coverage
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       id: coverage
       run: .github/scripts/ci/calculate-coverage.sh
         
     - name: Upload coverage artifacts
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/upload-artifact@v4
-      if: always()
       with:
         name: coverage-report
         path: coverage/
@@ -178,18 +183,25 @@ jobs:
   lint-and-quality:
     runs-on: ubuntu-latest
     needs: [detect-changes]
-    if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Skip when no Go changes
+      if: ${{ needs.detect-changes.outputs.go-files == 'false' }}
+      run: |
+        echo "⏭️ Skipping linting and quality checks - no Go file changes detected"
+        echo "Changes detected: ${{ needs.detect-changes.outputs.has-changes }}"
+      
     - name: Set up Go
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
         
     # Cache Go modules
     - name: Cache Go modules
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/cache@v4
       with:
         path: |
@@ -200,25 +212,30 @@ jobs:
           ${{ runner.os }}-go-${{ env.GO_VERSION }}-
           
     - name: Install Go dependencies
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: .github/scripts/ci/install-go-deps.sh
         
     # Cache linting tools
     - name: Cache linting tools
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       uses: actions/cache@v4
       with:
         path: ~/go/bin
         key: ${{ runner.os }}-go-tools-${{ env.GO_VERSION }}-lint
         
     - name: Install Go linting tools
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       run: .github/scripts/ci/install-go-linting-tools.sh
         
     - name: Check formatting (changed files only)
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       env:
         GITHUB_EVENT_NAME: ${{ github.event_name }}
         GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       run: .github/scripts/ci/check-formatting.sh
         
     - name: Run Go linting (smart failure handling)
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       env:
         GITHUB_EVENT_NAME: ${{ github.event_name }}
         GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -227,11 +244,11 @@ jobs:
   # Summary job that depends on all parallel jobs
   ci-summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, skip-build, build-and-test, test-coverage, lint-and-quality]
+    needs: [detect-changes, build-and-test, test-coverage, lint-and-quality]
     if: always()
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       
     - name: Report CI Results
-      run: .github/scripts/ci/generate-summary.sh "${{ needs.detect-changes.outputs.go-files }}" "${{ needs.skip-build.result }}" "${{ needs.build-and-test.result }}" "${{ needs.test-coverage.result }}" "${{ needs.lint-and-quality.result }}"
+      run: .github/scripts/ci/generate-summary.sh "${{ needs.detect-changes.outputs.go-files }}" "${{ needs.build-and-test.result }}" "${{ needs.test-coverage.result }}" "${{ needs.lint-and-quality.result }}"

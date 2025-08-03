@@ -4,12 +4,8 @@ name: Vex Go Parser Generation
 on:
   push:
     branches: [main]
-    paths:
-      - 'tools/grammar/**'
   pull_request:
     branches: [main]
-    paths:
-      - 'tools/grammar/**'
   # Run weekly to catch platform-specific issues
   schedule:
     - cron: '0 6 * * 1' # Monday 6 AM UTC
@@ -19,8 +15,32 @@ env:
   GO_VERSION: '1.21'
 
 jobs:
+  # Always runs - detects if we need to run tests
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      grammar-changed: ${{ steps.changes.outputs.grammar-changed }}
+      needs-testing: ${{ steps.decision.outputs.needs-testing }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Check for relevant changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            grammar-changed:
+              - 'tools/grammar/**'
+              
+      - name: Decide if testing needed
+        id: decision
+        run: .github/scripts/validation/decide-testing-needed.sh "${{ steps.changes.outputs.grammar-changed }}" "${{ github.event_name }}"
+
   test-go-parser-generation:
     runs-on: ${{ matrix.os }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.needs-testing == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -38,13 +58,13 @@ jobs:
 
       # Platform-specific ANTLR setup
       - name: Install ANTLR (Linux/macOS)
-        if: runner.os != 'Windows'
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' && runner.os != 'Windows' }}
         env:
           ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
         run: .github/scripts/parser/install-antlr-unix.sh
 
       - name: Install ANTLR (Windows)
-        if: runner.os == 'Windows'
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' && runner.os == 'Windows' }}
         shell: powershell
         env:
           ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
@@ -52,47 +72,50 @@ jobs:
 
       # Go runtime setup
       - name: Set up Go
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' }}
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
       # Generate Go parser
       - name: Generate Go parser (Linux/macOS)
-        if: runner.os != 'Windows'
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' && runner.os != 'Windows' }}
         run: .github/scripts/parser/generate-go-parser-unix.sh
 
       - name: Generate Go parser (Windows)
-        if: runner.os == 'Windows'
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' && runner.os == 'Windows' }}
         shell: powershell
         run: .github/scripts/parser/generate-go-parser-windows.ps1
 
       # Verify generated Go files
       - name: Verify generated Go files
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' }}
         run: .github/scripts/parser/verify-generated-files.sh
         shell: bash
 
       # Test Go compilation
       - name: Test Go compilation
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' }}
         run: .github/scripts/parser/test-compilation.sh
 
       # Upload artifacts for debugging
       - name: Upload generated Go parser
-        if: always()
+        if: ${{ steps.grammar-changes.outputs.changes == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: go-parser-${{ matrix.os }}
           path: tools/gen/go/
           retention-days: 7
 
-  # Summary job
-  go-parser-summary:
+  # Gateway job - ALWAYS runs and reports status (make this required in branch protection)
+  go-parser-validation-required:
     runs-on: ubuntu-latest
-    needs: test-go-parser-generation
+    needs: [detect-changes, test-go-parser-generation]
     if: always()
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         
-      - name: Check results
-        run: .github/scripts/parser/generate-summary.sh "${{ needs.test-go-parser-generation.result }}"
+      - name: Evaluate results
+        run: .github/scripts/validation/evaluate-parser-results.sh "${{ needs.detect-changes.outputs.grammar-changed }}" "${{ needs.detect-changes.outputs.needs-testing }}" "${{ needs.test-go-parser-generation.result }}"
 

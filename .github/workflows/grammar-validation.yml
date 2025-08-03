@@ -4,38 +4,65 @@ name: Vex Grammar & Examples Validation
 on:
   push:
     branches: [main]
-    paths:
-      - 'tools/grammar/**'
-      - 'examples/**/*.vx'
   pull_request:
     branches: [main]
-    paths:
-      - 'tools/grammar/**'
-      - 'examples/**/*.vx'
 
 env:
   ANTLR_VERSION: '4.13.1'
 
 jobs:
-  validate-grammar:
+  # Always runs - detects if we need to run validation
+  detect-changes:
     runs-on: ubuntu-latest
+    outputs:
+      grammar-changed: ${{ steps.changes.outputs.grammar-changed }}
+      needs-validation: ${{ steps.decision.outputs.needs-validation }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        
+      - name: Check for relevant changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            grammar-changed:
+              - 'tools/grammar/**'
+              - 'examples/**/*.vx'
+              
+      - name: Decide if validation needed
+        id: decision
+        run: .github/scripts/validation/decide-validation-needed.sh "${{ steps.changes.outputs.grammar-changed }}"
+
+  validate-grammar:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Skip when no grammar changes
+        if: ${{ needs.detect-changes.outputs.needs-validation == 'false' }}
+        run: |
+          echo "⏭️ Skipping grammar validation - no grammar file changes detected"
+          echo "Files that trigger validation: tools/grammar/**, examples/**/*.vx"
 
       - name: Set up Java
+        if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '11'
 
       - name: Set up Go
+        if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
 
       # Cache ANTLR installation
       - name: Cache ANTLR
+        if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
         id: antlr-cache
         uses: actions/cache@v4
         with:
@@ -43,23 +70,40 @@ jobs:
           key: ${{ runner.os }}-antlr-${{ env.ANTLR_VERSION }}
 
       - name: Install ANTLR
-        if: steps.antlr-cache.outputs.cache-hit != 'true'
+        if: ${{ needs.detect-changes.outputs.needs-validation == 'true' && steps.antlr-cache.outputs.cache-hit != 'true' }}
         env:
           ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
         run: .github/scripts/ci/install-antlr.sh
 
       - name: Setup ANTLR binary
+        if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
         run: .github/scripts/ci/setup-antlr-binary.sh
 
       - name: Validate grammar syntax
+        if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
         run: .github/scripts/grammar/validate-syntax.sh
 
       - name: Generate Go test parser
+        if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
         run: .github/scripts/grammar/generate-test-parser.sh
 
       - name: Test example files with Go parser
+        if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
         run: .github/scripts/grammar/test-examples.sh
 
       - name: Validate grammar completeness
+        if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
         run: .github/scripts/grammar/validate-completeness.sh
+
+  # Summary job
+  summary:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, validate-grammar]
+    if: always()
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Evaluate results
+      run: .github/scripts/validation/evaluate-grammar-results.sh "${{ needs.detect-changes.outputs.grammar-changed }}" "${{ needs.detect-changes.outputs.needs-validation }}" "${{ needs.validate-grammar.result }}"
 

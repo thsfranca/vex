@@ -9,8 +9,8 @@ GRAMMAR_FILE="tools/grammar/Vex.g4"
 echo "Checking for required grammar rules..."
 
 # Check if basic rules exist (account for multi-line definitions)
-if ! grep -q "^sp" "$GRAMMAR_FILE"; then
-    echo "[ERROR] Missing root rule 'sp'"
+if ! grep -q "^program" "$GRAMMAR_FILE"; then
+    echo "[ERROR] Missing root rule 'program'"
     exit 1
 fi
 

@@ -2,11 +2,18 @@
   "name": "fugo-minimal",
   "displayName": "Fugo Minimal",
   "description": "Minimal Fugo language support with automated changelog - testing automation",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "fugo-dev",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.74.0"
+  },
+  "scripts": {
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^2.22.0"
   },
   "categories": [
     "Programming Languages"
@@ -19,7 +26,9 @@
           "Fugo",
           "fugo-lang"
         ],
-        "extensions": [".fugo"],
+        "extensions": [
+          ".fugo"
+        ],
         "configuration": "./language-configuration.json",
         "icon": {
           "light": "./icon.png",

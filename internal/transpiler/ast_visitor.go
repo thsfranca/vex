@@ -25,6 +25,11 @@ func (v *ASTVisitor) GetGeneratedCode() string {
 	return v.codeGen.GetCode()
 }
 
+// GetCodeGenerator returns the code generator for accessing imports
+func (v *ASTVisitor) GetCodeGenerator() *CodeGenerator {
+	return v.codeGen
+}
+
 // VisitProgram visits the root node of the parse tree
 func (v *ASTVisitor) VisitProgram(ctx *parser.ProgramContext) interface{} {
 	// Visit all child lists
@@ -60,11 +65,18 @@ func (v *ASTVisitor) VisitList(ctx *parser.ListContext) interface{} {
 	switch firstElement {
 	case "def":
 		v.handleDefinition(content)
+	case "import":
+		v.handleImport(content[1:]) // Skip the "import" symbol
 	case "+", "-", "*", "/":
 		v.handleArithmetic(firstElement, content[1:])
 	default:
-		// Handle other expressions or function calls
-		v.handleExpression(content)
+		// Check if it's a method call (starts with .)
+		if strings.HasPrefix(firstElement, ".") {
+			v.handleMethodCall(firstElement, content[1:])
+		} else {
+			// Handle other expressions or function calls
+			v.handleExpression(content)
+		}
 	}
 
 	return nil
@@ -104,6 +116,37 @@ func (v *ASTVisitor) handleArithmetic(operator string, operands []antlr.Tree) {
 	v.codeGen.EmitArithmeticExpression(operator, operandValues)
 }
 
+// handleImport handles import statements like (import "net/http")
+func (v *ASTVisitor) handleImport(content []antlr.Tree) {
+	if len(content) < 1 {
+		v.codeGen.writeIndented("// Invalid import\n")
+		return
+	}
+
+	// Get the import path
+	importPath := v.evaluateExpression(content[0])
+	v.codeGen.EmitImport(importPath)
+}
+
+// handleMethodCall handles method calls like (.HandleFunc router "/path" handler)
+func (v *ASTVisitor) handleMethodCall(methodName string, content []antlr.Tree) {
+	if len(content) < 1 {
+		v.codeGen.writeIndented("// Invalid method call\n")
+		return
+	}
+
+	// Get the receiver (first argument)
+	receiver := v.evaluateExpression(content[0])
+	
+	// Get the method arguments
+	var args []string
+	for _, arg := range content[1:] {
+		args = append(args, v.evaluateExpression(arg))
+	}
+	
+	v.codeGen.EmitMethodCall(receiver, methodName[1:], args) // Remove the dot from method name
+}
+
 // handleExpression handles general expressions
 func (v *ASTVisitor) handleExpression(content []antlr.Tree) {
 	// For now, just evaluate each element as a standalone expression
@@ -133,7 +176,22 @@ func (v *ASTVisitor) evaluateExpression(node antlr.Tree) string {
 		return text
 
 	case *parser.ListContext:
-		// Handle nested lists - for now, just return placeholder
+		// Handle nested lists by recursively visiting them
+		// Create a temporary visitor to handle the nested list
+		nestedVisitor := NewASTVisitor()
+		ctx.Accept(nestedVisitor)
+		generatedCode := nestedVisitor.GetGeneratedCode()
+		
+		// If it generated code, extract the expression part
+		// For method calls like (.NewRouter mux), we want "mux.NewRouter()"
+		if strings.Contains(generatedCode, "=") {
+			// Extract the right side of the assignment
+			parts := strings.Split(strings.TrimSpace(generatedCode), "=")
+			if len(parts) >= 2 {
+				return strings.TrimSpace(parts[len(parts)-1])
+			}
+		}
+		
 		return "/* nested list */"
 
 	default:

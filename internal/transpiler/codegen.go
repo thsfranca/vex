@@ -9,6 +9,7 @@ import (
 type CodeGenerator struct {
 	indentLevel int
 	buffer      strings.Builder
+	imports     map[string]bool // Track unique imports
 }
 
 // NewCodeGenerator creates a new code generator instance
@@ -16,6 +17,7 @@ func NewCodeGenerator() *CodeGenerator {
 	return &CodeGenerator{
 		indentLevel: 0,
 		buffer:      strings.Builder{},
+		imports:     make(map[string]bool),
 	}
 }
 
@@ -62,6 +64,21 @@ func (cg *CodeGenerator) EmitArithmeticExpression(operator string, operands []st
 	cg.writeIndented(fmt.Sprintf("_ = %s\n", expression))
 }
 
+// EmitImport collects import statements for later generation
+// (import "net/http") -> adds to imports collection
+func (cg *CodeGenerator) EmitImport(importPath string) {
+	// Clean the import path (remove quotes if they exist, then add them back)
+	cleanPath := strings.Trim(importPath, "\"")
+	cg.imports[fmt.Sprintf("\"%s\"", cleanPath)] = true
+}
+
+// EmitMethodCall generates Go method calls
+// (.HandleFunc router "/path" handler) -> router.HandleFunc("/path", handler)
+func (cg *CodeGenerator) EmitMethodCall(receiver, methodName string, args []string) {
+	argsStr := strings.Join(args, ", ")
+	cg.writeIndented(fmt.Sprintf("_ = %s.%s(%s)\n", receiver, methodName, argsStr))
+}
+
 // convertOperator converts Vex operators to Go operators
 func convertOperator(vexOp string) string {
 	switch vexOp {
@@ -101,8 +118,18 @@ func (cg *CodeGenerator) GetCode() string {
 	return cg.buffer.String()
 }
 
+// GetImports returns all collected imports
+func (cg *CodeGenerator) GetImports() []string {
+	var imports []string
+	for importPath := range cg.imports {
+		imports = append(imports, importPath)
+	}
+	return imports
+}
+
 // Reset clears the code generator state
 func (cg *CodeGenerator) Reset() {
 	cg.buffer.Reset()
 	cg.indentLevel = 0
+	cg.imports = make(map[string]bool)
 }

@@ -24,8 +24,15 @@ func New() *Transpiler {
 
 // TranspileFromInput transpiles Vex source code to Go code
 func (t *Transpiler) TranspileFromInput(input string) (string, error) {
-	// Create input stream from the source code
-	inputStream := antlr.NewInputStream(input)
+	// Phase 1: Macro expansion
+	expander := NewMacroExpander()
+	expandedInput, err := expander.ExpandMacros(input)
+	if err != nil {
+		return "", fmt.Errorf("macro expansion failed: %w", err)
+	}
+
+	// Create input stream from the expanded source code
+	inputStream := antlr.NewInputStream(expandedInput)
 
 	// Create lexer
 	lexer := parser.NewVexLexer(inputStream)
@@ -53,8 +60,8 @@ func (t *Transpiler) TranspileFromInput(input string) (string, error) {
 	visitor := NewASTVisitor()
 	tree.Accept(visitor)
 
-	// Generate final Go code
-	return t.generateGoCodeWithContent(visitor.GetGeneratedCode()), nil
+	// Generate final Go code with imports
+	return t.generateGoCodeWithVisitor(visitor), nil
 }
 
 // TranspileFromFile transpiles a .vex file to Go code
@@ -86,6 +93,40 @@ func (t *Transpiler) generateGoCodeWithContent(content string) string {
 	var result strings.Builder
 	result.WriteString("package main\n\n")
 	result.WriteString("func main() {\n")
+	if content != "" {
+		// Add indentation to the content
+		lines := strings.Split(content, "\n")
+		for _, line := range lines {
+			if strings.TrimSpace(line) != "" {
+				result.WriteString("\t" + line + "\n")
+			}
+		}
+	}
+	result.WriteString("}\n")
+
+	return result.String()
+}
+
+// generateGoCodeWithVisitor generates Go code using visitor data (imports + content)
+func (t *Transpiler) generateGoCodeWithVisitor(visitor *ASTVisitor) string {
+	var result strings.Builder
+	
+	// Package declaration
+	result.WriteString("package main\n\n")
+	
+	// Add imports at the top
+	codeGen := visitor.GetCodeGenerator()
+	imports := codeGen.GetImports()
+	if len(imports) > 0 {
+		for _, imp := range imports {
+			result.WriteString("import " + imp + "\n")
+		}
+		result.WriteString("\n")
+	}
+	
+	// Main function with the generated code
+	result.WriteString("func main() {\n")
+	content := visitor.GetGeneratedCode()
 	if content != "" {
 		// Add indentation to the content
 		lines := strings.Split(content, "\n")

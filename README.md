@@ -19,18 +19,30 @@ The goal is to explore language design concepts including parsing, type systems,
 ## Project Structure
 
 ```
-fugo/
+vex/
 ├── docs/                           # Documentation
+│   ├── grammar-reference.md        # Language grammar documentation
+│   ├── vex-implementation-requirements.md # Development roadmap
+│   └── release-process.md          # Release automation documentation
 ├── examples/                       # Example Vex programs
+│   ├── valid/                      # Valid syntax examples for testing
+│   ├── invalid/                    # Invalid syntax for parser validation
 │   └── go-usage/                   # Go integration examples
 ├── tools/                          # Development and build tools
-│   ├── grammar/                    # ANTLR4 grammar definition
-│   ├── gen/                        # Generated parser files (created by make)
+│   ├── grammar/                    # ANTLR4 grammar definition (Vex.g4)
+│   ├── grammar-validator/          # Grammar validation with Go parser
 │   ├── change-detector/            # CI tool for detecting file changes
 │   ├── coverage-updater/           # Tool for updating test coverage
 │   ├── debug-helper/               # Debugging utilities
 │   ├── extension-tester/           # VSCode extension testing tool
-│   └── grammar-validator/          # Grammar validation tool
+│   └── release-manager/            # Automated release management
+├── vscode-extension/               # Official VSCode extension for Vex
+│   ├── syntaxes/                   # Syntax highlighting definitions
+│   ├── themes/                     # Custom color themes
+│   └── icons/                      # File type icons
+├── .github/                        # CI/CD infrastructure
+│   ├── workflows/                  # GitHub Actions workflows
+│   └── scripts/                    # Extracted workflow scripts
 └── scripts/                        # Build and utility scripts
 ```
 
@@ -44,14 +56,17 @@ Vex aims to be a functional programming language with:
 - **Concurrent programming** leveraging Go's goroutines and channels
 - **Backend service focus** with built-in HTTP and concurrency primitives
 
-### Current Status: Parser Foundation ✅
+### Current Status: Robust Development Infrastructure ✅
 
 The project currently includes:
 - **ANTLR4 grammar** for S-expressions, arrays, symbols, and strings
-- **Multi-language parser generation** (Go, Java, Python, C++, JavaScript)
-- **Example programs** demonstrating the syntax
-- **Test coverage enforcement** with quality gates
-- **CI/CD pipeline** with automated quality checks
+- **Go parser validation** with comprehensive test suite
+- **Grammar validation system** testing both valid and invalid syntax
+- **VSCode extension** with syntax highlighting and file icons
+- **Comprehensive CI/CD pipeline** with automated quality checks
+- **Automated release process** with PR label-based version management
+- **Modular tooling architecture** with dedicated Go tools for each workflow
+- **Example programs** organized into valid/invalid test cases
 
 ### Planned Features 🚧
 
@@ -65,28 +80,46 @@ The project currently includes:
 
 ### Prerequisites
 
-- ANTLR4 installed and available in your PATH
-- Target language runtime (Java, Go, Python, etc.) if you plan to use the generated parser
+- **Go 1.21+** for parser validation and tooling
+- **ANTLR4** for grammar compilation (automatically installed in CI)
+- **Node.js** (optional, for VSCode extension development)
 
-### Generating Parsers
+### Development Commands
 
 ```bash
-# Generate parsers for all supported languages
-make generate
+# Validate grammar with comprehensive testing
+make validate-grammar    # Test both valid and invalid syntax examples
 
-# Generate parser for specific language
-make java        # Java parser
-make go          # Go parser
-make python      # Python parser
-make cpp         # C++ parser
-make javascript  # JavaScript parser
+# Build all development tools
+make build-tools        # Compile change-detector, coverage-updater, etc.
+
+# Generate Go parser locally
+make go                 # Creates parser files for local development
 
 # Clean generated files
-make clean
+make clean             # Remove all generated artifacts
 
-# Show help
-make help
+# Show all available commands
+make help              # Display detailed help
 ```
+
+### VSCode Extension
+
+Install the official Vex language extension:
+
+```bash
+# Quick development install
+cd vscode-extension && ./quick-install.sh
+
+# Or package and install manually
+npm install && npm run package
+code --install-extension vex-*.vsix
+```
+
+The extension provides:
+- **Syntax highlighting** for `.vx` files
+- **Custom file icons** for Vex source files  
+- **Dark theme** optimized for Vex syntax
 
 ### Example Vex Code (Vision)
 
@@ -137,9 +170,32 @@ See [docs/vex-implementation-requirements.md](docs/vex-implementation-requiremen
 
 ## Project Status
 
-**Current Phase**: Parser and Grammar (✅ Complete)  
-**Next Phase**: Type System and Transpiler  
+**Current Phase**: Development Infrastructure (✅ Complete)  
+**Next Phase**: Type System and Go Transpilation Engine  
 **Timeline**: Personal learning project, developed for fun in spare time
+
+### Infrastructure Achievements
+
+✅ **Grammar Foundation**
+- ANTLR4 grammar with comprehensive S-expression support
+- Automated parser generation and validation
+- Test-driven grammar development with valid/invalid examples
+
+✅ **Development Tooling** 
+- Modular Go tools for CI/CD operations
+- Grammar validator with detailed error reporting
+- VSCode extension with full language support
+
+✅ **CI/CD Pipeline**
+- Automated testing on all pull requests
+- Grammar validation with positive/negative test cases
+- Extension testing and quality gates
+- Automated release management with semantic versioning
+
+✅ **Quality Standards**
+- Extracted workflow logic into maintainable Go tools
+- Comprehensive test coverage tracking
+- Automated code quality enforcement
 
 ### Test Coverage Standards
 
@@ -147,20 +203,39 @@ This project maintains high code quality through automated testing:
 
 | Component | Target | Status | Purpose |
 |-----------|--------|--------|---------|
-| **Parser** | 95%+ | ⏳ *Not implemented yet* | Critical language component |
-| **Transpiler** | 90%+ | ⏳ *Not implemented yet* | Core functionality |
-| **Type System** | 85%+ | ⏳ *Not implemented yet* | Type safety |
-| **Standard Library** | 80%+ | ⏳ *Not implemented yet* | User-facing features |
-| **Overall Project** | 75%+ | ⏳ *Not implemented yet* | Quality baseline |
+| **Grammar Validation** | 100% | ✅ *Active* | Parser correctness with valid/invalid test cases |
+| **Development Tools** | 90%+ | ✅ *Active* | CI/CD infrastructure reliability |
+| **VSCode Extension** | 85%+ | ✅ *Active* | IDE integration quality |
+| **Parser** | 95%+ | ⏳ *Next phase* | Critical language component |
+| **Transpiler** | 90%+ | ⏳ *Planned* | Core functionality |
+| **Type System** | 85%+ | ⏳ *Planned* | Type safety |
+| **Standard Library** | 80%+ | ⏳ *Planned* | User-facing features |
 
-> **Quality Philosophy**: Higher coverage requirements for more critical components. PRs that reduce coverage below these thresholds are automatically blocked.
+> **Quality Philosophy**: Higher coverage requirements for more critical components. The current infrastructure ensures robust development practices for future language implementation.
+
+## Release Process
+
+Vex uses an automated release system triggered by PR labels:
+
+- **`release:patch`** - Bug fixes and minor improvements
+- **`release:minor`** - New features and enhancements  
+- **`release:major`** - Breaking changes
+
+When a PR with a release label is merged to `main`, the system automatically:
+1. Bumps the version number
+2. Creates a Git tag
+3. Generates release notes
+4. Updates the changelog
+
+See [docs/release-process.md](docs/release-process.md) for detailed information.
 
 ## Contributing
 
 This is a personal study project, but feel free to:
-- Try the parser generators
+- Test the grammar validation system
+- Try the VSCode extension
 - Suggest language design ideas
-- Report issues with the grammar
+- Report issues with the grammar or tooling
 - Fork for your own experiments
 
 **Note**: This is an educational project for learning compiler/language implementation concepts. It's not intended for production use - just for the joy of building a programming language from scratch!

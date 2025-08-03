@@ -13,7 +13,7 @@
   - Standard Library: 80%+ (user-facing features)
   - Overall: 75%+ (project baseline)
 - [ ] **Code builds successfully** - All Go code compiles
-- [ ] **Examples still work** - Existing Fugo programs parse correctly
+- [ ] **Examples still work** - Existing Vex programs parse correctly
 
 ### 📝 Manual Checklist
 
@@ -25,7 +25,7 @@
 ### 🎯 For Language Features
 
 If this PR adds new language features:
-- [ ] **Grammar updated** (`tools/grammar/Fugo.g4`) if syntax changes
+- [ ] **Grammar updated** (`tools/grammar/Vex.g4`) if syntax changes
 - [ ] **Examples added** to demonstrate usage
 - [ ] **Issue reference** - Links to milestone issue (e.g., `Closes #1`)
 

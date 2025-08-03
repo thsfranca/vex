@@ -1,6 +1,6 @@
 # Changelog
 
-Simple changelog for the Fugo VSCode Extension.
+Simple changelog for the Vex VSCode Extension.
 
 ## [Unreleased]
 

@@ -1,8 +1,8 @@
-# Flux Language Implementation Progress
+# Vex Language Implementation Progress
 
 > **Project Goal**: Build a statically-typed functional programming language that transpiles to Go
 > **Timeline**: Personal learning project, developed for fun in spare time
-> **Repository**: https://github.com/thsfranca/flux
+> **Repository**: https://github.com/thsfranca/vex
 
 ## Milestone Overview
 
@@ -22,16 +22,16 @@
 **Completed**: December 2024
 
 ### What Was Built
-- [x] ANTLR4 grammar for Flux syntax (`tools/grammar/Flux.g4`)
+- [x] ANTLR4 grammar for Vex syntax (`tools/grammar/Vex.g4`)
 - [x] Multi-language parser generation (Go, Java, Python, C++, JavaScript)
 - [x] Go parser successfully generated (`tools/gen/go/`)
-- [x] Example Flux programs (`examples/`)
+- [x] Example Vex programs (`examples/`)
 - [x] Project documentation and README
 - [x] Implementation requirements document
 
 ### Key Achievements
 - **Grammar supports**: S-expressions, arrays, symbols, strings, comments, nested structures
-- **Working parsers**: Can parse valid Flux syntax into AST
+- **Working parsers**: Can parse valid Vex syntax into AST
 - **Go integration**: Generated Go parser ready for next phase
 - **Foundation set**: Clear roadmap and project structure
 
@@ -45,7 +45,7 @@
 ## Phase 2: Go Transpilation Engine 🚧 **NEXT**
 
 ### Goal
-Generate executable Go code from Flux programs to achieve native performance and Go ecosystem access.
+Generate executable Go code from Vex programs to achieve native performance and Go ecosystem access.
 
 ### Step 1: Basic Expression Transpilation
 **What you'll build:**
@@ -60,7 +60,7 @@ Generate executable Go code from Flux programs to achieve native performance and
 - Go code structure and syntax generation
 
 **Success Criteria:**
-```fugo
+```vex
 42                ; Transpiles to: _ = 42
 "hello"          ; Transpiles to: _ = "hello"
 (+ 1 2)          ; Transpiles to: _ = 1 + 2
@@ -80,13 +80,13 @@ Generate executable Go code from Flux programs to achieve native performance and
 - Package and import management
 
 **Success Criteria:**
-```fugo
+```vex
 (defn add [x y] (+ x y))        ; Transpiles to: func add(x int, y int) int { return x + y }
 (print (add 5 3))               ; Transpiles to: fmt.Println(add(5, 3))
 ```
 
 ### Technical Notes
-- Extending `FluxListener` to become `FluxEvaluator`
+- Extending `VexListener` to become `VexEvaluator`
 - Using Go's `interface{}` initially for values (optimize later)
 - Simple map-based symbol table (enhance with scoping later)
 
@@ -115,11 +115,11 @@ Update this section each week with:
 **What you'll build:**
 - Basic type annotations in function signatures
 - Type checking during transpilation
-- Go type mapping (Flux types → Go types)
+- Go type mapping (Vex types → Go types)
 
 ### Phase 4: Advanced Transpilation Features
 **What you'll build:**
-- Go interop (calling Go functions from Flux)
+- Go interop (calling Go functions from Vex)
 - Optimized code generation
 - Error handling and propagation
 
@@ -160,7 +160,7 @@ Update this section each week with:
 ## Resources and References
 
 ### Key Documents
-- [Implementation Requirements](docs/fugo-implementation-requirements.md)
+- [Implementation Requirements](docs/vex-implementation-requirements.md)
 - [Grammar Reference](docs/grammar-reference.md)
 - [Go Usage Example](examples/go-usage/README.md)
 

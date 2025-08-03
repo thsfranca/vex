@@ -1,9 +1,9 @@
 {
-  "name": "flux-minimal",
-  "displayName": "Flux Minimal",
-  "description": "Minimal Flux support",
+  "name": "vex-minimal",
+  "displayName": "Vex Minimal",
+  "description": "Minimal Vex support",
   "version": "0.1.0",
-  "publisher": "flux-dev",
+  "publisher": "vex-dev",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -11,20 +11,20 @@
   "contributes": {
     "languages": [
       {
-        "id": "flux",
+        "id": "vex",
         "aliases": [
-          "Flux"
+          "Vex"
         ],
         "extensions": [
-          ".fx"
+          ".vx"
         ]
       }
     ],
     "grammars": [
       {
-        "language": "flux",
-        "scopeName": "source.flux",
-        "path": "./syntaxes/flux-minimal.tmLanguage.json"
+        "language": "vex",
+        "scopeName": "source.vx",
+        "path": "./syntaxes/vex-minimal.tmLanguage.json"
       }
     ]
   }

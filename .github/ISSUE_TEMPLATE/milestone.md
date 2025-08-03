@@ -1,6 +1,6 @@
 ---
 name: 📋 Implementation Milestone
-about: Track progress on major Fugo language features
+about: Track progress on major Vex language features
 title: '[MILESTONE] Phase X: Feature Name'
 labels: ['milestone', 'enhancement']
 assignees: ''
@@ -36,7 +36,7 @@ assignees: ''
 
 When this milestone is complete, the following should work:
 
-```fugo
+```vex
 ; Example code that should work after completion
 (def x 42)
 (print x)

@@ -1,8 +1,8 @@
-# Flux Grammar Reference
+# Vex Grammar Reference
 
 ## Overview
 
-The Flux grammar defines a Lisp-like programming language with support for S-expressions, arrays, symbols, and strings.
+The Vex grammar defines a Lisp-like programming language with support for S-expressions, arrays, symbols, and strings.
 
 ## Grammar Rules
 
@@ -92,13 +92,13 @@ To generate a parser for your target language:
 
 ```bash
 # For Java
-antlr4 -Dlanguage=Java Flux.g4
+antlr4 -Dlanguage=Java Vex.g4
 
 # For Python
-antlr4 -Dlanguage=Python3 Flux.g4
+antlr4 -Dlanguage=Python3 Vex.g4
 
 # For Go
-antlr4 -Dlanguage=Go Flux.g4
+antlr4 -Dlanguage=Go Vex.g4
 ```
 
 Or use the provided Makefile:

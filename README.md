@@ -1,24 +1,28 @@
-# Flux Language
+# Vex Language
 
-[![CI](https://github.com/thsfranca/flux/actions/workflows/ci.yml/badge.svg)](https://github.com/thsfranca/flux/actions/workflows/ci.yml)
-[![Test Coverage](https://github.com/thsfranca/flux/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/thsfranca/flux/actions/workflows/test-coverage.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/thsfranca/flux)](https://goreportcard.com/report/github.com/thsfranca/flux)
+<div align="center">
+  <img src="vscode-extension/vex-logo.svg" alt="Vex Language Logo" width="128" height="128">
+</div>
+
+[![CI](https://github.com/thsfranca/vex/actions/workflows/ci.yml/badge.svg)](https://github.com/thsfranca/vex/actions/workflows/ci.yml)
+[![Test Coverage](https://github.com/thsfranca/vex/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/thsfranca/vex/actions/workflows/test-coverage.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/thsfranca/vex)](https://goreportcard.com/report/github.com/thsfranca/vex)
 
 A statically-typed functional programming language that transpiles to Go, designed for learning language implementation concepts and exploring functional programming paradigms.
 
 ## Overview
 
-Flux is an experimental programming language that combines functional programming principles with static typing, inspired by Lisp syntax and designed to transpile to Go for maximum performance. This is a **study project created for educational purposes and fun** - it's not intended for production use.
+Vex is an experimental programming language that combines functional programming principles with static typing, inspired by Lisp syntax and designed to transpile to Go for maximum performance. This is a **study project created for educational purposes and fun** - it's not intended for production use.
 
 The goal is to explore language design concepts including parsing, type systems, code generation, and Go interoperability while building a complete language implementation from scratch.
 
 ## Project Structure
 
 ```
-fugo/
+vex/
 ├── tools/
 │   ├── grammar/
-│   │   └── Flux.g4          # ANTLR4 grammar definition
+│   │   └── Vex.g4           # ANTLR4 grammar definition
 │   └── gen/                 # Generated parser files (created by make)
 │       ├── java/            # Java parser files
 │       ├── go/              # Go parser files
@@ -26,13 +30,13 @@ fugo/
 │       ├── cpp/             # C++ parser files
 │       └── javascript/      # JavaScript parser files
 ├── examples/
-│   └── main.fx             # Example Flux programs
-└── docs/                    # Documentation (planned)
+│   └── *.vx                # Example Vex programs
+└── docs/                    # Documentation
 ```
 
 ## Language Vision
 
-Flux aims to be a functional programming language with:
+Vex aims to be a functional programming language with:
 
 - **Static typing** with type inference for performance and safety
 - **Lisp-inspired syntax** using S-expressions and immutable data
@@ -84,11 +88,11 @@ make clean
 make help
 ```
 
-### Example Flux Code (Vision)
+### Example Vex Code (Vision)
 
-Here's what Flux programs might look like when fully implemented:
+Here's what Vex programs might look like when fully implemented:
 
-```flux
+```vex
 ; HTTP service with static typing
 (defn handle-user [req: HttpRequest] -> Response
   (let [user-id: int (parse-int req.params.id)
@@ -129,7 +133,7 @@ This project explores key language implementation concepts:
 
 ## Implementation Roadmap
 
-See [docs/flux-implementation-requirements.md](docs/flux-implementation-requirements.md) for the complete development plan, covering type systems, Go transpilation, immutable data structures, and production features.
+See [docs/vex-implementation-requirements.md](docs/vex-implementation-requirements.md) for the complete development plan, covering type systems, Go transpilation, immutable data structures, and production features.
 
 ## Project Status
 

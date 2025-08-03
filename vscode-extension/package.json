@@ -1,9 +1,9 @@
 {
-  "name": "flux-minimal",
-  "displayName": "Flux Minimal",
-  "description": "Minimal Flux language support with automated changelog - testing automation",
+  "name": "vex-minimal",
+  "displayName": "Vex Minimal",
+  "description": "Minimal Vex language support with automated changelog - testing automation",
   "version": "0.1.4",
-  "publisher": "flux-dev",
+  "publisher": "vex-dev",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.74.0"
@@ -14,13 +14,13 @@
   "contributes": {
     "languages": [
       {
-        "id": "flux",
+        "id": "vex",
         "aliases": [
-          "Flux",
-          "flux-lang"
+          "Vex",
+          "vex-lang"
         ],
         "extensions": [
-          ".fx"
+          ".vx"
         ],
         "configuration": "./language-configuration.json",
         "icon": {
@@ -31,29 +31,29 @@
     ],
     "grammars": [
       {
-        "language": "flux",
-        "scopeName": "source.flux",
-        "path": "./syntaxes/flux-minimal.tmLanguage.json"
+        "language": "vex",
+        "scopeName": "source.vx",
+        "path": "./syntaxes/vex-minimal.tmLanguage.json"
       }
     ],
     "themes": [
       {
-        "id": "flux-dark",
-        "label": "Flux Dark",
+        "id": "vex-dark",
+        "label": "Vex Dark",
         "uiTheme": "vs-dark",
-        "path": "./themes/flux-dark-theme.json"
+        "path": "./themes/vex-dark-theme.json"
       }
     ],
     "iconThemes": [
       {
-        "id": "flux-icons",
-        "label": "Flux File Icons",
-        "path": "./icons/flux-icon-theme.json"
+        "id": "vex-icons",
+        "label": "Vex File Icons",
+        "path": "./icons/vex-icon-theme.json"
       }
     ],
     "icons": {
-      "flux-file": {
-        "description": "Flux file icon",
+      "vex-file": {
+        "description": "Vex file icon",
         "default": {
           "iconPath": "./icon.png"
         }

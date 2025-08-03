@@ -1,3 +1,3 @@
-module github.com/thsfranca/flux
+module github.com/thsfranca/vex
 
 go 1.22

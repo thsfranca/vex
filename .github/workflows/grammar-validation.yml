@@ -1,17 +1,17 @@
 ---
-name: Flux Grammar & Examples Validation
+name: Vex Grammar & Examples Validation
 
 on:
   push:
     branches: [main]
     paths:
       - 'tools/grammar/**'
-      - 'examples/**/*.fx'
+      - 'examples/**/*.vx'
   pull_request:
     branches: [main]
     paths:
       - 'tools/grammar/**'
-      - 'examples/**/*.fx'
+      - 'examples/**/*.vx'
 
 env:
   ANTLR_VERSION: '4.13.1'
@@ -52,13 +52,13 @@ jobs:
       - name: Validate grammar syntax
         run: |
           cd tools/grammar
-          antlr4 -Dlanguage=Java Flux.g4 -o /tmp/grammar-test
+          antlr4 -Dlanguage=Java Vex.g4 -o /tmp/grammar-test
 
       - name: Generate test parser
         run: |
           cd tools/grammar
-          antlr4 -Dlanguage=Java -listener -visitor Flux.g4 -o /tmp/flux-parser
-          javac -cp "/usr/local/lib/antlr.jar:/tmp/flux-parser" /tmp/flux-parser/*.java
+          antlr4 -Dlanguage=Java -listener -visitor Vex.g4 -o /tmp/vex-parser
+          javac -cp "/usr/local/lib/antlr.jar:/tmp/vex-parser" /tmp/vex-parser/*.java
 
       - name: Test example files
         run: |
@@ -73,15 +73,15 @@ jobs:
           public class TestParser {
               public static void main(String[] args) throws IOException {
                   if (args.length != 1) {
-                      System.err.println("Usage: java TestParser <file.fx>");
+                      System.err.println("Usage: java TestParser <file.vx>");
                       System.exit(1);
                   }
                   
                   String input = new String(Files.readAllBytes(Paths.get(args[0])));
                   ANTLRInputStream inputStream = new ANTLRInputStream(input);
-                  FluxLexer lexer = new FluxLexer(inputStream);
+                  VexLexer lexer = new VexLexer(inputStream);
                   CommonTokenStream tokens = new CommonTokenStream(lexer);
-                  FluxParser parser = new FluxParser(tokens);
+                  VexParser parser = new VexParser(tokens);
                   
                   // Add error handling
                   parser.removeErrorListeners();
@@ -103,19 +103,19 @@ jobs:
           EOF
           
           # Compile test runner
-          cd /tmp/flux-parser
+          cd /tmp/vex-parser
           javac -cp "/usr/local/lib/antlr.jar:." ../test-parser.java
           
-          # Test each .fx file
+          # Test each .vx file
           FAILED_FILES=""
-          for fx_file in $(find $GITHUB_WORKSPACE/examples -name "*.fx"); do
+          for vx_file in $(find $GITHUB_WORKSPACE/examples -name "*.vx"); do
             echo ""
-            echo "Testing: $fx_file"
-            if java -cp "/usr/local/lib/antlr.jar:/tmp/flux-parser:/tmp" TestParser "$fx_file"; then
-              echo "✅ $fx_file parsed successfully"
+            echo "Testing: $vx_file"
+            if java -cp "/usr/local/lib/antlr.jar:/tmp/vex-parser:/tmp" TestParser "$vx_file"; then
+              echo "✅ $vx_file parsed successfully"
             else
-              echo "❌ $fx_file failed to parse"
-              FAILED_FILES="$FAILED_FILES $fx_file"
+              echo "❌ $vx_file failed to parse"
+              FAILED_FILES="$FAILED_FILES $vx_file"
             fi
           done
           
@@ -128,7 +128,7 @@ jobs:
             exit 1
           else
             echo ""
-            echo "🎉 All .fx example files parsed successfully!"
+            echo "🎉 All .vx example files parsed successfully!"
           fi
 
       - name: Validate grammar completeness
@@ -136,7 +136,7 @@ jobs:
           echo "🔍 Checking grammar completeness..."
           
           # Check for common language constructs that should be supported
-          GRAMMAR_FILE="tools/grammar/Flux.g4"
+          GRAMMAR_FILE="tools/grammar/Vex.g4"
           
           echo "Checking for required grammar rules..."
           

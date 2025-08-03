@@ -1,5 +1,5 @@
 ---
-name: Flux Go Parser Generation
+name: Vex Go Parser Generation
 
 on:
   push:
@@ -75,7 +75,7 @@ jobs:
         run: |
           echo "🔨 Generating Go parser on ${{ matrix.os }}..."
           cd tools/grammar
-          antlr4 -Dlanguage=Go -listener -visitor Flux.g4 -o ../gen/go/
+          antlr4 -Dlanguage=Go -listener -visitor Vex.g4 -o ../gen/go/
           echo "✅ Go parser generation completed"
 
       - name: Generate Go parser (Windows)
@@ -84,7 +84,7 @@ jobs:
         run: |
           Write-Host "🔨 Generating Go parser on ${{ matrix.os }}..."
           cd tools/grammar
-          antlr4.bat -Dlanguage=Go -listener -visitor Flux.g4 -o ../gen/go/
+          antlr4.bat -Dlanguage=Go -listener -visitor Vex.g4 -o ../gen/go/
           Write-Host "✅ Go parser generation completed"
 
       # Verify generated Go files
@@ -92,7 +92,7 @@ jobs:
         run: |
           echo "🔍 Verifying generated Go parser files..."
           
-          if [ -f "tools/gen/go/flux_lexer.go" ] && [ -f "tools/gen/go/flux_parser.go" ]; then
+          if [ -f "tools/gen/go/vex_lexer.go" ] && [ -f "tools/gen/go/vex_parser.go" ]; then
             echo "✅ Go parser files generated successfully"
           else
             echo "❌ Missing Go parser files"
@@ -106,7 +106,7 @@ jobs:
         run: |
           echo "🧪 Testing Go parser compilation..."
           cd tools/gen/go
-          go mod init flux-parser-test || true
+          go mod init vex-parser-test || true
           go mod tidy || true
           if go build .; then
             echo "✅ Go parser compiles successfully"
@@ -136,7 +136,7 @@ jobs:
           
           if [ "${{ needs.test-go-parser-generation.result }}" = "success" ]; then
             echo "✅ Go parser generated successfully on all platforms"
-            echo "🎉 Flux grammar is ready for Go transpilation!"
+            echo "🎉 Vex grammar is ready for Go transpilation!"
           else
             echo "❌ Go parser generation failed on some platforms"
             echo "💡 Check the job logs and artifacts for debugging"

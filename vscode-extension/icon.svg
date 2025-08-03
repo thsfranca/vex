@@ -1,18 +1,17 @@
 <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&amp;display=swap');
+      .vex-font {
+        font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Consolas', monospace;
+        font-weight: 500;
+      }
+    </style>
+  </defs>
+  
   <!-- Shadow text layer -->
-  <text x="66" y="82" text-anchor="middle" 
-        font-family="-apple-system, BlinkMacSystemFont, 'SF Mono', 'Segoe UI Mono', 'Roboto Mono', Menlo, Monaco, Consolas, 'Ubuntu Mono', monospace" 
-        font-size="72" 
-        font-weight="500" 
-        font-style="normal" 
-        fill="#000000" 
-        opacity="0.15">(λ)</text>
+  <text x="66" y="82" text-anchor="middle" class="vex-font" font-size="72" fill="#000000" opacity="0.15" letter-spacing="-0.05em">.vx</text>
   
   <!-- Main text -->
-  <text x="64" y="80" text-anchor="middle" 
-        font-family="-apple-system, BlinkMacSystemFont, 'SF Mono', 'Segoe UI Mono', 'Roboto Mono', Menlo, Monaco, Consolas, 'Ubuntu Mono', monospace" 
-        font-size="72" 
-        font-weight="500" 
-        font-style="normal" 
-        fill="#82AAFF">(λ)</text>
+  <text x="64" y="80" text-anchor="middle" class="vex-font" font-size="72" fill="#82AAFF" letter-spacing="-0.05em">.vx</text>
 </svg>

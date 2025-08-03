@@ -1,6 +1,6 @@
 # Go Parser Usage Example
 
-This example demonstrates how to use the generated Go parser for the Fugo language.
+This example demonstrates how to use the generated Go parser for the Vex language.
 
 ## Setup
 
@@ -29,7 +29,7 @@ go run main.go
 ## What it does
 
 The example:
-1. Creates a sample Fugo program as a string
+1. Creates a sample Vex program as a string
 2. Parses it using the generated ANTLR4 Go parser
 3. Walks the parse tree using a custom listener
 4. Prints information about the parsed structures
@@ -37,10 +37,10 @@ The example:
 ## Generated Files
 
 The Go parser generation creates these files:
-- `fugo_lexer.go` - Tokenizes input text
-- `fugo_parser.go` - Main parser logic
-- `fugo_listener.go` - Listener interface for tree walking
-- `fugo_base_listener.go` - Base listener implementation
+- `vex_lexer.go` - Tokenizes input text
+- `vex_parser.go` - Main parser logic
+- `vex_listener.go` - Listener interface for tree walking
+- `vex_base_listener.go` - Base listener implementation
 
 ## Usage Patterns
 
@@ -50,9 +50,9 @@ The Go parser generation creates these files:
 input := antlr.NewInputStream(code)
 
 // Create lexer and parser
-lexer := parser.NewFugoLexer(input)
+lexer := parser.NewVexLexer(input)
 tokenStream := antlr.NewCommonTokenStream(lexer, 0)
-p := parser.NewFugoParser(tokenStream)
+p := parser.NewVexParser(tokenStream)
 
 // Parse
 tree := p.Sp()
@@ -62,7 +62,7 @@ tree := p.Sp()
 ```go
 // Custom listener
 type MyListener struct {
-    *parser.BaseFugoListener
+    *parser.BaseVexListener
 }
 
 func (l *MyListener) EnterList(ctx *parser.ListContext) {

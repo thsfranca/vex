@@ -12,9 +12,15 @@ import (
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stderr, "Usage: %s <file.vx> [file2.vx ...]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "       %s --valid <valid-files...>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "       %s --invalid <invalid-files...>\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\nValidates Vex grammar by parsing .vx files using generated ANTLR parser\n")
+		fmt.Fprintf(os.Stderr, "\nModes:\n")
+		fmt.Fprintf(os.Stderr, "  --valid   : Files MUST parse successfully (CI fails if they don't)\n")
+		fmt.Fprintf(os.Stderr, "  --invalid : Files MUST fail to parse (CI fails if they do)\n")
+		fmt.Fprintf(os.Stderr, "  default   : Report all results, fail CI if any file fails\n")
 		fmt.Fprintf(os.Stderr, "\nNote: This tool requires generated Vex parser files to be present.\n")
-		fmt.Fprintf(os.Stderr, "Run 'antlr4 -Dlanguage=Go -listener -visitor Vex.g4 -o .' first.\n")
+		fmt.Fprintf(os.Stderr, "Run 'antlr -Dlanguage=Go -listener -visitor Vex.g4 -o parser/' first.\n")
 		os.Exit(1)
 	}
 
@@ -26,9 +32,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	var failedFiles []string
+	// Parse command line arguments
+	var mode string
+	var files []string
+	
+	if os.Args[1] == "--valid" || os.Args[1] == "--invalid" {
+		mode = os.Args[1][2:] // Remove "--" prefix
+		files = os.Args[2:]
+	} else {
+		mode = "default"
+		files = os.Args[1:]
+	}
 
-	for _, filename := range os.Args[1:] {
+	var failedFiles []string
+	var unexpectedResults []string
+
+	for _, filename := range files {
 		fmt.Printf("\nTesting: %s\n", filename)
 
 		// Read file content
@@ -59,22 +78,54 @@ func main() {
 		// Parse starting from the 'sp' rule (root rule)  
 		tree := vexParser.Sp()
 
+		// Check results based on mode
 		if errorListener.hasError {
-			failedFiles = append(failedFiles, filename)
+			if mode == "invalid" {
+				fmt.Printf("✅ %s failed as expected (invalid test case)\n", filename)
+			} else {
+				fmt.Printf("❌ %s failed to parse\n", filename)
+				failedFiles = append(failedFiles, filename)
+			}
 		} else {
-			fmt.Printf("✅ %s parsed successfully\n", filename)
-			fmt.Printf("Parse tree: %s\n", tree.ToStringTree(vexParser.GetRuleNames(), vexParser))
+			if mode == "valid" || mode == "default" {
+				fmt.Printf("✅ %s parsed successfully\n", filename)
+				fmt.Printf("Parse tree: %s\n", tree.ToStringTree(vexParser.GetRuleNames(), vexParser))
+			} else { // mode == "invalid"
+				fmt.Printf("❌ %s parsed successfully but should have failed (invalid test case)\n", filename)
+				unexpectedResults = append(unexpectedResults, filename)
+			}
 		}
 	}
 
+	// Report final results
+	hasErrors := len(failedFiles) > 0 || len(unexpectedResults) > 0
+	
 	if len(failedFiles) > 0 {
 		fmt.Println("\n💥 The following files failed to parse:")
 		for _, file := range failedFiles {
 			fmt.Printf("  - %s\n", file)
 		}
+	}
+	
+	if len(unexpectedResults) > 0 {
+		fmt.Println("\n⚠️  The following invalid test files unexpectedly succeeded:")
+		for _, file := range unexpectedResults {
+			fmt.Printf("  - %s\n", file)
+		}
+	}
+	
+	if hasErrors {
+		fmt.Println("\n❌ Grammar validation failed!")
 		os.Exit(1)
 	} else {
-		fmt.Println("\n🎉 All .vx example files parsed successfully!")
+		switch mode {
+		case "valid":
+			fmt.Println("\n🎉 All valid example files parsed successfully!")
+		case "invalid":
+			fmt.Println("\n🎉 All invalid example files failed as expected!")
+		default:
+			fmt.Println("\n🎉 All example files produced expected results!")
+		}
 	}
 }
 

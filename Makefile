@@ -31,8 +31,10 @@ validate-grammar: ## Validate grammar by testing example files (requires ANTLR4)
 	@cd tools/grammar && antlr -Dlanguage=Go -listener -visitor Vex.g4 -o ../grammar-validator/parser/
 	@echo "🔨 Building grammar validator..."
 	@cd tools/grammar-validator && go build -o grammar-validator .
-	@echo "🧪 Testing .vx example files..."
-	@cd tools/grammar-validator && ./grammar-validator ../../examples/*.vx
+	@echo "🧪 Testing valid example files..."
+	@cd tools/grammar-validator && ./grammar-validator --valid ../../examples/valid/*.vx
+	@echo "🧪 Testing invalid example files..."
+	@cd tools/grammar-validator && ./grammar-validator --invalid ../../examples/invalid/*.vx
 
 test: ## Run all tests
 	@echo "🧪 Running tests..."

@@ -77,16 +77,27 @@ jobs:
           go mod download
           go build -o grammar-validator .
           
-          # Find and test all .vx files
-          echo "🧪 Testing .vx example files..."
-          VX_FILES=$(find $GITHUB_WORKSPACE/examples -name "*.vx")
-          if [ -z "$VX_FILES" ]; then
-              echo "⚠️ No .vx files found in examples directory"
-              exit 0
+          # Test valid example files (must pass)
+          echo "🧪 Testing valid example files..."
+          if [ -d "$GITHUB_WORKSPACE/examples/valid" ]; then
+            VALID_FILES=$(find $GITHUB_WORKSPACE/examples/valid -name "*.vx")
+            if [ -n "$VALID_FILES" ]; then
+              ./grammar-validator --valid $VALID_FILES
+            else
+              echo "⚠️ No valid .vx files found"
+            fi
           fi
           
-          # Run tests using our dedicated tool
-          ./grammar-validator $VX_FILES
+          # Test invalid example files (must fail)
+          echo "🧪 Testing invalid example files..."
+          if [ -d "$GITHUB_WORKSPACE/examples/invalid" ]; then
+            INVALID_FILES=$(find $GITHUB_WORKSPACE/examples/invalid -name "*.vx")
+            if [ -n "$INVALID_FILES" ]; then
+              ./grammar-validator --invalid $INVALID_FILES
+            else
+              echo "⚠️ No invalid .vx files found"
+            fi
+          fi
 
       - name: Validate grammar completeness
         run: |

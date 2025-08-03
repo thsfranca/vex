@@ -105,18 +105,13 @@ jobs:
         retention-days: 7
 
     # Gateway job - ALWAYS runs and reports status (make this required in branch protection)
-  summary:
+  validate-extension-required:
     runs-on: ubuntu-latest
-    needs: [detect-changes, validate]
+    needs: [detect-changes, skip-validation, validate]
     if: always()
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Go (for summary)
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.21'
-
-    - name: Report VSCode extension validation results
-      run: .github/scripts/extension/generate-summary.sh "${{ needs.detect-changes.outputs.extension-files }}" "${{ needs.validate.result }}"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Evaluate results
+        run: .github/scripts/validation/evaluate-extension-results.sh "${{ needs.detect-changes.outputs.extension-files }}" "${{ needs.validate.result }}" "${{ needs.skip-validation.result }}"

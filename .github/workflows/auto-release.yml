@@ -78,6 +78,7 @@ jobs:
 
       - name: Create release notes
         if: steps.check-labels.outputs.release-type != 'none'
+        id: create-notes
         run: |
           echo "📝 Creating release notes..."
           cd tools/release-manager
@@ -94,8 +95,52 @@ jobs:
           EOF
           )
           
-          # Create release notes
-          ./release-manager create-notes "$PR_DATA"
+          # Create release notes and capture output
+          NOTES_OUTPUT=$(./release-manager create-notes "$PR_DATA")
+          echo "$NOTES_OUTPUT"
+          
+          # Extract release notes for GitHub Release
+          echo "release-notes<<EOF" >> $GITHUB_OUTPUT
+          echo "## Release v${{ steps.bump-version.outputs.new-version }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "**Release Type**: ${{ steps.check-labels.outputs.release-type }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "**Changes:**" >> $GITHUB_OUTPUT
+          echo "- ${{ github.event.pull_request.title }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/v${{ steps.bump-version.outputs.old-version }}...v${{ steps.bump-version.outputs.new-version }}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: steps.check-labels.outputs.release-type != 'none'
+        run: |
+          echo "🚀 Creating GitHub Release..."
+          
+          # Determine if this is a prerelease
+          PRERELEASE_FLAG=""
+          if [[ "${{ steps.check-labels.outputs.release-type }}" =~ ^(alpha|beta|rc)$ ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          
+          # Create placeholder artifacts
+          mkdir -p dist
+          echo "# Vex Language v${{ steps.bump-version.outputs.new-version }}" > dist/README.md
+          echo "Basic transpiler with working features:" >> dist/README.md
+          echo "- Variable definitions: (def x 10) → x := 10" >> dist/README.md
+          echo "- Arithmetic expressions: (+ 1 2) → 1 + 2" >> dist/README.md
+          echo "- CLI tool: fugo-transpiler" >> dist/README.md
+          
+          # Package examples
+          tar -czf dist/vex-examples-v${{ steps.bump-version.outputs.new-version }}.tar.gz examples/
+          
+          # Create the GitHub Release
+          gh release create "v${{ steps.bump-version.outputs.new-version }}" \
+            --title "Vex v${{ steps.bump-version.outputs.new-version }}" \
+            --notes "${{ steps.create-notes.outputs.release-notes }}" \
+            $PRERELEASE_FLAG \
+            dist/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Success notification
         if: steps.check-labels.outputs.release-type != 'none'
@@ -105,8 +150,8 @@ jobs:
           echo "📋 Details:"
           echo "  • Version: ${{ steps.bump-version.outputs.old-version }} → ${{ steps.bump-version.outputs.new-version }}"
           echo "  • Tag: v${{ steps.bump-version.outputs.new-version }}"
+          echo "  • GitHub Release: Created"
           echo "  • Triggered by: PR #${{ github.event.pull_request.number }}"
           echo "  • Release type: ${{ steps.check-labels.outputs.release-type }}"
           echo ""
-          echo "🔗 The language-release.yml workflow will build and publish the release artifacts."
-          echo "🔗 Check releases: https://github.com/${{ github.repository }}/releases"
+          echo "🔗 Check the release: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump-version.outputs.new-version }}"

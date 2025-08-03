@@ -2,19 +2,45 @@
 
 ## Overview
 
-Vex is a statically-typed functional programming language designed specifically for high-performance backend services. The language transpiles to Go to achieve maximum performance while maintaining excellent Go ecosystem interoperability. This document outlines the complete implementation roadmap.
+Vex is a statically-typed functional programming language designed specifically for **AI code generation** and high-performance backend services. The language transpiles to Go to achieve maximum performance while maintaining excellent Go ecosystem interoperability and providing uniform, predictable syntax patterns that AI models can reliably understand and generate. This document outlines the complete implementation roadmap.
 
 ## Core Design Principles
 
-**Performance First**: Every design decision must prioritize runtime performance and scalability for backend services handling high request volumes.
+**🤖 AI-First Design**: Every language feature must be optimized for AI code generation. Uniform S-expression syntax, predictable patterns, and semantic clarity take priority over syntactic convenience.
 
-**Static Type Safety**: Compile-time type checking prevents runtime errors and enables aggressive optimization through Go transpilation.
+**🎯 Scalable HTTP Specialization**: Language features specifically designed so that every program naturally handles multiple HTTP requests simultaneously, with JWT authentication and scalable web API development - the most market-valuable use cases.
 
-**Go Ecosystem Integration**: Seamless interoperability with existing Go libraries, frameworks, and infrastructure.
+**⚡ Scalable Performance First**: Every design decision ensures that all programs automatically achieve high performance and scalability, naturally handling thousands of simultaneous HTTP requests through Go's goroutines.
 
-**Functional Programming**: Immutable data structures, pure functions, and functional composition as primary paradigms.
+**🔒 Static Type Safety**: Compile-time type checking prevents runtime errors and enables aggressive optimization through Go transpilation.
 
-**Backend Service Focus**: Language features specifically designed for HTTP services, concurrent processing, and stateful applications.
+**🔗 Go Ecosystem Integration**: Seamless interoperability with existing Go libraries, frameworks, and infrastructure.
+
+**🧩 Functional Programming**: Immutable data structures, pure functions, and functional composition as primary paradigms that AI can reliably generate and that provide automatic thread-safety for all programs.
+
+### AI-Friendly Design Goals
+
+**Uniform Syntax**: S-expressions provide consistent `(operation args...)` structure with no precedence rules or special cases.
+
+**Semantic Clarity**: Function names and operations clearly express intent, making AI generation more reliable.
+
+**Composable Patterns**: Simple building blocks that AI can combine into complex systems.
+
+**Predictable Structure**: Consistent patterns that AI models can learn once and apply everywhere.
+
+**Minimal Cognitive Load**: Fewer syntax rules mean AI can focus on business logic rather than parsing complexity, while immutable-by-default design eliminates all concurrency complexity.
+
+### Automatic Scalability Design Goals
+
+**Thread-Safe by Default**: Immutable data structures make it impossible to have race conditions - all programs safely handle multiple simultaneous requests.
+
+**Automatic Parallelization**: Every HTTP request runs in its own lightweight Go goroutine without any special syntax or configuration.
+
+**Natural Statelessness**: Functional design inherently creates stateless request handling, perfect for horizontal scaling.
+
+**Built-in Non-Blocking**: All I/O operations are naturally non-blocking through Go's runtime and standard libraries.
+
+**Zero-Configuration Scaling**: No pools to configure, no limits to set - programs automatically scale to available resources.
 
 ## Phase 1: Core Type System Implementation
 

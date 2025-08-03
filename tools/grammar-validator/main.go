@@ -35,7 +35,7 @@ func main() {
 	// Parse command line arguments
 	var mode string
 	var files []string
-	
+
 	if os.Args[1] == "--valid" || os.Args[1] == "--invalid" {
 		mode = os.Args[1][2:] // Remove "--" prefix
 		files = os.Args[2:]
@@ -75,7 +75,7 @@ func main() {
 		vexParser.RemoveErrorListeners()
 		vexParser.AddErrorListener(errorListener)
 
-		// Parse starting from the 'sp' rule (root rule)  
+		// Parse starting from the 'sp' rule (root rule)
 		tree := vexParser.Program()
 
 		// Check results based on mode
@@ -99,21 +99,21 @@ func main() {
 
 	// Report final results
 	hasErrors := len(failedFiles) > 0 || len(unexpectedResults) > 0
-	
+
 	if len(failedFiles) > 0 {
 		fmt.Println("\n💥 The following files failed to parse:")
 		for _, file := range failedFiles {
 			fmt.Printf("  - %s\n", file)
 		}
 	}
-	
+
 	if len(unexpectedResults) > 0 {
 		fmt.Println("\n⚠️  The following invalid test files unexpectedly succeeded:")
 		for _, file := range unexpectedResults {
 			fmt.Printf("  - %s\n", file)
 		}
 	}
-	
+
 	if hasErrors {
 		fmt.Println("\n[ERROR] Grammar validation failed!")
 		os.Exit(1)
@@ -137,7 +137,7 @@ type ErrorListener struct {
 }
 
 func (el *ErrorListener) SyntaxError(recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
-			fmt.Printf("[ERROR] Syntax error in %s at line %d:%d - %s\n", el.filename, line, column, msg)
+	fmt.Printf("[ERROR] Syntax error in %s at line %d:%d - %s\n", el.filename, line, column, msg)
 	el.hasError = true
 }
 

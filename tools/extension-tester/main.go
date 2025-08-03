@@ -78,7 +78,7 @@ func createSamples() {
 
 	fmt.Println("[SUCCESS] Sample Vex files created successfully")
 	fmt.Println("📁 Test files:")
-	
+
 	// List test files
 	files, err := os.ReadDir("test-samples")
 	if err != nil {
@@ -96,7 +96,7 @@ func packageExtension() {
 
 	// Verify required files exist
 	fmt.Println("📋 Checking extension structure...")
-	
+
 	if _, err := os.Stat("package.json"); err != nil {
 		fmt.Println("[ERROR] package.json not found")
 		os.Exit(1)
@@ -104,14 +104,14 @@ func packageExtension() {
 
 	// Package the extension using @vscode/vsce
 	fmt.Println("🔧 Using @vscode/vsce to package extension...")
-	cmd := exec.Command("npx", "@vscode/vsce", "package", 
-		"--out", "vex-test-build.vsix", 
-		"--no-git-tag-version", 
+	cmd := exec.Command("npx", "@vscode/vsce", "package",
+		"--out", "vex-test-build.vsix",
+		"--no-git-tag-version",
 		"--allow-missing-repository")
-	
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to package extension: %v\n", err)
@@ -119,7 +119,7 @@ func packageExtension() {
 	}
 
 	fmt.Println("[SUCCESS] Extension packaged successfully")
-	
+
 	// List .vsix files
 	files, err := filepath.Glob("*.vsix")
 	if err == nil {

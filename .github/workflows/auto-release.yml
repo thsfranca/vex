@@ -78,9 +78,7 @@ jobs:
 
       - name: Create release notes
         if: steps.check-labels.outputs.release-type != 'none'
-        id: create-notes
         run: |
-          echo "📝 Creating release notes..."
           cd tools/release-manager
           
           # Create PR data JSON for the tool
@@ -95,50 +93,23 @@ jobs:
           EOF
           )
           
-          # Create release notes and capture output
-          NOTES_OUTPUT=$(./release-manager create-notes "$PR_DATA")
-          echo "$NOTES_OUTPUT"
+          # Create release notes via tool
+          ./release-manager create-notes "$PR_DATA"
           
-          # Extract release notes for GitHub Release
-          echo "release-notes<<EOF" >> $GITHUB_OUTPUT
-          echo "## Release v${{ steps.bump-version.outputs.new-version }}" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          echo "**Release Type**: ${{ steps.check-labels.outputs.release-type }}" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          echo "**Changes:**" >> $GITHUB_OUTPUT
-          echo "- ${{ github.event.pull_request.title }}" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/v${{ steps.bump-version.outputs.old-version }}...v${{ steps.bump-version.outputs.new-version }}" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Create release notes for GitHub Release
+          .github/scripts/release/create-release-notes.sh \
+            "${{ steps.bump-version.outputs.new-version }}" \
+            "${{ steps.bump-version.outputs.old-version }}" \
+            "${{ github.event.pull_request.number }}" \
+            "${{ github.event.pull_request.title }}" \
+            "${{ steps.check-labels.outputs.release-type }}"
 
       - name: Create GitHub Release
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
-          echo "🚀 Creating GitHub Release..."
-          
-          # Determine if this is a prerelease
-          PRERELEASE_FLAG=""
-          if [[ "${{ steps.check-labels.outputs.release-type }}" =~ ^(alpha|beta|rc)$ ]]; then
-            PRERELEASE_FLAG="--prerelease"
-          fi
-          
-          # Create placeholder artifacts
-          mkdir -p dist
-          echo "# Vex Language v${{ steps.bump-version.outputs.new-version }}" > dist/README.md
-          echo "Basic transpiler with working features:" >> dist/README.md
-          echo "- Variable definitions: (def x 10) → x := 10" >> dist/README.md
-          echo "- Arithmetic expressions: (+ 1 2) → 1 + 2" >> dist/README.md
-          echo "- CLI tool: fugo-transpiler" >> dist/README.md
-          
-          # Package examples
-          tar -czf dist/vex-examples-v${{ steps.bump-version.outputs.new-version }}.tar.gz examples/
-          
-          # Create the GitHub Release
-          gh release create "v${{ steps.bump-version.outputs.new-version }}" \
-            --title "Vex v${{ steps.bump-version.outputs.new-version }}" \
-            --notes "${{ steps.create-notes.outputs.release-notes }}" \
-            $PRERELEASE_FLAG \
-            dist/*
+          .github/scripts/release/create-github-release.sh \
+            "${{ steps.bump-version.outputs.new-version }}" \
+            "${{ steps.check-labels.outputs.release-type }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

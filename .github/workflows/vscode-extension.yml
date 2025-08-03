@@ -101,6 +101,9 @@ jobs:
     needs: [detect-changes, skip-validation, validate]
     if: always()
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
     - name: Set up Go (for summary)
       uses: actions/setup-go@v5
       with:

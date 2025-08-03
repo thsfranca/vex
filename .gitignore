@@ -26,6 +26,12 @@ tools/*/[!.]*
 *.swp
 *.swo
 
+# Language Server Protocol
+.lsp/
+
+# Clojure/Linting tools
+.clj-kondo/
+
 # OS generated files
 .DS_Store
 .DS_Store?

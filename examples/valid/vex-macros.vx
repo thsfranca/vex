@@ -1,0 +1,2 @@
+(macro defn [name params body]
+  (def ~name (fn ~params ~body)))

@@ -83,6 +83,9 @@ func (v *ASTVisitor) VisitList(ctx *parser.ListContext) interface{} {
 		} else if strings.HasPrefix(firstElement, ".") {
 			// Check if it's a method call (starts with .)
 			v.handleMethodCall(firstElement, content[1:])
+		} else if strings.Contains(firstElement, "/") {
+			// Check if it's a package function call with slash notation (contains /)
+			v.handleSlashNotationCall(firstElement, content[1:])
 		} else {
 			// Handle other expressions or function calls
 			v.handleExpression(content)
@@ -155,6 +158,27 @@ func (v *ASTVisitor) handleMethodCall(methodName string, content []antlr.Tree) {
 	}
 	
 	v.codeGen.EmitMethodCall(receiver, methodName[1:], args) // Remove the dot from method name
+}
+
+// handleSlashNotationCall handles package function calls like (fmt/Println "message")
+func (v *ASTVisitor) handleSlashNotationCall(packageFunction string, content []antlr.Tree) {
+	// Split package/function on the slash
+	parts := strings.Split(packageFunction, "/")
+	if len(parts) != 2 {
+		v.codeGen.writeIndented(fmt.Sprintf("// Invalid slash notation: %s\n", packageFunction))
+		return
+	}
+	
+	packageName := parts[0]
+	functionName := parts[1]
+	
+	// Get the function arguments
+	var args []string
+	for _, arg := range content {
+		args = append(args, v.evaluateExpression(arg))
+	}
+	
+	v.codeGen.EmitSlashNotationCall(packageName, functionName, args)
 }
 
 // handleMacroDefinition handles macro definitions like (macro name [params] body)
@@ -268,7 +292,38 @@ func (v *ASTVisitor) evaluateExpression(node antlr.Tree) string {
 		return text
 
 	case *parser.ListContext:
-		// Handle nested lists by recursively visiting them
+		// Check if this is a slash notation call like (mux/NewRouter)
+		children := ctx.GetChildren()
+		if len(children) >= 3 { // ( symbol )
+			if firstChild, ok := children[1].(*antlr.TerminalNodeImpl); ok {
+				firstElement := firstChild.GetText()
+				if strings.Contains(firstElement, "/") {
+					// Handle slash notation in expressions
+					parts := strings.Split(firstElement, "/")
+					if len(parts) == 2 {
+						packageName := parts[0]
+						functionName := parts[1]
+						
+						// Extract arguments if any
+						var args []string
+						for i := 2; i < len(children)-1; i++ {
+							argValue := v.evaluateExpression(children[i])
+							args = append(args, argValue)
+						}
+						
+						// Generate function call
+						if len(args) > 0 {
+							argsStr := strings.Join(args, ", ")
+							return fmt.Sprintf("%s.%s(%s)", packageName, functionName, argsStr)
+						} else {
+							return fmt.Sprintf("%s.%s()", packageName, functionName)
+						}
+					}
+				}
+			}
+		}
+		
+		// Handle other nested lists by recursively visiting them
 		// Create a temporary visitor to handle the nested list
 		nestedVisitor := NewASTVisitor()
 		ctx.Accept(nestedVisitor)

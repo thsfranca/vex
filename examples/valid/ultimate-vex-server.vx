@@ -1,0 +1,21 @@
+(macro defn [name params body]
+  (def ~name (fn ~params ~body)))
+
+(import "net/http")
+(import "github.com/gorilla/mux") 
+(import "fmt")
+
+(defn hello-handler [w r]
+  (.WriteString w "Hello from Ultimate AI-Friendly Vex!"))
+
+(defn status-handler [w r]
+  (.WriteString w "{\"status\": \"ok\", \"language\": \"vex\", \"syntax\": \"slash-notation\"}"))
+
+(def router (mux/NewRouter))
+(.HandleFunc router "/" hello-handler)
+(.HandleFunc router "/status" status-handler)
+
+(fmt/Println "🚀 Ultimate AI-Friendly Vex HTTP Server")
+(fmt/Println "📡 Serving on http://localhost:8080")
+(fmt/Println "✨ Using pure slash notation syntax")
+(http/ListenAndServe ":8080" router)

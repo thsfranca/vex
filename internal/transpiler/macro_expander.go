@@ -30,7 +30,6 @@ func NewMacroExpander() *MacroExpander {
 // registerBuiltinMacros registers the built-in macros
 func (me *MacroExpander) registerBuiltinMacros() {
 	me.macros["http-server"] = me.expandHttpServer
-	me.macros["defn"] = me.expandDefn
 }
 
 // ExpandMacros expands macros in Vex source code
@@ -51,17 +50,8 @@ func (me *MacroExpander) ExpandMacros(source string) (string, error) {
 
 // expandMacroInSource expands a specific macro in the source code
 func (me *MacroExpander) expandMacroInSource(source, macroName string, macroFunc MacroExpanderFunc) (string, error) {
-	// Different patterns for different macros
-	var pattern string
-	
-	if macroName == "defn" {
-		// For defn, we need to handle: (defn name [params] body...)
-		pattern = fmt.Sprintf(`\(%s\s+[^)\s]+\s+\[[^\]]*\][^)]*\)`, regexp.QuoteMeta(macroName))
-	} else {
-		// For http-server and others: (macro-name (...))
-		pattern = fmt.Sprintf(`\(%s[^)]*\([^)]*\)[^)]*\)`, regexp.QuoteMeta(macroName))
-	}
-	
+	// For http-server and others: (macro-name (...))
+	pattern := fmt.Sprintf(`\(%s[^)]*\([^)]*\)[^)]*\)`, regexp.QuoteMeta(macroName))
 	re := regexp.MustCompile(pattern)
 	
 	// Find all matches
@@ -95,37 +85,6 @@ func (me *MacroExpander) extractArguments(match, macroName string) []string {
 	// A full implementation would handle nested s-expressions properly
 	args := strings.Fields(content)
 	return args
-}
-
-// expandDefn expands the defn macro to def + fn
-// (defn name [params] body) -> (def name (fn [params] body))
-func (me *MacroExpander) expandDefn(match string, args []string) (string, error) {
-	// For now, handle a simple case by reconstructing from the original match
-	// Extract the function name, params, and body from the match
-	
-	// This is a simplified implementation - a full parser would be better
-	// For now, assume the format: (defn name [params] body...)
-	
-	// Parse the match to extract components
-	content := strings.TrimPrefix(match, "(defn")
-	content = strings.TrimSuffix(content, ")")
-	content = strings.TrimSpace(content)
-	
-	// Find the function name (first token)
-	parts := strings.Fields(content)
-	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid defn syntax")
-	}
-	
-	funcName := parts[0]
-	
-	// Find the parameter list and body (everything after the name)
-	remainingContent := strings.TrimSpace(strings.TrimPrefix(content, funcName))
-	
-	// Generate the expanded form: (def name (fn [params] body))
-	expanded := fmt.Sprintf("(def %s (fn %s))", funcName, remainingContent)
-	
-	return expanded, nil
 }
 
 // expandHttpServer expands the http-server macro

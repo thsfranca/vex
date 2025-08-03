@@ -82,6 +82,13 @@ func (cg *CodeGenerator) EmitMethodCall(receiver, methodName string, args []stri
 	cg.writeIndented(fmt.Sprintf("_ = %s.%s(%s)\n", receiver, methodName, argsStr))
 }
 
+// EmitSlashNotationCall generates Go package function calls from slash notation
+// (fmt/Println "message") -> fmt.Println("message")
+func (cg *CodeGenerator) EmitSlashNotationCall(packageName, functionName string, args []string) {
+	argsStr := strings.Join(args, ", ")
+	cg.writeIndented(fmt.Sprintf("%s.%s(%s)\n", packageName, functionName, argsStr))
+}
+
 // EmitFunctionLiteral generates Go function literals
 // (fn [w r] body) -> func(w http.ResponseWriter, r *http.Request) { body }
 func (cg *CodeGenerator) EmitFunctionLiteral(params []string, bodyElements []antlr.Tree, visitor *ASTVisitor) string {

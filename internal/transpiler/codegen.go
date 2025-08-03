@@ -3,12 +3,16 @@ package transpiler
 import (
 	"fmt"
 	"strings"
+
+	"github.com/antlr4-go/antlr/v4"
+	"github.com/thsfranca/vex/internal/transpiler/parser"
 )
 
 // CodeGenerator handles the generation of Go code from AST nodes
 type CodeGenerator struct {
 	indentLevel int
 	buffer      strings.Builder
+	imports     map[string]bool // Track unique imports
 }
 
 // NewCodeGenerator creates a new code generator instance
@@ -16,6 +20,7 @@ func NewCodeGenerator() *CodeGenerator {
 	return &CodeGenerator{
 		indentLevel: 0,
 		buffer:      strings.Builder{},
+		imports:     make(map[string]bool),
 	}
 }
 
@@ -62,6 +67,114 @@ func (cg *CodeGenerator) EmitArithmeticExpression(operator string, operands []st
 	cg.writeIndented(fmt.Sprintf("_ = %s\n", expression))
 }
 
+// EmitImport collects import statements for later generation
+// (import "net/http") -> adds to imports collection
+func (cg *CodeGenerator) EmitImport(importPath string) {
+	// Clean the import path (remove quotes if they exist, then add them back)
+	cleanPath := strings.Trim(importPath, "\"")
+	cg.imports[fmt.Sprintf("\"%s\"", cleanPath)] = true
+}
+
+// EmitMethodCall generates Go method calls
+// (.HandleFunc router "/path" handler) -> router.HandleFunc("/path", handler)
+func (cg *CodeGenerator) EmitMethodCall(receiver, methodName string, args []string) {
+	argsStr := strings.Join(args, ", ")
+	cg.writeIndented(fmt.Sprintf("_ = %s.%s(%s)\n", receiver, methodName, argsStr))
+}
+
+// EmitSlashNotationCall generates Go package function calls from slash notation
+// (fmt/Println "message") -> fmt.Println("message")
+func (cg *CodeGenerator) EmitSlashNotationCall(packageName, functionName string, args []string) {
+	argsStr := strings.Join(args, ", ")
+	cg.writeIndented(fmt.Sprintf("%s.%s(%s)\n", packageName, functionName, argsStr))
+}
+
+// EmitFunctionLiteral generates Go function literals
+// (fn [w r] body) -> func(w http.ResponseWriter, r *http.Request) { body }
+func (cg *CodeGenerator) EmitFunctionLiteral(params []string, bodyElements []antlr.Tree, visitor *ASTVisitor) string {
+	var result strings.Builder
+	
+	// Start function literal
+	result.WriteString("func(")
+	
+	// Add parameters with types
+	if len(params) == 2 {
+		// Assume HTTP handler signature for 2 parameters
+		result.WriteString(fmt.Sprintf("%s http.ResponseWriter, %s *http.Request", params[0], params[1]))
+		// Add http import
+		cg.EmitImport("\"net/http\"")
+	} else {
+		// Generic parameters - types will need to be inferred or specified
+		for i, param := range params {
+			if i > 0 {
+				result.WriteString(", ")
+			}
+			result.WriteString(fmt.Sprintf("%s interface{}", param))
+		}
+	}
+	
+	result.WriteString(") {\n")
+	
+	// Generate function body by processing each body element
+	for _, bodyElement := range bodyElements {
+		bodyCode := cg.processFunctionBodyElement(bodyElement, visitor)
+		if bodyCode != "" {
+			result.WriteString(fmt.Sprintf("\t%s\n", bodyCode))
+		}
+	}
+	
+	result.WriteString("}")
+	
+	return result.String()
+}
+
+// processFunctionBodyElement processes a single element in a function body
+func (cg *CodeGenerator) processFunctionBodyElement(element antlr.Tree, visitor *ASTVisitor) string {
+	switch ctx := element.(type) {
+	case *parser.ListContext:
+		// Method calls, function calls, etc.
+		children := ctx.GetChildren()
+		if len(children) < 3 { // Need at least ( symbol )
+			return ""
+		}
+		
+		// Get the first element (function/method name)
+		firstChild := children[1] // Skip opening parenthesis
+		if terminalNode, ok := firstChild.(*antlr.TerminalNodeImpl); ok {
+			firstElement := terminalNode.GetText()
+			
+			// Extract arguments (skip opening paren, function name, closing paren)
+			var args []string
+			for i := 2; i < len(children)-1; i++ {
+				argValue := visitor.evaluateExpression(children[i])
+				args = append(args, argValue)
+			}
+			
+			if strings.HasPrefix(firstElement, ".") {
+				// Method call: (.WriteString w "Hello!")
+				if len(args) >= 1 {
+					receiver := args[0]
+					methodArgs := args[1:]
+					argsStr := strings.Join(methodArgs, ", ")
+					return fmt.Sprintf("%s.%s(%s)", receiver, firstElement[1:], argsStr)
+				}
+			} else {
+				// Function call: (fmt.Println "Hello")
+				argsStr := strings.Join(args, ", ")
+				return fmt.Sprintf("%s(%s)", firstElement, argsStr)
+			}
+		}
+		
+	default:
+		// Use the visitor's evaluateExpression for everything else
+		return visitor.evaluateExpression(element)
+	}
+	
+	return ""
+}
+
+
+
 // convertOperator converts Vex operators to Go operators
 func convertOperator(vexOp string) string {
 	switch vexOp {
@@ -101,8 +214,18 @@ func (cg *CodeGenerator) GetCode() string {
 	return cg.buffer.String()
 }
 
+// GetImports returns all collected imports
+func (cg *CodeGenerator) GetImports() []string {
+	var imports []string
+	for importPath := range cg.imports {
+		imports = append(imports, importPath)
+	}
+	return imports
+}
+
 // Reset clears the code generator state
 func (cg *CodeGenerator) Reset() {
 	cg.buffer.Reset()
 	cg.indentLevel = 0
+	cg.imports = make(map[string]bool)
 }

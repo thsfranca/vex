@@ -1,0 +1,23 @@
+(import "net/http")
+(import "github.com/gorilla/mux")
+(import "fmt")
+
+(def hello-handler (func w r) (
+  (.Header.Set w "Content-Type" "text/plain")
+  (.WriteString w "Hello from Vex HTTP Server!")
+))
+
+(def status-handler (func w r) (
+  (.Header.Set w "Content-Type" "application/json")
+  (.WriteString w "{\"status\": \"ok\", \"message\": \"Vex server is running!\"}")
+))
+
+(def router (.NewRouter mux))
+(.HandleFunc router "/" hello-handler)
+(.HandleFunc router "/status" status-handler)
+
+(fmt.Println "🚀 Vex HTTP Server starting on :8080...")
+(fmt.Println "Try: curl http://localhost:8080/")
+(fmt.Println "Try: curl http://localhost:8080/status")
+
+(.ListenAndServe http ":8080" router)

@@ -1,0 +1,2 @@
+(def hello-handler (fn [w r]
+  (.WriteString w "Hello from Vex function!")))

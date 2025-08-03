@@ -25,7 +25,6 @@ tools/*/[!.]*
 .idea/
 *.swp
 *.swo
-*~
 
 # OS generated files
 .DS_Store
@@ -44,7 +43,7 @@ Thumbs.db
 
 # VSCode Extension Build Artifacts
 vscode-extension/*.vsix
-vscode-extension/fugo-*.vsix
+vscode-extension/vex-*.vsix
 
 # Extension development files
 vscode-extension/node_modules/

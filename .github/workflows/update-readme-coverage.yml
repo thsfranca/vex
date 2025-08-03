@@ -29,28 +29,36 @@ jobs:
           makefile-changes:
             - 'Makefile'
             
+    - name: Set up Go (for change detection)
+      if: ${{ steps.changes.outputs.makefile-changes == 'true' }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
     - name: Analyze Makefile changes for Go relevance
       id: makefile-analysis
       if: ${{ steps.changes.outputs.makefile-changes == 'true' }}
       run: |
-        # Check if Makefile diff contains Go-related patterns
-        GO_RELATED="false"
-        if git diff origin/main...HEAD Makefile | grep -E "(go (build|test|mod|generate)|GOPATH|GOOS|GOARCH|\.go|antlr.*-Dlanguage=Go)" > /dev/null; then
-          GO_RELATED="true"
-        fi
+        cd tools/change-detector
+        go build -o change-detector .
+        output=$(./change-detector makefile-analysis)
+        GO_RELATED=$(echo "$output" | grep "go-related=" | cut -d'=' -f2)
         echo "go-related=$GO_RELATED" >> $GITHUB_OUTPUT
         
     - name: Final Go files decision
       id: final-decision  
       run: |
+        cd tools/change-detector
+        if [ ! -f change-detector ]; then
+          go build -o change-detector .
+        fi
+        
         BASIC_GO="${{ steps.changes.outputs.go-files }}"
         MAKEFILE_GO="${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
         
-        if [[ "$BASIC_GO" == "true" || "$MAKEFILE_GO" == "true" ]]; then
-          echo "go-files=true" >> $GITHUB_OUTPUT
-        else
-          echo "go-files=false" >> $GITHUB_OUTPUT
-        fi
+        output=$(./change-detector final-decision "$BASIC_GO" "$MAKEFILE_GO")
+        GO_FILES=$(echo "$output" | grep "go-files=" | cut -d'=' -f2)
+        echo "go-files=$GO_FILES" >> $GITHUB_OUTPUT
 
   update-coverage:
     runs-on: ubuntu-latest
@@ -75,109 +83,23 @@ jobs:
     
     - name: Generate Go coverage
       run: |
-        # Create coverage directory
-        mkdir -p coverage
+        cd tools/coverage-updater
+        go build -o coverage-updater .
         
-        # Run coverage analysis
-        go test -v -coverprofile=coverage/total.out -coverpkg=./... ./... 2>/dev/null || echo "0" > coverage/total_coverage.txt
+        # Generate coverage and capture environment variables
+        output=$(./coverage-updater generate-coverage)
+        echo "$output"
         
-        # Calculate coverage percentages
-        calculate_coverage() {
-          local file=$1
-          if [ -f "$file" ]; then
-            go tool cover -func="$file" | grep "total:" | awk '{print $3}' | sed 's/%//'
-          else
-            echo "0"
-          fi
-        }
-        
-        # Generate component coverage files (these will be 0 until implemented)
-        go test -v -coverprofile=coverage/parser.out ./internal/frontend/parser/... 2>/dev/null || echo "0" > coverage/parser_coverage.txt
-        go test -v -coverprofile=coverage/transpiler.out ./internal/transpiler/... 2>/dev/null || echo "0" > coverage/transpiler_coverage.txt
-        go test -v -coverprofile=coverage/types.out ./internal/types/... 2>/dev/null || echo "0" > coverage/types_coverage.txt
-        go test -v -coverprofile=coverage/stdlib.out ./stdlib/... 2>/dev/null || echo "0" > coverage/stdlib_coverage.txt
-        
-        # Calculate actual coverage
-        PARSER_COV=$(calculate_coverage "coverage/parser.out")
-        TRANSPILER_COV=$(calculate_coverage "coverage/transpiler.out") 
-        TYPES_COV=$(calculate_coverage "coverage/types.out")
-        STDLIB_COV=$(calculate_coverage "coverage/stdlib.out")
-        TOTAL_COV=$(calculate_coverage "coverage/total.out")
-        
-        # Generate coverage status for each component
-        generate_status() {
-          local coverage=$1
-          local target=$2
-          local implemented=$3
-          
-          if [ "$implemented" = "false" ]; then
-            echo "⏳ *Not implemented yet*"
-          elif [ $(echo "$coverage >= $target" | bc -l) -eq 1 ]; then
-            echo "✅ $coverage%"
-          else
-            echo "❌ $coverage% (below $target%)"
-          fi
-        }
-        
-        # Check if components are implemented
-        PARSER_IMPL="false"
-        TRANSPILER_IMPL="false" 
-        TYPES_IMPL="false"
-        STDLIB_IMPL="false"
-        
-        [ -d "internal/frontend/parser" ] && [ -f "coverage/parser.out" ] && PARSER_IMPL="true"
-        [ -d "internal/transpiler" ] && [ -f "coverage/transpiler.out" ] && TRANSPILER_IMPL="true"
-        [ -d "internal/types" ] && [ -f "coverage/types.out" ] && TYPES_IMPL="true"
-        [ -d "stdlib" ] && [ -f "coverage/stdlib.out" ] && STDLIB_IMPL="true"
-        
-        # Generate status strings
-        PARSER_STATUS=$(generate_status "$PARSER_COV" "95" "$PARSER_IMPL")
-        TRANSPILER_STATUS=$(generate_status "$TRANSPILER_COV" "90" "$TRANSPILER_IMPL")
-        TYPES_STATUS=$(generate_status "$TYPES_COV" "85" "$TYPES_IMPL")
-        STDLIB_STATUS=$(generate_status "$STDLIB_COV" "80" "$STDLIB_IMPL")
-        
-        # Handle total coverage
-        if [ "$TOTAL_COV" = "0" ]; then
-          TOTAL_STATUS="⏳ *No tests yet*"
-        elif [ $(echo "$TOTAL_COV >= 75" | bc -l) -eq 1 ]; then
-          TOTAL_STATUS="✅ $TOTAL_COV%"
-        else
-          TOTAL_STATUS="❌ $TOTAL_COV% (below 75%)"
-        fi
-        
-        # Save to environment
-        echo "PARSER_STATUS=$PARSER_STATUS" >> $GITHUB_ENV
-        echo "TRANSPILER_STATUS=$TRANSPILER_STATUS" >> $GITHUB_ENV
-        echo "TYPES_STATUS=$TYPES_STATUS" >> $GITHUB_ENV
-        echo "STDLIB_STATUS=$STDLIB_STATUS" >> $GITHUB_ENV
-        echo "TOTAL_STATUS=$TOTAL_STATUS" >> $GITHUB_ENV
+        # Extract status variables and add to environment
+        echo "$output" | grep "_STATUS=" >> $GITHUB_ENV
     
     - name: Update README with coverage
       run: |
-        # Create coverage table
-        cat > coverage_table.tmp << 'COVERAGE_EOF'
-        | Component | Target | Status | Purpose |
-        |-----------|--------|--------|---------|
-        | **Parser** | 95%+ | PARSER_STATUS_PLACEHOLDER | Critical language component |
-        | **Transpiler** | 90%+ | TRANSPILER_STATUS_PLACEHOLDER | Core functionality |
-        | **Type System** | 85%+ | TYPES_STATUS_PLACEHOLDER | Type safety |
-        | **Standard Library** | 80%+ | STDLIB_STATUS_PLACEHOLDER | User-facing features |
-        | **Overall Project** | 75%+ | TOTAL_STATUS_PLACEHOLDER | Quality baseline |
-        
-        > **Quality Philosophy**: Higher coverage requirements for more critical components. PRs that reduce coverage below these thresholds are automatically blocked.
-        COVERAGE_EOF
-        
-        # Replace placeholders with actual values
-        sed -i "s/PARSER_STATUS_PLACEHOLDER/$PARSER_STATUS/g" coverage_table.tmp
-        sed -i "s/TRANSPILER_STATUS_PLACEHOLDER/$TRANSPILER_STATUS/g" coverage_table.tmp  
-        sed -i "s/TYPES_STATUS_PLACEHOLDER/$TYPES_STATUS/g" coverage_table.tmp
-        sed -i "s/STDLIB_STATUS_PLACEHOLDER/$STDLIB_STATUS/g" coverage_table.tmp
-        sed -i "s/TOTAL_STATUS_PLACEHOLDER/$TOTAL_STATUS/g" coverage_table.tmp
-        
-        # Replace coverage section in README
-        awk '/Component.*Target.*Status.*Purpose/,/Quality Philosophy/{next} {print}' README.md > README.tmp
-        awk '/## Project Status/{print; print ""; system("cat coverage_table.tmp"); print ""; next} {print}' README.tmp > README.md
-        rm -f README.tmp coverage_table.tmp
+        cd tools/coverage-updater
+        if [ ! -f coverage-updater ]; then
+          go build -o coverage-updater .
+        fi
+        ./coverage-updater update-readme
     
     - name: Commit updated coverage
       run: |

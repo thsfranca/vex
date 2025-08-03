@@ -19,19 +19,19 @@ The goal is to explore language design concepts including parsing, type systems,
 ## Project Structure
 
 ```
-vex/
-├── tools/
-│   ├── grammar/
-│   │   └── Vex.g4           # ANTLR4 grammar definition
-│   └── gen/                 # Generated parser files (created by make)
-│       ├── java/            # Java parser files
-│       ├── go/              # Go parser files
-│       ├── python/          # Python parser files
-│       ├── cpp/             # C++ parser files
-│       └── javascript/      # JavaScript parser files
-├── examples/
-│   └── *.vx                # Example Vex programs
-└── docs/                    # Documentation
+fugo/
+├── docs/                           # Documentation
+├── examples/                       # Example Vex programs
+│   └── go-usage/                   # Go integration examples
+├── tools/                          # Development and build tools
+│   ├── grammar/                    # ANTLR4 grammar definition
+│   ├── gen/                        # Generated parser files (created by make)
+│   ├── change-detector/            # CI tool for detecting file changes
+│   ├── coverage-updater/           # Tool for updating test coverage
+│   ├── debug-helper/               # Debugging utilities
+│   ├── extension-tester/           # VSCode extension testing tool
+│   └── grammar-validator/          # Grammar validation tool
+└── scripts/                        # Build and utility scripts
 ```
 
 ## Language Vision

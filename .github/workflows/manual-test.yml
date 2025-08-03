@@ -31,73 +31,55 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Set up Go (for debug helper)
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
     - name: Debug info
       if: ${{ inputs.debug_mode }}
+      env:
+        TEST_TYPE: ${{ inputs.test_type }}
+        DEBUG_MODE: ${{ inputs.debug_mode }}
       run: |
-        echo "🔍 DEBUG INFORMATION"
-        echo "==================="
-        echo "Test type: ${{ inputs.test_type }}"
-        echo "Debug mode: ${{ inputs.debug_mode }}"
-        echo "Event: ${{ github.event_name }}"
-        echo "Ref: ${{ github.ref }}"
-        echo "SHA: ${{ github.sha }}"
-        echo ""
-        echo "📂 Repository structure:"
-        find . -type f -name "*.go" | head -10
-        echo ""
-        echo "📦 Go modules:"
-        cat go.mod 2>/dev/null || echo "No go.mod found"
+        cd tools/debug-helper
+        go build -o debug-helper .
+        ./debug-helper debug-info
         
     - name: Simulate skip scenario
       if: ${{ inputs.test_type == 'skip-simulation' }}
       run: |
-        echo "✅ Simulating skip scenario for non-Go changes"
-        echo "This is what happens when only docs/VSCode extension files change"
-        echo "Total time: ~10-15 seconds"
-        echo "vs. old workflow: ~8-10 minutes"
-        
-    - name: Set up Go (if needed)
-      if: ${{ inputs.test_type != 'skip-simulation' }}
-      uses: actions/setup-go@v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        
+        cd tools/debug-helper
+        if [ ! -f debug-helper ]; then
+          go build -o debug-helper .
+        fi
+        ./debug-helper skip-simulation
     - name: Build Go packages only
       if: ${{ inputs.test_type == 'build-only' || inputs.test_type == 'full' }}
       run: |
-        if find . -name "main.go" | grep -q .; then
-          echo "🔨 Building Go packages..."
-          go build ./...
-        else
-          echo "📝 No main packages found yet"
+        cd tools/debug-helper
+        if [ ! -f debug-helper ]; then
+          go build -o debug-helper .
         fi
+        ./debug-helper build-only
         
     - name: Run Go tests only  
       if: ${{ inputs.test_type == 'test-only' || inputs.test_type == 'full' }}
       run: |
-        if find . -name "*_test.go" | grep -q .; then
-          echo "🧪 Running tests..."
-          go test -v ./...
-        else
-          echo "📝 No tests found yet"
+        cd tools/debug-helper
+        if [ ! -f debug-helper ]; then
+          go build -o debug-helper .
         fi
+        ./debug-helper test-only
         
     - name: Run Go linting only
       if: ${{ inputs.test_type == 'lint-only' || inputs.test_type == 'full' }}
       run: |
-        if find . -name "*.go" | grep -q .; then
-          echo "🔍 Installing linting tools..."
-          go install golang.org/x/tools/cmd/goimports@latest
-          echo "🔍 Checking formatting..."
-          goimports -l . | tee /tmp/goimports.out
-          if [ -s /tmp/goimports.out ]; then
-            echo "⚠️ Formatting issues found (not failing in manual test)"
-          else
-            echo "✅ Code is properly formatted"
-          fi
-        else
-          echo "📝 No Go files found to lint"
+        cd tools/debug-helper
+        if [ ! -f debug-helper ]; then
+          go build -o debug-helper .
         fi
+        ./debug-helper lint-only
         
     - name: Performance summary
       run: |

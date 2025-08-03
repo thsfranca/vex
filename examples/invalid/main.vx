@@ -1,0 +1,30 @@
+; Example Vex program with INVALID syntax for current grammar
+; This file tests error handling - these features are NOT yet supported
+
+; Package declaration
+(package main)
+
+; Function definitions using def
+(def greet [name] 
+  (print "Hello" name))
+
+(def add [x y] 
+  (+ x y))              ; ERROR: '+' operator not defined in current grammar
+
+; Simple expressions
+(print "Welcome to Fugo!")
+
+; Array literals - INVALID: Vex grammar doesn't support [..] bracket syntax yet
+[1 2 3 4 5]             ; ERROR: '[' not expected, grammar expects '(' for lists
+["hello" "world" "from" "fugo"]  ; ERROR: Array literals not supported
+
+; Nested expressions with operators
+(if (> (add 2 3) 4)     ; ERROR: '>' comparison operator not defined in grammar
+    (print "Math works!")
+    (print "Something is wrong"))
+
+; Mixed data structures
+(list [1 2 3] "mixed" (nested expressions) ["work" "too"])  ; ERROR: [..] syntax invalid
+
+; Comments are supported
+; This is another comment

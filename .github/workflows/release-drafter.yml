@@ -16,14 +16,14 @@ permissions:
 
 jobs:
   update_release_draft:
-    name: "Fugo Language Release Draft"
+    name: "Vex Language Release Draft"
     permissions:
       contents: write
       pull-requests: write
       issues: write
     runs-on: ubuntu-latest
     steps:
-      - name: Update Fugo Release Draft
+      - name: Update Vex Release Draft
         uses: release-drafter/release-drafter@v6
         with:
           config-name: release-drafter.yml

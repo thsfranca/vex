@@ -5,7 +5,7 @@
 
 set -e  # Exit on any error
 
-echo "🚀 Quick reinstalling Fugo VSCode Extension..."
+echo "[INSTALL] Quick reinstalling Fugo VSCode Extension..."
 
 # Check if Cursor is running
 CURSOR_RUNNING=false
@@ -16,13 +16,13 @@ fi
 
 # Check if vsce is installed
 if ! command -v vsce &> /dev/null; then
-    echo "❌ vsce not found. Installing..."
+    echo "[ERROR] vsce not found. Installing..."
     npm install -g @vscode/vsce
 fi
 
 # Extension info
-EXTENSION_NAME="fugo-minimal"
-PUBLISHER="fugo-dev"
+EXTENSION_NAME="vex-minimal"
+PUBLISHER="vex-dev"
 FULL_NAME="$PUBLISHER.$EXTENSION_NAME"
 
 # If Cursor is running, create a background restart script
@@ -33,7 +33,7 @@ if [ "$CURSOR_RUNNING" = true ]; then
     cat > /tmp/fugo-restart-cursor.sh << 'EOF'
 #!/bin/bash
 sleep 3  # Wait for Cursor to fully close
-echo "🚀 Restarting Cursor..."
+echo "[RESTART] Restarting Cursor..."
 open -a "Cursor" 2>/dev/null || cursor 2>/dev/null || echo "Could not auto-start Cursor"
 rm -f /tmp/fugo-restart-cursor.sh  # Clean up
 EOF
@@ -59,18 +59,18 @@ else
 fi
 vsce package --out "./fugo-latest.vsix"
 
-echo "⚡ Installing new extension..."
+echo "[INSTALL] Installing new extension..."
 cursor --install-extension "./fugo-latest.vsix"
 
 echo ""
-echo "✅ Extension reinstalled successfully!"
+echo "[SUCCESS] Extension reinstalled successfully!"
 if [ "$CURSOR_RUNNING" = true ]; then
     echo "🎯 Cursor will restart automatically in a few seconds..."
 else
     echo "🎯 Start Cursor and test your changes!"
 fi
 echo ""
-echo "📝 Test checklist:"
+echo "[TEST] Test checklist:"
 echo "   • Open examples/test-extension.fugo"
 echo "   • Verify syntax highlighting works"
 echo "   • Check Color Theme → 'Fugo Dark'"

@@ -1,9 +1,9 @@
 {
-  "name": "fugo-minimal",
-  "displayName": "Fugo Minimal",
-  "description": "Minimal Fugo support",
+  "name": "vex-minimal",
+  "displayName": "Vex Minimal",
+  "description": "Minimal Vex support",
   "version": "0.1.0",
-  "publisher": "fugo-dev",
+  "publisher": "vex-dev",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -11,16 +11,20 @@
   "contributes": {
     "languages": [
       {
-        "id": "fugo",
-        "aliases": ["Fugo"],
-        "extensions": [".fugo"]
+        "id": "vex",
+        "aliases": [
+          "Vex"
+        ],
+        "extensions": [
+          ".vx"
+        ]
       }
     ],
     "grammars": [
       {
-        "language": "fugo",
-        "scopeName": "source.fugo",
-        "path": "./syntaxes/fugo-minimal.tmLanguage.json"
+        "language": "vex",
+        "scopeName": "source.vx",
+        "path": "./syntaxes/vex-minimal.tmLanguage.json"
       }
     ]
   }

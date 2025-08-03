@@ -1,0 +1,27 @@
+; Basic syntax test for Vex parser - VALID syntax examples
+; This file demonstrates what IS currently supported by the Vex grammar
+
+(def test-var 42)       ; VALID: S-expressions with symbols and numbers
+(defn hello [name]      ; VALID: Function definitions with parameter lists 
+  ("Hello " name "!"))  ; VALID: String literals and symbol references
+
+(+ 1 2 3)               ; VALID: Plus operator (apparently supported!)
+("This is a string")    ; VALID: String literals in lists
+(true false nil)        ; VALID: Boolean and nil literals
+
+; SUPPORTED FEATURES:
+; ✅ S-expression syntax: (...)
+; ✅ Symbols: def, defn, hello, name, test-var
+; ✅ Numbers: 42, 1, 2, 3  
+; ✅ Strings: "Hello ", "!", "This is a string"
+; ✅ Booleans: true, false
+; ✅ Nil: nil
+; ✅ Parameter lists: [name]
+; ✅ Nested expressions
+; ✅ Comments starting with ;
+; ✅ Basic operators: + (others may work too)
+
+; NOT YET SUPPORTED (see invalid/ examples):
+; ❌ Array literals with [..] brackets
+; ❌ Some operators: > < = != (need to be tested)
+; ❌ Mixed bracket/parentheses syntax

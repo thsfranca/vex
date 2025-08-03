@@ -1,5 +1,20 @@
 # Generated parser files
 tools/gen/
+tools/grammar/vex_*.go
+tools/grammar/Vex.interp
+tools/grammar/Vex.tokens
+tools/grammar/VexLexer.interp
+tools/grammar/VexLexer.tokens
+
+# Compiled binaries  
+bin/
+tools/*/[!.]*
+!tools/*/*.go
+!tools/*/*.md
+!tools/*/*.mod
+!tools/*/*.sum
+!tools/*/*.sh
+
 
 # ANTLR generated files
 *.interp
@@ -10,7 +25,6 @@ tools/gen/
 .idea/
 *.swp
 *.swo
-*~
 
 # OS generated files
 .DS_Store
@@ -21,14 +35,15 @@ tools/gen/
 ehthumbs.db
 Thumbs.db
 
-# Backup files
+# Backup and temporary files
 *~
 *.bak
 *.backup
+*.tmp
 
 # VSCode Extension Build Artifacts
 vscode-extension/*.vsix
-vscode-extension/fugo-*.vsix
+vscode-extension/vex-*.vsix
 
 # Extension development files
 vscode-extension/node_modules/

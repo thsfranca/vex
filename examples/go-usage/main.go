@@ -8,9 +8,9 @@ import (
 )
 
 func main() {
-	// Example Fugo code to parse
+	// Example Vex code to parse
 	input := `
-		; Example Fugo program
+		; Example Vex program
 		(package main)
 		(def greet [name] (print "Hello" name))
 		[1 2 3 "hello"]
@@ -20,13 +20,13 @@ func main() {
 	inputStream := antlr.NewInputStream(input)
 
 	// Create lexer
-	lexer := parser.NewFugoLexer(inputStream)
+	lexer := parser.NewVexLexer(inputStream)
 
 	// Create token stream
 	tokenStream := antlr.NewCommonTokenStream(lexer, 0)
 
 	// Create parser
-	p := parser.NewFugoParser(tokenStream)
+	p := parser.NewVexParser(tokenStream)
 
 	// Add error listener
 	p.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
@@ -39,26 +39,26 @@ func main() {
 	fmt.Println(tree.ToStringTree(p.GetRuleNames(), p))
 
 	// Create and use a custom listener
-	listener := &FugoListener{}
+	listener := &VexListener{}
 	antlr.ParseTreeWalkerDefault.Walk(listener, tree)
 }
 
-// FugoListener is a custom listener for Fugo parse events
-type FugoListener struct {
-	*parser.BaseFugoListener
+// VexListener is a custom listener for Vex parse events
+type VexListener struct {
+	*parser.BaseVexListener
 }
 
 // EnterSp is called when entering the root rule
-func (l *FugoListener) EnterSp(ctx *parser.SpContext) {
+func (l *VexListener) EnterSp(ctx *parser.SpContext) {
 	fmt.Printf("Entering program with %d expressions\n", len(ctx.AllList()))
 }
 
 // EnterList is called when entering a list expression
-func (l *FugoListener) EnterList(ctx *parser.ListContext) {
+func (l *VexListener) EnterList(ctx *parser.ListContext) {
 	fmt.Printf("Found list with %d elements\n", ctx.GetChildCount()-2) // -2 for parentheses
 }
 
 // EnterArray is called when entering an array expression
-func (l *FugoListener) EnterArray(ctx *parser.ArrayContext) {
+func (l *VexListener) EnterArray(ctx *parser.ArrayContext) {
 	fmt.Printf("Found array with %d elements\n", ctx.GetChildCount()-2) // -2 for brackets
 }

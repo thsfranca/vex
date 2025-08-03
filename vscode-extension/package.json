@@ -1,9 +1,9 @@
 {
-  "name": "fugo-minimal",
-  "displayName": "Fugo Minimal",
-  "description": "Minimal Fugo language support with automated changelog - testing automation",
+  "name": "vex-minimal",
+  "displayName": "Vex Minimal",
+  "description": "Minimal Vex language support with automated changelog - testing automation",
   "version": "0.1.4",
-  "publisher": "fugo-dev",
+  "publisher": "vex-dev",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.74.0"
@@ -14,13 +14,13 @@
   "contributes": {
     "languages": [
       {
-        "id": "fugo",
+        "id": "vex",
         "aliases": [
-          "Fugo",
-          "fugo-lang"
+          "Vex",
+          "vex-lang"
         ],
         "extensions": [
-          ".fugo"
+          ".vx"
         ],
         "configuration": "./language-configuration.json",
         "icon": {
@@ -31,29 +31,29 @@
     ],
     "grammars": [
       {
-        "language": "fugo",
-        "scopeName": "source.fugo",
-        "path": "./syntaxes/fugo-minimal.tmLanguage.json"
+        "language": "vex",
+        "scopeName": "source.vx",
+        "path": "./syntaxes/vex-minimal.tmLanguage.json"
       }
     ],
     "themes": [
       {
-        "id": "fugo-dark",
-        "label": "Fugo Dark",
+        "id": "vex-dark",
+        "label": "Vex Dark",
         "uiTheme": "vs-dark",
-        "path": "./themes/fugo-dark-theme.json"
+        "path": "./themes/vex-dark-theme.json"
       }
     ],
     "iconThemes": [
       {
-        "id": "fugo-icons",
-        "label": "Fugo File Icons",
-        "path": "./icons/fugo-icon-theme.json"
+        "id": "vex-icons",
+        "label": "Vex File Icons",
+        "path": "./icons/vex-icon-theme.json"
       }
     ],
     "icons": {
-      "fugo-file": {
-        "description": "Fugo file icon",
+      "vex-file": {
+        "description": "Vex file icon",
         "default": {
           "iconPath": "./icon.png"
         }

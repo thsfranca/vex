@@ -1,0 +1,22 @@
+; Array examples with INVALID syntax for current Vex grammar
+; Current grammar only supports S-expressions with (), not array literals with []
+
+; Simple arrays - ERROR: '[..]' bracket syntax not supported
+[1 2 3]                 ; ERROR: mismatched input '[' expecting '('
+["a" "b" "c"]           ; ERROR: array literals not defined in grammar  
+[hello world symbols]   ; ERROR: brackets not recognized as valid syntax
+
+; Nested arrays - ERROR: nested bracket syntax fails parsing
+[[1 2] [3 4] [5 6]]     ; ERROR: double bracket nesting not supported
+[["nested" "strings"] ["more" "strings"]]  ; ERROR: string arrays invalid
+
+; Mixed content arrays - ERROR: bracket syntax with mixed types
+[1 "two" three [4 5]]   ; ERROR: mixed bracket content not supported
+[symbols "strings" [nested arrays] (and lists)]  ; ERROR: brackets invalid
+
+; Empty array - ERROR: empty brackets not recognized
+[]                      ; ERROR: '[]' not defined in current grammar
+
+; NOTE: To fix these, use S-expression syntax instead:
+; [1 2 3] becomes (array 1 2 3)
+; ["a" "b" "c"] becomes (array "a" "b" "c")

@@ -1,24 +1,24 @@
 {
-  "name": "Fugo File Icons",
+  "name": "Vex File Icons",
   "iconDefinitions": {
-    "fugo-icon": {
+    "vex-icon": {
       "iconPath": "../icon.png"
     }
   },
   "fileExtensions": {
-    "fugo": "fugo-icon"
+    "vx": "vex-icon"
   },
   "languageIds": {
-    "fugo": "fugo-icon"
+    "vx": "vex-icon"
   },
   "light": {
     "fileExtensions": {
-      "fugo": "fugo-icon"
+      "vx": "vex-icon"
     }
   },
   "highContrast": {
     "fileExtensions": {
-      "fugo": "fugo-icon"  
+      "vx": "vex-icon"  
     }
   }
 }

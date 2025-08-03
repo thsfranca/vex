@@ -1,14 +1,18 @@
-# Fugo Language
+# Vex Language
 
-[![CI](https://github.com/thsfranca/fugo/actions/workflows/ci.yml/badge.svg)](https://github.com/thsfranca/fugo/actions/workflows/ci.yml)
-[![Test Coverage](https://github.com/thsfranca/fugo/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/thsfranca/fugo/actions/workflows/test-coverage.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/thsfranca/fugo)](https://goreportcard.com/report/github.com/thsfranca/fugo)
+<div align="center">
+  <img src="vscode-extension/vex-logo.svg" alt="Vex Language Logo" width="128" height="128">
+</div>
+
+[![CI](https://github.com/thsfranca/vex/actions/workflows/ci.yml/badge.svg)](https://github.com/thsfranca/vex/actions/workflows/ci.yml)
+[![Test Coverage](https://github.com/thsfranca/vex/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/thsfranca/vex/actions/workflows/test-coverage.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/thsfranca/vex)](https://goreportcard.com/report/github.com/thsfranca/vex)
 
 A statically-typed functional programming language that transpiles to Go, designed for learning language implementation concepts and exploring functional programming paradigms.
 
 ## Overview
 
-Fugo is an experimental programming language that combines functional programming principles with static typing, inspired by Lisp syntax and designed to transpile to Go for maximum performance. This is a **study project created for educational purposes and fun** - it's not intended for production use.
+Vex is an experimental programming language that combines functional programming principles with static typing, inspired by Lisp syntax and designed to transpile to Go for maximum performance. This is a **study project created for educational purposes and fun** - it's not intended for production use.
 
 The goal is to explore language design concepts including parsing, type systems, code generation, and Go interoperability while building a complete language implementation from scratch.
 
@@ -16,23 +20,23 @@ The goal is to explore language design concepts including parsing, type systems,
 
 ```
 fugo/
-├── tools/
-│   ├── grammar/
-│   │   └── Fugo.g4          # ANTLR4 grammar definition
-│   └── gen/                 # Generated parser files (created by make)
-│       ├── java/            # Java parser files
-│       ├── go/              # Go parser files
-│       ├── python/          # Python parser files
-│       ├── cpp/             # C++ parser files
-│       └── javascript/      # JavaScript parser files
-├── examples/
-│   └── main.fugo            # Example Fugo programs
-└── docs/                    # Documentation (planned)
+├── docs/                           # Documentation
+├── examples/                       # Example Vex programs
+│   └── go-usage/                   # Go integration examples
+├── tools/                          # Development and build tools
+│   ├── grammar/                    # ANTLR4 grammar definition
+│   ├── gen/                        # Generated parser files (created by make)
+│   ├── change-detector/            # CI tool for detecting file changes
+│   ├── coverage-updater/           # Tool for updating test coverage
+│   ├── debug-helper/               # Debugging utilities
+│   ├── extension-tester/           # VSCode extension testing tool
+│   └── grammar-validator/          # Grammar validation tool
+└── scripts/                        # Build and utility scripts
 ```
 
 ## Language Vision
 
-Fugo aims to be a functional programming language with:
+Vex aims to be a functional programming language with:
 
 - **Static typing** with type inference for performance and safety
 - **Lisp-inspired syntax** using S-expressions and immutable data
@@ -84,11 +88,11 @@ make clean
 make help
 ```
 
-### Example Fugo Code (Vision)
+### Example Vex Code (Vision)
 
-Here's what Fugo programs might look like when fully implemented:
+Here's what Vex programs might look like when fully implemented:
 
-```fugo
+```vex
 ; HTTP service with static typing
 (defn handle-user [req: HttpRequest] -> Response
   (let [user-id: int (parse-int req.params.id)
@@ -129,7 +133,7 @@ This project explores key language implementation concepts:
 
 ## Implementation Roadmap
 
-See [docs/fugo-implementation-requirements.md](docs/fugo-implementation-requirements.md) for the complete development plan, covering type systems, Go transpilation, immutable data structures, and production features.
+See [docs/vex-implementation-requirements.md](docs/vex-implementation-requirements.md) for the complete development plan, covering type systems, Go transpilation, immutable data structures, and production features.
 
 ## Project Status
 

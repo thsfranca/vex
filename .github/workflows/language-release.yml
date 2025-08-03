@@ -1,5 +1,5 @@
 ---
-name: Language Release (Manual + Pre-release)
+name: Vex Language Release (Manual + Pre-release)
 
 on:
   push:
@@ -39,24 +39,24 @@ jobs:
             echo "release-name=Release Candidate $TAG" >> $GITHUB_OUTPUT
           else
             echo "prerelease=false" >> $GITHUB_OUTPUT
-            echo "release-name=Fugo $TAG" >> $GITHUB_OUTPUT
+            echo "release-name=Vex $TAG" >> $GITHUB_OUTPUT
           fi
 
       # Future: Build transpiler when ready
       - name: Build language tools (placeholder)
         run: |
           mkdir -p dist
-          echo "# Fugo Language Tools - ${{ github.ref_name }}" > dist/README.md
+          echo "# Vex Language Tools - ${{ github.ref_name }}" > dist/README.md
           echo "Parser foundation complete. Transpiler coming in Phase 2." >> dist/README.md
           
           # When transpiler is ready:
-          # go build -o dist/fugo ./cmd/fugo
-          # go build -o dist/fugo-fmt ./cmd/fmt
+          # go build -o dist/vex ./cmd/vex
+# go build -o dist/vex-fmt ./cmd/fmt
           
       - name: Package examples and docs
         run: |
-          tar -czf dist/fugo-examples-${{ github.ref_name }}.tar.gz examples/
-          tar -czf dist/fugo-docs-${{ github.ref_name }}.tar.gz docs/
+          tar -czf dist/vex-examples-${{ github.ref_name }}.tar.gz examples/
+          tar -czf dist/vex-docs-${{ github.ref_name }}.tar.gz docs/
 
       - name: Get or create release
         id: get-release

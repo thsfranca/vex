@@ -4,12 +4,8 @@ name: Vex Go Parser Generation
 on:
   push:
     branches: [main]
-    paths:
-      - 'tools/grammar/**'
   pull_request:
     branches: [main]
-    paths:
-      - 'tools/grammar/**'
   # Run weekly to catch platform-specific issues
   schedule:
     - cron: '0 6 * * 1' # Monday 6 AM UTC
@@ -19,8 +15,39 @@ env:
   GO_VERSION: '1.21'
 
 jobs:
+  # Always runs - detects if we need to run tests
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      grammar-changed: ${{ steps.changes.outputs.grammar-changed }}
+      needs-testing: ${{ steps.decision.outputs.needs-testing }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Check for relevant changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            grammar-changed:
+              - 'tools/grammar/**'
+              
+      - name: Decide if testing needed
+        id: decision
+        run: |
+          if [ "${{ steps.changes.outputs.grammar-changed }}" == "true" ] || [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "needs-testing=true" >> $GITHUB_OUTPUT
+            echo "🧪 Tests will run: Grammar changes or scheduled run"
+          else
+            echo "needs-testing=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Tests will be skipped: No relevant changes"
+          fi
+
   test-go-parser-generation:
     runs-on: ${{ matrix.os }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.needs-testing == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -84,15 +111,30 @@ jobs:
           path: tools/gen/go/
           retention-days: 7
 
-  # Summary job
-  go-parser-summary:
+  # Gateway job - ALWAYS runs and reports status (make this required in branch protection)
+  go-parser-validation-required:
     runs-on: ubuntu-latest
-    needs: test-go-parser-generation
+    needs: [detect-changes, test-go-parser-generation]
     if: always()
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        
-      - name: Check results
-        run: .github/scripts/parser/generate-summary.sh "${{ needs.test-go-parser-generation.result }}"
+      - name: Evaluate results
+        run: |
+          echo "📊 Evaluation Summary:"
+          echo "  - Grammar changed: ${{ needs.detect-changes.outputs.grammar-changed }}"
+          echo "  - Tests needed: ${{ needs.detect-changes.outputs.needs-testing }}"
+          echo "  - Tests result: ${{ needs.test-go-parser-generation.result }}"
+          
+          if [ "${{ needs.detect-changes.outputs.needs-testing }}" == "true" ]; then
+            echo "🧪 Grammar tests were required and ran"
+            if [ "${{ needs.test-go-parser-generation.result }}" == "success" ]; then
+              echo "✅ All parser generation tests passed!"
+              exit 0
+            else
+              echo "❌ Parser generation tests failed!"
+              exit 1
+            fi
+          else
+            echo "✅ No grammar changes detected - parser generation tests skipped (OK)"
+            exit 0
+          fi
 

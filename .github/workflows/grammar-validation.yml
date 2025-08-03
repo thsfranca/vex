@@ -4,21 +4,47 @@ name: Vex Grammar & Examples Validation
 on:
   push:
     branches: [main]
-    paths:
-      - 'tools/grammar/**'
-      - 'examples/**/*.vx'
   pull_request:
     branches: [main]
-    paths:
-      - 'tools/grammar/**'
-      - 'examples/**/*.vx'
 
 env:
   ANTLR_VERSION: '4.13.1'
 
 jobs:
+  # Always runs - detects if we need to run validation
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      grammar-changed: ${{ steps.changes.outputs.grammar-changed }}
+      needs-validation: ${{ steps.decision.outputs.needs-validation }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Check for relevant changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            grammar-changed:
+              - 'tools/grammar/**'
+              - 'examples/**/*.vx'
+              
+      - name: Decide if validation needed
+        id: decision
+        run: |
+          if [ "${{ steps.changes.outputs.grammar-changed }}" == "true" ]; then
+            echo "needs-validation=true" >> $GITHUB_OUTPUT
+            echo "🧪 Validation will run: Grammar or examples changed"
+          else
+            echo "needs-validation=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Validation will be skipped: No relevant changes"
+          fi
+
   validate-grammar:
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.needs-validation == 'true'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,4 +88,31 @@ jobs:
 
       - name: Validate grammar completeness
         run: .github/scripts/grammar/validate-completeness.sh
+
+  # Gateway job - ALWAYS runs and reports status (make this required in branch protection)
+  grammar-validation-required:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, validate-grammar]
+    if: always()
+    steps:
+      - name: Evaluate results
+        run: |
+          echo "📊 Grammar Validation Summary:"
+          echo "  - Grammar changed: ${{ needs.detect-changes.outputs.grammar-changed }}"
+          echo "  - Validation needed: ${{ needs.detect-changes.outputs.needs-validation }}"
+          echo "  - Validation result: ${{ needs.validate-grammar.result }}"
+          
+          if [ "${{ needs.detect-changes.outputs.needs-validation }}" == "true" ]; then
+            echo "🧪 Grammar validation was required and ran"
+            if [ "${{ needs.validate-grammar.result }}" == "success" ]; then
+              echo "✅ Grammar validation passed!"
+              exit 0
+            else
+              echo "❌ Grammar validation failed!"
+              exit 1
+            fi
+          else
+            echo "✅ No grammar/example changes detected - validation skipped (OK)"
+            exit 0
+          fi
 

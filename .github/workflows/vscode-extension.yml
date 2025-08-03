@@ -98,19 +98,29 @@ jobs:
         path: vscode-extension/vex-test-build.vsix
         retention-days: 7
 
-  # Summary job
-  summary:
+    # Gateway job - ALWAYS runs and reports status (make this required in branch protection)
+  validate-extension-required:
     runs-on: ubuntu-latest
     needs: [detect-changes, skip-validation, validate]
     if: always()
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Go (for summary)
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.21'
-
-    - name: Report VSCode extension validation results
-      run: .github/scripts/extension/generate-summary.sh "${{ needs.detect-changes.outputs.extension-files }}" "${{ needs.validate.result }}" "${{ needs.skip-validation.result }}"
+      - name: Evaluate results
+        run: |
+          echo "📊 VSCode Extension Validation Summary:"
+          echo "  - Extension files changed: ${{ needs.detect-changes.outputs.extension-files }}"
+          echo "  - Validation result: ${{ needs.validate.result }}"
+          echo "  - Skip result: ${{ needs.skip-validation.result }}"
+          
+          if [ "${{ needs.detect-changes.outputs.extension-files }}" == "true" ]; then
+            echo "🧪 Extension validation was required and ran"
+            if [ "${{ needs.validate.result }}" == "success" ]; then
+              echo "✅ VSCode extension validation passed!"
+              exit 0
+            else
+              echo "❌ VSCode extension validation failed!"
+              exit 1
+            fi
+          else
+            echo "✅ No extension changes detected - validation skipped (OK)"
+            exit 0
+          fi

@@ -76,7 +76,7 @@ func main() {
 		vexParser.AddErrorListener(errorListener)
 
 		// Parse starting from the 'sp' rule (root rule)  
-		tree := vexParser.Sp()
+		tree := vexParser.Program()
 
 		// Check results based on mode
 		if errorListener.hasError {

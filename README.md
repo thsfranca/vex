@@ -1,7 +1,7 @@
 # Vex Language
 
 <div align="center">
-  <img src="vscode-extension/vex-logo.svg" alt="Vex Language Logo" width="128" height="128">
+  <img src="assets/vex-logo.svg" alt="Vex Language Logo" width="128" height="128">
 </div>
 
 [![CI](https://github.com/thsfranca/vex/actions/workflows/ci.yml/badge.svg)](https://github.com/thsfranca/vex/actions/workflows/ci.yml)
@@ -31,19 +31,13 @@ vex/
 ├── tools/                          # Development and build tools
 │   ├── grammar/                    # ANTLR4 grammar definition (Vex.g4)
 │   ├── grammar-validator/          # Grammar validation with Go parser
-│   ├── change-detector/            # CI tool for detecting file changes
-│   ├── coverage-updater/           # Tool for updating test coverage
-│   ├── debug-helper/               # Debugging utilities
-│   ├── extension-tester/           # VSCode extension testing tool
-│   └── release-manager/            # Automated release management
-├── vscode-extension/               # Official VSCode extension for Vex
-│   ├── syntaxes/                   # Syntax highlighting definitions
-│   ├── themes/                     # Custom color themes
-│   └── icons/                      # File type icons
+│   └── (various other tools)/      # CI, debugging, and release utilities
 ├── .github/                        # CI/CD infrastructure
 │   ├── workflows/                  # GitHub Actions workflows
 │   └── scripts/                    # Extracted workflow scripts
-└── scripts/                        # Build and utility scripts
+├── assets/                         # Project assets (logo, etc.)
+├── scripts/                        # Build and utility scripts
+└── vscode-extension/               # VSCode language support (optional)
 ```
 
 ## Language Vision
@@ -62,11 +56,11 @@ The project currently includes:
 - **ANTLR4 grammar** for S-expressions, arrays, symbols, and strings
 - **Go parser validation** with comprehensive test suite
 - **Grammar validation system** testing both valid and invalid syntax
-- **VSCode extension** with syntax highlighting and file icons
 - **Comprehensive CI/CD pipeline** with automated quality checks
 - **Automated release process** with PR label-based version management
 - **Modular tooling architecture** with dedicated Go tools for each workflow
 - **Example programs** organized into valid/invalid test cases
+- **Editor support** for development convenience
 
 ### Planned Features 🚧
 
@@ -102,24 +96,6 @@ make clean             # Remove all generated artifacts
 # Show all available commands
 make help              # Display detailed help
 ```
-
-### VSCode Extension
-
-Install the official Vex language extension:
-
-```bash
-# Quick development install
-cd vscode-extension && ./quick-install.sh
-
-# Or package and install manually
-npm install && npm run package
-code --install-extension vex-*.vsix
-```
-
-The extension provides:
-- **Syntax highlighting** for `.vx` files
-- **Custom file icons** for Vex source files  
-- **Dark theme** optimized for Vex syntax
 
 ### Example Vex Code (Vision)
 
@@ -233,9 +209,19 @@ See [docs/release-process.md](docs/release-process.md) for detailed information.
 
 This is a personal study project, but feel free to:
 - Test the grammar validation system
-- Try the VSCode extension
 - Suggest language design ideas
 - Report issues with the grammar or tooling
 - Fork for your own experiments
+- Try the editor support tools
 
 **Note**: This is an educational project for learning compiler/language implementation concepts. It's not intended for production use - just for the joy of building a programming language from scratch!
+
+---
+
+## Editor Support
+
+For development convenience, a VSCode extension is available in the `vscode-extension/` directory with syntax highlighting and file icons for `.vx` files.
+
+```bash
+cd vscode-extension && ./quick-install.sh
+```

@@ -227,5 +227,8 @@ jobs:
     needs: [detect-changes, skip-build, build-and-test, test-coverage, lint-and-quality]
     if: always()
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
     - name: Report CI Results
       run: .github/scripts/ci/generate-summary.sh "${{ needs.detect-changes.outputs.go-files }}" "${{ needs.skip-build.result }}" "${{ needs.build-and-test.result }}" "${{ needs.test-coverage.result }}" "${{ needs.lint-and-quality.result }}"

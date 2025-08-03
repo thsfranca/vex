@@ -1,4 +1,4 @@
-grammar Fugo;
+grammar Flux;
 
 sp: list+ EOF ;
 

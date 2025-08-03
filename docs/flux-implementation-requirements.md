@@ -1,8 +1,8 @@
-# Fugo Language Implementation Requirements
+# Flux Language Implementation Requirements
 
 ## Overview
 
-Fugo is a statically-typed functional programming language designed specifically for high-performance backend services. The language transpiles to Go to achieve maximum performance while maintaining excellent Go ecosystem interoperability. This document outlines the complete implementation roadmap.
+Flux is a statically-typed functional programming language designed specifically for high-performance backend services. The language transpiles to Go to achieve maximum performance while maintaining excellent Go ecosystem interoperability. This document outlines the complete implementation roadmap.
 
 ## Core Design Principles
 
@@ -66,18 +66,18 @@ Extend the existing ANTLR grammar to support:
 - Go interop syntax for calling Go functions
 
 **Function Definition Syntax**
-```fugo
+```flux
 (defn function-name [param1: Type1 param2: Type2] -> ReturnType
   body-expressions)
 ```
 
 **Type Declaration Syntax**
-```fugo
+```flux
 (deftype TypeName {field1: Type1 field2: Type2})
 ```
 
 **Pattern Matching Syntax**
-```fugo
+```flux
 (match expression
   pattern1 -> result1
   pattern2 -> result2)
@@ -96,7 +96,7 @@ Design a module system that supports:
 ### Transpiler Architecture
 
 **Multi-Stage Compilation Pipeline**
-1. Parse Fugo source into AST using existing ANTLR parser
+1. Parse Flux source into AST using existing ANTLR parser
 2. Perform semantic analysis and type checking
 3. Transform AST into typed intermediate representation
 4. Generate idiomatic Go code with optimal type usage
@@ -105,8 +105,8 @@ Design a module system that supports:
 **Code Generation Strategy**
 The transpiler must generate Go code that:
 - Uses concrete types instead of `interface{}` wherever possible
-- Leverages Go's struct types for Fugo records
-- Maps Fugo functions to Go functions with matching signatures
+- Leverages Go's struct types for Flux records
+- Maps Flux functions to Go functions with matching signatures
 - Implements immutable collections using persistent data structures
 - Generates efficient iteration patterns for collection operations
 
@@ -120,14 +120,14 @@ Since Go handles garbage collection, the transpiler should:
 ### Go Interoperability Layer
 
 **Function Binding System**
-Create a mechanism to expose Go functions to Fugo code through:
-- Automatic type conversion between Fugo and Go types
+Create a mechanism to expose Go functions to Flux code through:
+- Automatic type conversion between Flux and Go types
 - Error handling integration using Go's error interface
 - Goroutine management for concurrent operations
 - Context propagation for request scoping
 
 **Standard Library Integration**
-Map common Go standard library packages to Fugo functions:
+Map common Go standard library packages to Flux functions:
 - HTTP handling through net/http integration
 - JSON processing with encoding/json
 - Database operations via database/sql
@@ -162,7 +162,7 @@ Implement hash array mapped tries (HAMT) for persistent maps with:
 ### Concurrency Model
 
 **Goroutine Integration**
-Design Fugo concurrency primitives that map to Go goroutines:
+Design Flux concurrency primitives that map to Go goroutines:
 - Lightweight process spawning with isolated state
 - Channel-based communication for message passing
 - Actor-like patterns for stateful services
@@ -199,7 +199,7 @@ Comprehensive error messages that:
 - Provide precise source location information
 - Suggest fixes for common type errors
 - Include context about failed type inference
-- Map transpilation errors back to Fugo source
+- Map transpilation errors back to Flux source
 
 **Incremental Compilation**
 Fast development cycle through:
@@ -220,7 +220,7 @@ Full LSP server providing:
 **Debugging Support**
 - Source map generation for debugging transpiled Go code
 - REPL implementation for interactive development
-- Stack trace mapping from Go back to Fugo
+- Stack trace mapping from Go back to Flux
 - Variable inspection with type information
 
 ## Phase 7: Standard Library and Ecosystem
@@ -248,7 +248,7 @@ Specialized libraries for backend development:
 - Module versioning with semantic versioning support
 - Dependency resolution with conflict detection
 - Integration with Go modules for Go library dependencies
-- Package registry for sharing Fugo libraries
+- Package registry for sharing Flux libraries
 
 ## Phase 8: Performance Optimization and Production Readiness
 

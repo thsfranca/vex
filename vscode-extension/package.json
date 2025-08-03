@@ -1,9 +1,9 @@
 {
-  "name": "fugo-minimal",
-  "displayName": "Fugo Minimal",
-  "description": "Minimal Fugo language support with automated changelog - testing automation",
+  "name": "flux-minimal",
+  "displayName": "Flux Minimal",
+  "description": "Minimal Flux language support with automated changelog - testing automation",
   "version": "0.1.4",
-  "publisher": "fugo-dev",
+  "publisher": "flux-dev",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.74.0"
@@ -14,13 +14,13 @@
   "contributes": {
     "languages": [
       {
-        "id": "fugo",
+        "id": "flux",
         "aliases": [
-          "Fugo",
-          "fugo-lang"
+          "Flux",
+          "flux-lang"
         ],
         "extensions": [
-          ".fugo"
+          ".fx"
         ],
         "configuration": "./language-configuration.json",
         "icon": {
@@ -31,29 +31,29 @@
     ],
     "grammars": [
       {
-        "language": "fugo",
-        "scopeName": "source.fugo",
-        "path": "./syntaxes/fugo-minimal.tmLanguage.json"
+        "language": "flux",
+        "scopeName": "source.flux",
+        "path": "./syntaxes/flux-minimal.tmLanguage.json"
       }
     ],
     "themes": [
       {
-        "id": "fugo-dark",
-        "label": "Fugo Dark",
+        "id": "flux-dark",
+        "label": "Flux Dark",
         "uiTheme": "vs-dark",
-        "path": "./themes/fugo-dark-theme.json"
+        "path": "./themes/flux-dark-theme.json"
       }
     ],
     "iconThemes": [
       {
-        "id": "fugo-icons",
-        "label": "Fugo File Icons",
-        "path": "./icons/fugo-icon-theme.json"
+        "id": "flux-icons",
+        "label": "Flux File Icons",
+        "path": "./icons/flux-icon-theme.json"
       }
     ],
     "icons": {
-      "fugo-file": {
-        "description": "Fugo file icon",
+      "flux-file": {
+        "description": "Flux file icon",
         "default": {
           "iconPath": "./icon.png"
         }

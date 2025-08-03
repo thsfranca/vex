@@ -1,0 +1,166 @@
+---
+name: Flux Grammar & Examples Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/grammar/**'
+      - 'examples/**/*.fx'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tools/grammar/**'
+      - 'examples/**/*.fx'
+
+env:
+  ANTLR_VERSION: '4.13.1'
+
+jobs:
+  validate-grammar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      # Cache ANTLR installation
+      - name: Cache ANTLR
+        id: antlr-cache
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/antlr.jar
+          key: ${{ runner.os }}-antlr-${{ env.ANTLR_VERSION }}
+
+      - name: Install ANTLR
+        if: steps.antlr-cache.outputs.cache-hit != 'true'
+        run: |
+          wget https://www.antlr.org/download/antlr-${{ env.ANTLR_VERSION }}-complete.jar -O /tmp/antlr.jar
+          sudo mv /tmp/antlr.jar /usr/local/lib/
+
+      - name: Setup ANTLR binary
+        run: |
+          echo '#!/bin/bash' | sudo tee /usr/local/bin/antlr4
+          echo 'java -jar /usr/local/lib/antlr.jar "$@"' | sudo tee -a /usr/local/bin/antlr4
+          sudo chmod +x /usr/local/bin/antlr4
+
+      - name: Validate grammar syntax
+        run: |
+          cd tools/grammar
+          antlr4 -Dlanguage=Java Flux.g4 -o /tmp/grammar-test
+
+      - name: Generate test parser
+        run: |
+          cd tools/grammar
+          antlr4 -Dlanguage=Java -listener -visitor Flux.g4 -o /tmp/flux-parser
+          javac -cp "/usr/local/lib/antlr.jar:/tmp/flux-parser" /tmp/flux-parser/*.java
+
+      - name: Test example files
+        run: |
+          # Create test runner
+          cat > /tmp/test-parser.java << 'EOF'
+          import org.antlr.v4.runtime.*;
+          import org.antlr.v4.runtime.tree.*;
+          import java.io.IOException;
+          import java.nio.file.Files;
+          import java.nio.file.Paths;
+          
+          public class TestParser {
+              public static void main(String[] args) throws IOException {
+                  if (args.length != 1) {
+                      System.err.println("Usage: java TestParser <file.fx>");
+                      System.exit(1);
+                  }
+                  
+                  String input = new String(Files.readAllBytes(Paths.get(args[0])));
+                  ANTLRInputStream inputStream = new ANTLRInputStream(input);
+                  FluxLexer lexer = new FluxLexer(inputStream);
+                  CommonTokenStream tokens = new CommonTokenStream(lexer);
+                  FluxParser parser = new FluxParser(tokens);
+                  
+                  // Add error handling
+                  parser.removeErrorListeners();
+                  parser.addErrorListener(new BaseErrorListener() {
+                      @Override
+                      public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
+                                            int line, int charPositionInLine, String msg,
+                                            RecognitionException e) {
+                          System.err.println("Syntax error at line " + line + ":" + charPositionInLine + " - " + msg);
+                          System.exit(1);
+                      }
+                  });
+                  
+                  ParseTree tree = parser.sp();
+                  System.out.println("✅ Successfully parsed: " + args[0]);
+                  System.out.println("Parse tree: " + tree.toStringTree(parser));
+              }
+          }
+          EOF
+          
+          # Compile test runner
+          cd /tmp/flux-parser
+          javac -cp "/usr/local/lib/antlr.jar:." ../test-parser.java
+          
+          # Test each .fx file
+          FAILED_FILES=""
+          for fx_file in $(find $GITHUB_WORKSPACE/examples -name "*.fx"); do
+            echo ""
+            echo "Testing: $fx_file"
+            if java -cp "/usr/local/lib/antlr.jar:/tmp/flux-parser:/tmp" TestParser "$fx_file"; then
+              echo "✅ $fx_file parsed successfully"
+            else
+              echo "❌ $fx_file failed to parse"
+              FAILED_FILES="$FAILED_FILES $fx_file"
+            fi
+          done
+          
+          if [ -n "$FAILED_FILES" ]; then
+            echo ""
+            echo "💥 The following files failed to parse:"
+            for file in $FAILED_FILES; do
+              echo "  - $file"
+            done
+            exit 1
+          else
+            echo ""
+            echo "🎉 All .fx example files parsed successfully!"
+          fi
+
+      - name: Validate grammar completeness
+        run: |
+          echo "🔍 Checking grammar completeness..."
+          
+          # Check for common language constructs that should be supported
+          GRAMMAR_FILE="tools/grammar/Flux.g4"
+          
+          echo "Checking for required grammar rules..."
+          
+          # Check if basic rules exist
+          if ! grep -q "sp.*:" "$GRAMMAR_FILE"; then
+            echo "❌ Missing root rule 'sp'"
+            exit 1
+          fi
+          
+          if ! grep -q "list.*:" "$GRAMMAR_FILE"; then
+            echo "❌ Missing 'list' rule"
+            exit 1
+          fi
+          
+          if ! grep -q "SYMBOL" "$GRAMMAR_FILE"; then
+            echo "❌ Missing SYMBOL token"
+            exit 1
+          fi
+          
+          if ! grep -q "STRING" "$GRAMMAR_FILE"; then
+            echo "❌ Missing STRING token"
+            exit 1
+          fi
+          
+          echo "✅ Grammar contains required basic rules"
+          echo "✅ Grammar validation completed successfully"
+

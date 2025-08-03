@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  "name": "Fugo",
+  "name": "Flux",
   "patterns": [
     {
       "include": "#comments"
@@ -67,35 +67,35 @@
     "brackets": {
       "patterns": [
         {
-          "name": "punctuation.section.parens.fugo",
+          "name": "punctuation.section.parens.flux",
           "match": "[()]"
         },
         {
-          "name": "punctuation.section.brackets.fugo",
+          "name": "punctuation.section.brackets.flux",
           "match": "[\\[\\]]"
         },
         {
-          "name": "punctuation.section.braces.fugo",
+          "name": "punctuation.section.braces.flux",
           "match": "[{}]"
         }
       ]
     },
     "function-calls": {
-      "name": "meta.function-call.fugo",
+      "name": "meta.function-call.flux",
       "begin": "\\(",
       "end": "\\)",
       "beginCaptures": {
-        "0": {"name": "punctuation.section.parens.fugo"}
+        "0": {"name": "punctuation.section.parens.flux"}
       },
       "endCaptures": {
-        "0": {"name": "punctuation.section.parens.fugo"}
+        "0": {"name": "punctuation.section.parens.flux"}
       },
       "patterns": [
         {
-          "name": "entity.name.function.fugo",
+          "name": "entity.name.function.flux",
           "match": "\\G\\s*([a-zA-Z][a-zA-Z0-9_-]*)",
           "captures": {
-            "1": {"name": "entity.name.function.fugo"}
+            "1": {"name": "entity.name.function.flux"}
           }
         },
         {
@@ -122,9 +122,9 @@
       ]
     },
     "symbols": {
-      "name": "variable.other.fugo",
+      "name": "variable.other.flux",
       "match": "\\b[a-zA-Z][a-zA-Z0-9_-]*\\b"
     }
   },
-  "scopeName": "source.fugo"
+  "scopeName": "source.flux"
 }

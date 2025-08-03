@@ -50,7 +50,7 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "Extension v${{ steps.extract-version.outputs.version }}" \
             --notes "VSCode Extension release v${{ steps.extract-version.outputs.version }}" \
-            vscode-extension/fugo-minimal-${{ steps.extract-version.outputs.version }}.vsix
+            vscode-extension/flux-minimal-${{ steps.extract-version.outputs.version }}.vsix
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -59,7 +59,7 @@ jobs:
       #   if: github.event.release.prerelease == false
       #   run: |
       #     cd vscode-extension
-      #     npx vsce publish --packagePath fugo-minimal-${{ steps.extract-version.outputs.version }}.vsix
+      #     npx vsce publish --packagePath flux-minimal-${{ steps.extract-version.outputs.version }}.vsix
       #   env:
       #     VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
 

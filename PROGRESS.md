@@ -1,8 +1,8 @@
-# Fugo Language Implementation Progress
+# Flux Language Implementation Progress
 
 > **Project Goal**: Build a statically-typed functional programming language that transpiles to Go
 > **Timeline**: Personal learning project, developed for fun in spare time
-> **Repository**: https://github.com/thsfranca/fugo
+> **Repository**: https://github.com/thsfranca/flux
 
 ## Milestone Overview
 
@@ -22,16 +22,16 @@
 **Completed**: December 2024
 
 ### What Was Built
-- [x] ANTLR4 grammar for Fugo syntax (`tools/grammar/Fugo.g4`)
+- [x] ANTLR4 grammar for Flux syntax (`tools/grammar/Flux.g4`)
 - [x] Multi-language parser generation (Go, Java, Python, C++, JavaScript)
 - [x] Go parser successfully generated (`tools/gen/go/`)
-- [x] Example Fugo programs (`examples/`)
+- [x] Example Flux programs (`examples/`)
 - [x] Project documentation and README
 - [x] Implementation requirements document
 
 ### Key Achievements
 - **Grammar supports**: S-expressions, arrays, symbols, strings, comments, nested structures
-- **Working parsers**: Can parse valid Fugo syntax into AST
+- **Working parsers**: Can parse valid Flux syntax into AST
 - **Go integration**: Generated Go parser ready for next phase
 - **Foundation set**: Clear roadmap and project structure
 
@@ -45,7 +45,7 @@
 ## Phase 2: Go Transpilation Engine 🚧 **NEXT**
 
 ### Goal
-Generate executable Go code from Fugo programs to achieve native performance and Go ecosystem access.
+Generate executable Go code from Flux programs to achieve native performance and Go ecosystem access.
 
 ### Step 1: Basic Expression Transpilation
 **What you'll build:**
@@ -86,7 +86,7 @@ Generate executable Go code from Fugo programs to achieve native performance and
 ```
 
 ### Technical Notes
-- Extending `FugoListener` to become `FugoEvaluator`
+- Extending `FluxListener` to become `FluxEvaluator`
 - Using Go's `interface{}` initially for values (optimize later)
 - Simple map-based symbol table (enhance with scoping later)
 
@@ -115,11 +115,11 @@ Update this section each week with:
 **What you'll build:**
 - Basic type annotations in function signatures
 - Type checking during transpilation
-- Go type mapping (Fugo types → Go types)
+- Go type mapping (Flux types → Go types)
 
 ### Phase 4: Advanced Transpilation Features
 **What you'll build:**
-- Go interop (calling Go functions from Fugo)
+- Go interop (calling Go functions from Flux)
 - Optimized code generation
 - Error handling and propagation
 

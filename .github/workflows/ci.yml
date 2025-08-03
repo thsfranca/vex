@@ -148,7 +148,7 @@ jobs:
     - name: Generate parsers
       if: steps.parser-cache.outputs.cache-hit != 'true'
       run: |
-        if [ -f "tools/grammar/Fugo.g4" ]; then
+        if [ -f "tools/grammar/Flux.g4" ]; then
           make go || echo "Parser generation failed, continuing..."
         fi
         

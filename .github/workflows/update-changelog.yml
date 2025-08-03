@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   update-changelog:
-    # Only run for main Fugo releases (not extension releases)
+    # Only run for main Flux releases (not extension releases)
     if: ${{ !startsWith(github.event.release.tag_name, 'extension-') }}
     runs-on: ubuntu-latest
     steps:

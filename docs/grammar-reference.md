@@ -1,8 +1,8 @@
-# Fugo Grammar Reference
+# Flux Grammar Reference
 
 ## Overview
 
-The Fugo grammar defines a Lisp-like programming language with support for S-expressions, arrays, symbols, and strings.
+The Flux grammar defines a Lisp-like programming language with support for S-expressions, arrays, symbols, and strings.
 
 ## Grammar Rules
 
@@ -92,13 +92,13 @@ To generate a parser for your target language:
 
 ```bash
 # For Java
-antlr4 -Dlanguage=Java Fugo.g4
+antlr4 -Dlanguage=Java Flux.g4
 
 # For Python
-antlr4 -Dlanguage=Python3 Fugo.g4
+antlr4 -Dlanguage=Python3 Flux.g4
 
 # For Go
-antlr4 -Dlanguage=Go Fugo.g4
+antlr4 -Dlanguage=Go Flux.g4
 ```
 
 Or use the provided Makefile:

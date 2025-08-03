@@ -1,24 +1,24 @@
 {
   "name": "Fugo File Icons",
   "iconDefinitions": {
-    "fugo-icon": {
+    "flux-icon": {
       "iconPath": "../icon.png"
     }
   },
   "fileExtensions": {
-    "fugo": "fugo-icon"
+    "flux": "flux-icon"
   },
   "languageIds": {
-    "fugo": "fugo-icon"
+    "flux": "flux-icon"
   },
   "light": {
     "fileExtensions": {
-      "fugo": "fugo-icon"
+      "flux": "flux-icon"
     }
   },
   "highContrast": {
     "fileExtensions": {
-      "fugo": "fugo-icon"  
+      "flux": "flux-icon"  
     }
   }
 }

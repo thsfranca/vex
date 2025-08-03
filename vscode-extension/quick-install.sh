@@ -21,8 +21,8 @@ if ! command -v vsce &> /dev/null; then
 fi
 
 # Extension info
-EXTENSION_NAME="fugo-minimal"
-PUBLISHER="fugo-dev"
+EXTENSION_NAME="flux-minimal"
+PUBLISHER="flux-dev"
 FULL_NAME="$PUBLISHER.$EXTENSION_NAME"
 
 # If Cursor is running, create a background restart script

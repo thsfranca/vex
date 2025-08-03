@@ -2,8 +2,6 @@
 ; This file demonstrates what the Vex transpiler currently supports
 
 ; Simple standalone expressions (evaluated and discarded)
-42
-"Hello, World!"
 (+ 10 20)
 (* 6 7)
 

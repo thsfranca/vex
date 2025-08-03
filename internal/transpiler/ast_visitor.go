@@ -1,7 +1,6 @@
 package transpiler
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -165,7 +164,7 @@ func (v *ASTVisitor) handleSlashNotationCall(packageFunction string, content []a
 	// Split package/function on the slash
 	parts := strings.Split(packageFunction, "/")
 	if len(parts) != 2 {
-		v.codeGen.writeIndented(fmt.Sprintf("// Invalid slash notation: %s\n", packageFunction))
+		v.codeGen.writeIndented("// Invalid slash notation: " + packageFunction + "\n")
 		return
 	}
 	
@@ -213,7 +212,7 @@ func (v *ASTVisitor) handleMacroDefinition(content []antlr.Tree) {
 		v.macroRegistry.RegisterMacro(macroName, params, template)
 		
 		// Don't generate any Go code for macro definitions
-		v.codeGen.writeIndented(fmt.Sprintf("// Registered macro: %s\n", macroName))
+		v.codeGen.writeIndented("// Registered macro: " + macroName + "\n")
 	}
 }
 
@@ -221,15 +220,15 @@ func (v *ASTVisitor) handleMacroDefinition(content []antlr.Tree) {
 func (v *ASTVisitor) handleMacroCall(macroName string, args []antlr.Tree) {
 	expanded, err := v.macroRegistry.ExpandMacro(macroName, args)
 	if err != nil {
-		v.codeGen.writeIndented(fmt.Sprintf("// Error expanding macro %s: %s\n", macroName, err.Error()))
+		v.codeGen.writeIndented("// Error expanding macro " + macroName + ": " + err.Error() + "\n")
 		return
 	}
 
 	// Re-parse and process the expanded code
 	err = v.processExpandedCode(expanded)
 	if err != nil {
-		v.codeGen.writeIndented(fmt.Sprintf("// Error processing expanded macro %s: %s\n", macroName, err.Error()))
-		v.codeGen.writeIndented(fmt.Sprintf("// Expanded code was: %s\n", expanded))
+		v.codeGen.writeIndented("// Error processing expanded macro " + macroName + ": " + err.Error() + "\n")
+		v.codeGen.writeIndented("// Expanded code was: " + expanded + "\n")
 	}
 }
 
@@ -292,58 +291,154 @@ func (v *ASTVisitor) evaluateExpression(node antlr.Tree) string {
 		return text
 
 	case *parser.ListContext:
-		// Check if this is a slash notation call like (mux/NewRouter)
-		children := ctx.GetChildren()
-		if len(children) >= 3 { // ( symbol )
-			if firstChild, ok := children[1].(*antlr.TerminalNodeImpl); ok {
-				firstElement := firstChild.GetText()
-				if strings.Contains(firstElement, "/") {
-					// Handle slash notation in expressions
-					parts := strings.Split(firstElement, "/")
-					if len(parts) == 2 {
-						packageName := parts[0]
-						functionName := parts[1]
-						
-						// Extract arguments if any
-						var args []string
-						for i := 2; i < len(children)-1; i++ {
-							argValue := v.evaluateExpression(children[i])
-							args = append(args, argValue)
-						}
-						
-						// Generate function call
-						if len(args) > 0 {
-							argsStr := strings.Join(args, ", ")
-							return fmt.Sprintf("%s.%s(%s)", packageName, functionName, argsStr)
-						} else {
-							return fmt.Sprintf("%s.%s()", packageName, functionName)
-						}
-					}
-				}
-			}
-		}
-		
-		// Handle other nested lists by recursively visiting them
-		// Create a temporary visitor to handle the nested list
-		nestedVisitor := NewASTVisitor()
-		ctx.Accept(nestedVisitor)
-		generatedCode := nestedVisitor.GetGeneratedCode()
-		
-		// If it generated code, extract the expression part
-		// For method calls like (.NewRouter mux), we want "mux.NewRouter()"
-		if strings.Contains(generatedCode, "=") {
-			// Extract the right side of the assignment
-			parts := strings.Split(strings.TrimSpace(generatedCode), "=")
-			if len(parts) >= 2 {
-				return strings.TrimSpace(parts[len(parts)-1])
-			}
-		}
-		
-		return "/* nested list */"
+		return v.evaluateListExpression(ctx)
 
 	default:
 		return "/* unknown */"
 	}
+}
+
+// evaluateListExpression evaluates a list expression and returns its Go representation
+// This method handles the same logic as VisitList but returns values instead of emitting code
+func (v *ASTVisitor) evaluateListExpression(ctx *parser.ListContext) string {
+	children := ctx.GetChildren()
+	if len(children) < 3 { // '(' ... ')'
+		return "/* empty list */"
+	}
+
+	// Skip opening parenthesis, process content, skip closing parenthesis
+	content := children[1 : len(children)-1]
+
+	if len(content) == 0 {
+		return "/* empty list */"
+	}
+
+	// Get the first element
+	firstChild := content[0]
+	var firstElement string
+	if symbolCtx, ok := firstChild.(*antlr.TerminalNodeImpl); ok {
+		firstElement = symbolCtx.GetText()
+	}
+
+	switch firstElement {
+	case "+", "-", "*", "/":
+		// Handle arithmetic expressions - return the result directly
+		return v.evaluateArithmeticExpression(firstElement, content[1:])
+	case "fn":
+		// Handle function literals - return the function literal expression
+		return v.evaluateFunctionLiteral(content[1:])
+	default:
+		// Check if it's a method call (starts with .)
+		if strings.HasPrefix(firstElement, ".") {
+			return v.evaluateMethodCall(firstElement, content[1:])
+		} else if strings.Contains(firstElement, "/") {
+			// Handle slash notation
+			return v.evaluateSlashNotationCall(firstElement, content[1:])
+		} else {
+			// Handle regular function calls
+			return v.evaluateFunctionCall(firstElement, content[1:])
+		}
+	}
+}
+
+// evaluateArithmeticExpression evaluates arithmetic expressions and returns the result
+func (v *ASTVisitor) evaluateArithmeticExpression(operator string, operands []antlr.Tree) string {
+	goOperands := getStringSlice()
+	defer putStringSlice(goOperands)
+	for _, operand := range operands {
+		value := v.evaluateExpression(operand)
+		goOperands = append(goOperands, value)
+	}
+	
+	if len(goOperands) < 2 {
+		return "/* invalid arithmetic */"
+	}
+	
+	goOperator := v.codeGen.convertOperator(operator)
+	return strings.Join(goOperands, " "+goOperator+" ")
+}
+
+// evaluateMethodCall evaluates method call expressions and returns the result
+func (v *ASTVisitor) evaluateMethodCall(methodName string, args []antlr.Tree) string {
+	if len(args) < 1 {
+		return "/* invalid method call */"
+	}
+	
+	// First argument is the receiver
+	receiver := v.evaluateExpression(args[0])
+	
+	// Rest are method arguments
+	methodArgs := getStringSlice()
+	defer putStringSlice(methodArgs)
+	for i := 1; i < len(args); i++ {
+		argValue := v.evaluateExpression(args[i])
+		methodArgs = append(methodArgs, argValue)
+	}
+	
+	argsStr := strings.Join(methodArgs, ", ")
+	return receiver + "." + methodName[1:] + "(" + argsStr + ")"
+}
+
+// evaluateSlashNotationCall evaluates slash notation calls and returns the result
+func (v *ASTVisitor) evaluateSlashNotationCall(packageFunction string, args []antlr.Tree) string {
+	parts := strings.Split(packageFunction, "/")
+	if len(parts) != 2 {
+		return "/* invalid slash notation */"
+	}
+	
+	packageName := parts[0]
+	functionName := parts[1]
+	
+	// Extract arguments
+	var goArgs []string
+	for _, arg := range args {
+		argValue := v.evaluateExpression(arg)
+		goArgs = append(goArgs, argValue)
+	}
+	
+	argsStr := strings.Join(goArgs, ", ")
+	return packageName + "." + functionName + "(" + argsStr + ")"
+}
+
+// evaluateFunctionCall evaluates regular function calls and returns the result
+func (v *ASTVisitor) evaluateFunctionCall(functionName string, args []antlr.Tree) string {
+	var goArgs []string
+	for _, arg := range args {
+		argValue := v.evaluateExpression(arg)
+		goArgs = append(goArgs, argValue)
+	}
+	
+	argsStr := strings.Join(goArgs, ", ")
+	return functionName + "(" + argsStr + ")"
+}
+
+// evaluateFunctionLiteral evaluates function literals and returns the result
+func (v *ASTVisitor) evaluateFunctionLiteral(content []antlr.Tree) string {
+	if len(content) < 2 {
+		return "/* invalid function literal */"
+	}
+
+	// First element should be parameter list (array)
+	paramList := content[0]
+	
+	// Extract parameter names
+	var params []string
+	if arrayCtx, ok := paramList.(*parser.ArrayContext); ok {
+		children := arrayCtx.GetChildren()
+		// Skip [ and ] brackets
+		for i := 1; i < len(children)-1; i++ {
+			if terminalNode, ok := children[i].(*antlr.TerminalNodeImpl); ok {
+				params = append(params, terminalNode.GetText())
+			}
+		}
+	}
+
+	// Function body (rest of the arguments)
+	bodyElements := content[1:]
+	
+	// Create a temporary code generator to generate the function literal
+	tempCodeGen := NewCodeGenerator()
+	return tempCodeGen.EmitFunctionLiteral(params, bodyElements, v)
 }
 
 // processExpandedCode re-parses and processes expanded macro code

@@ -1,27 +1,37 @@
-; List (S-expression) examples for Fugo grammar
+; List (S-expression) examples with INVALID operators for current Vex grammar
+; S-expression syntax is correct, but operators are not yet defined
 
-; Simple function calls
+; Simple function calls - VALID syntax
 (print "hello")
 (add 1 2)
 (multiply 3 4 5)
 
-; Nested function calls
+; Nested function calls with invalid operators
 (print (add 1 (multiply 2 3)))
-(if (> x 0) (print "positive") (print "negative"))
+(if (> x 0) (print "positive") (print "negative"))  ; ERROR: '>' not defined
 
-; Special forms
+; Special forms - VALID syntax  
 (def name value)
 (package main)
 (import "library")
 
-; Complex nested structures
+; Complex nested structures with invalid operators
 (defn factorial [n]
-  (if (= n 0)
+  (if (= n 0)          ; ERROR: '=' equality operator not defined in grammar
       1
-      (* n (factorial (- n 1)))))
+      (* n (factorial (- n 1)))))  ; ERROR: '*' and '-' operators not defined
 
-; Lists with mixed content
-(mixed symbols "strings" [arrays] (nested lists))
+; Lists with mixed content including invalid array syntax
+(mixed symbols "strings" [arrays] (nested lists))  ; ERROR: [arrays] brackets invalid
 
-; Empty list (if supported)
+; Empty list - VALID syntax
 ()
+
+; ERRORS IN THIS FILE:
+; - Line 10: '>' comparison operator not recognized  
+; - Line 19: '=' equality operator not defined
+; - Line 21: '*' multiplication operator not defined
+; - Line 21: '-' subtraction operator not defined
+; - Line 24: '[arrays]' bracket syntax not supported
+;
+; NOTE: Current grammar supports S-expressions but lacks arithmetic/comparison operators

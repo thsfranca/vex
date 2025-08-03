@@ -1,0 +1,75 @@
+---
+name: Extension Auto Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'vscode-extension/package.json'
+
+permissions:
+  contents: write
+
+jobs:
+  check-version-change:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.check.outputs.changed }}
+      new-version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if version changed
+        id: check
+        run: |
+          # Get current version
+          CURRENT_VERSION=$(jq -r '.version' vscode-extension/package.json)
+          
+          # Get previous version (from previous commit)
+          git checkout HEAD~1 -- vscode-extension/package.json 2>/dev/null || echo "No previous version"
+          PREVIOUS_VERSION=$(jq -r '.version' vscode-extension/package.json 2>/dev/null || echo "0.0.0")
+          
+          # Restore current version
+          git checkout HEAD -- vscode-extension/package.json
+          
+          echo "Previous version: $PREVIOUS_VERSION"
+          echo "Current version: $CURRENT_VERSION"
+          
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "✅ Version changed: $PREVIOUS_VERSION → $CURRENT_VERSION"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No version change detected"
+          fi
+
+  auto-tag-and-release:
+    needs: check-version-change
+    if: needs.check-version-change.outputs.version-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create extension tag
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          TAG="extension-v${{ needs.check-version-change.outputs.new-version }}"
+          
+          # Check if tag already exists
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+            exit 0
+          fi
+          
+          # Create and push tag
+          git tag "$TAG"
+          git push origin "$TAG"
+          
+          echo "✅ Created and pushed tag: $TAG"

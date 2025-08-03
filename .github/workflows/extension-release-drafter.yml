@@ -18,13 +18,15 @@ permissions:
 
 jobs:
   update_extension_release_draft:
+    name: "Extension Release Draft"
     permissions:
       contents: write
       pull-requests: write
       issues: write
     runs-on: ubuntu-latest
     steps:
-      - uses: release-drafter/release-drafter@v6
+      - name: Update Extension Release Draft
+        uses: release-drafter/release-drafter@v6
         with:
           config-name: release-drafter-extension.yml
           commitish: main

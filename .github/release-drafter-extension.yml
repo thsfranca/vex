@@ -65,6 +65,9 @@ template: |
   **Compatible with**: VSCode 1.74.0+
   **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...extension-v$RESOLVED_VERSION
 
+include-pre-releases: false
+commitish: main
+
 autolabeler:
   - label: 'syntax'
     files:

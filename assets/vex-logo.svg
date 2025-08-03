@@ -1,0 +1,14 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&amp;display=swap');
+      .cursor-font {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 500;
+      }
+    </style>
+  </defs>
+  
+  <!-- Final Vex logo: Property access style with brand color -->
+  <text x="64" y="72" text-anchor="middle" class="cursor-font" font-size="36" fill="#82AAFF" letter-spacing="-0.05em">.vx</text>
+</svg>

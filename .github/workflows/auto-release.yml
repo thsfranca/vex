@@ -79,7 +79,6 @@ jobs:
       - name: Create release notes
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
-          echo "📝 Creating release notes..."
           cd tools/release-manager
           
           # Create PR data JSON for the tool
@@ -94,8 +93,25 @@ jobs:
           EOF
           )
           
-          # Create release notes
+          # Create release notes via tool
           ./release-manager create-notes "$PR_DATA"
+          
+          # Create release notes for GitHub Release
+          .github/scripts/release/create-release-notes.sh \
+            "${{ steps.bump-version.outputs.new-version }}" \
+            "${{ steps.bump-version.outputs.old-version }}" \
+            "${{ github.event.pull_request.number }}" \
+            "${{ github.event.pull_request.title }}" \
+            "${{ steps.check-labels.outputs.release-type }}"
+
+      - name: Create GitHub Release
+        if: steps.check-labels.outputs.release-type != 'none'
+        run: |
+          .github/scripts/release/create-github-release.sh \
+            "${{ steps.bump-version.outputs.new-version }}" \
+            "${{ steps.check-labels.outputs.release-type }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Success notification
         if: steps.check-labels.outputs.release-type != 'none'
@@ -105,8 +121,8 @@ jobs:
           echo "📋 Details:"
           echo "  • Version: ${{ steps.bump-version.outputs.old-version }} → ${{ steps.bump-version.outputs.new-version }}"
           echo "  • Tag: v${{ steps.bump-version.outputs.new-version }}"
+          echo "  • GitHub Release: Created"
           echo "  • Triggered by: PR #${{ github.event.pull_request.number }}"
           echo "  • Release type: ${{ steps.check-labels.outputs.release-type }}"
           echo ""
-          echo "🔗 The language-release.yml workflow will build and publish the release artifacts."
-          echo "🔗 Check releases: https://github.com/${{ github.repository }}/releases"
+          echo "🔗 Check the release: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump-version.outputs.new-version }}"

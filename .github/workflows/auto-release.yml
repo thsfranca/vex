@@ -1,0 +1,112 @@
+---
+name: Auto Release on PR Labels
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  auto-release:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Check for release labels
+        id: check-labels
+        run: |
+          echo "🔍 Checking PR labels for release triggers..."
+          cd tools/release-manager
+          go build -o release-manager .
+          
+          # Check labels and capture output
+          LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          OUTPUT=$(./release-manager check-labels "$LABELS")
+          echo "$OUTPUT"
+          
+          # Extract release-type from output and set GitHub output
+          RELEASE_TYPE=$(echo "$OUTPUT" | grep "^release-type=" | cut -d'=' -f2)
+          echo "release-type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+
+      - name: Configure Git
+        if: steps.check-labels.outputs.release-type != 'none'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Bump version
+        if: steps.check-labels.outputs.release-type != 'none'
+        id: bump-version
+        run: |
+          echo "⬆️ Bumping version..."
+          cd tools/release-manager
+          
+          # Bump version and capture output
+          OUTPUT=$(./release-manager bump-version "${{ steps.check-labels.outputs.release-type }}")
+          echo "$OUTPUT"
+          
+          # Extract version info from output and set GitHub outputs
+          OLD_VERSION=$(echo "$OUTPUT" | grep "^old-version=" | cut -d'=' -f2)
+          NEW_VERSION=$(echo "$OUTPUT" | grep "^new-version=" | cut -d'=' -f2)
+          
+          echo "old-version=$OLD_VERSION" >> $GITHUB_OUTPUT
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create release commit and tag
+        if: steps.check-labels.outputs.release-type != 'none'
+        run: |
+          echo "🏷️ Creating release commit and tag..."
+          ./scripts/create-release-tag.sh \
+            "${{ steps.bump-version.outputs.new-version }}" \
+            "${{ steps.bump-version.outputs.old-version }}" \
+            "${{ github.event.pull_request.number }}" \
+            "${{ steps.check-labels.outputs.release-type }}"
+
+      - name: Create release notes
+        if: steps.check-labels.outputs.release-type != 'none'
+        run: |
+          echo "📝 Creating release notes..."
+          cd tools/release-manager
+          
+          # Create PR data JSON for the tool
+          PR_DATA=$(cat << 'EOF'
+          {
+            "number": ${{ github.event.pull_request.number }},
+            "title": "${{ github.event.pull_request.title }}",
+            "body": "${{ github.event.pull_request.body }}",
+            "author": "${{ github.event.pull_request.user.login }}",
+            "release_type": "${{ steps.check-labels.outputs.release-type }}"
+          }
+          EOF
+          )
+          
+          # Create release notes
+          ./release-manager create-notes "$PR_DATA"
+
+      - name: Success notification
+        if: steps.check-labels.outputs.release-type != 'none'
+        run: |
+          echo "🎉 Auto-release completed successfully!"
+          echo ""
+          echo "📋 Details:"
+          echo "  • Version: ${{ steps.bump-version.outputs.old-version }} → ${{ steps.bump-version.outputs.new-version }}"
+          echo "  • Tag: v${{ steps.bump-version.outputs.new-version }}"
+          echo "  • Triggered by: PR #${{ github.event.pull_request.number }}"
+          echo "  • Release type: ${{ steps.check-labels.outputs.release-type }}"
+          echo ""
+          echo "🔗 The language-release.yml workflow will build and publish the release artifacts."
+          echo "🔗 Check releases: https://github.com/${{ github.repository }}/releases"

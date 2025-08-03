@@ -108,13 +108,13 @@ jobs:
           
           echo "Checking for required grammar rules..."
           
-          # Check if basic rules exist
-          if ! grep -q "sp.*:" "$GRAMMAR_FILE"; then
+          # Check if basic rules exist (account for multi-line definitions)
+          if ! grep -q "^sp" "$GRAMMAR_FILE"; then
             echo "❌ Missing root rule 'sp'"
             exit 1
           fi
           
-          if ! grep -q "list.*:" "$GRAMMAR_FILE"; then
+          if ! grep -q "^list" "$GRAMMAR_FILE"; then
             echo "❌ Missing 'list' rule"
             exit 1
           fi

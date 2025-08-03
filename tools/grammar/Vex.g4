@@ -1,6 +1,6 @@
 grammar Vex;
 
-sp: list+ EOF ;
+program: list+ EOF ;
 
 list
     : '(' (array | list | SYMBOL | STRING)+ ')'
@@ -11,7 +11,7 @@ array
     ;
 
 SYMBOL
-    : (LETTER | INTEGER | '.')+
+    : (LETTER | INTEGER | '.' | '+' | '-' | '*' | '/' | '=' | '!' | '<' | '>' | '?' | '_')+
     ;
 
 STRING

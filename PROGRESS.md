@@ -40,16 +40,16 @@
 - Decided on static typing for performance, thread safety, and AI predictability
 - Established Lisp-inspired S-expression syntax optimized for AI generation
 - **AI-First Design**: Prioritized uniform syntax patterns over syntactic sugar
-- **Concurrent HTTP Focus**: Specialized in handling multiple HTTP requests simultaneously
-- **Functional Immutability**: Thread-safe by design with immutable data structures
-- **Goroutine Integration**: Each HTTP request runs in its own lightweight thread
+- **Scalable HTTP Focus**: Every Vex program naturally handles multiple HTTP requests simultaneously
+- **Inherent Thread Safety**: Immutable data structures make concurrency automatic and safe
+- **Natural Scalability**: HTTP requests automatically run in lightweight threads
 
 ---
 
 ## Phase 2: Basic Go Transpilation 🚧 **IN PROGRESS**
 
 ### Goal
-Generate executable Go code from Vex programs to achieve native performance, concurrent HTTP handling, and Go ecosystem access.
+Generate executable Go code from Vex programs to achieve native performance, automatic scalability, and Go ecosystem access.
 
 ### ✅ Step 1: Basic Expression Transpilation **COMPLETED**
 **What was built:**
@@ -128,9 +128,9 @@ Update this section each week with:
 
 ### Current Session - Basic Transpiler Complete
 **Status**: Phase 2 - Basic transpilation working
-**Focus**: Building AI-friendly concurrent HTTP server framework next
+**Focus**: Building AI-friendly HTTP server framework next
 **Achievement**: Successfully implemented core transpiler with CLI tool
-**Next**: Concurrent HTTP server patterns and JWT authentication for maximum AI/market value
+**Next**: HTTP server patterns and JWT authentication for maximum AI/market value
 
 ---
 

@@ -8,15 +8,15 @@ Vex is a statically-typed functional programming language designed specifically 
 
 **🤖 AI-First Design**: Every language feature must be optimized for AI code generation. Uniform S-expression syntax, predictable patterns, and semantic clarity take priority over syntactic convenience.
 
-**🎯 Concurrent HTTP Specialization**: Language features specifically designed for handling multiple HTTP requests simultaneously, JWT authentication, and scalable web API development - the most market-valuable use cases.
+**🎯 Scalable HTTP Specialization**: Language features specifically designed so that every program naturally handles multiple HTTP requests simultaneously, with JWT authentication and scalable web API development - the most market-valuable use cases.
 
-**⚡ Concurrent Performance First**: Every design decision must prioritize runtime performance and scalability for backend services handling thousands of simultaneous HTTP requests using Go's goroutines.
+**⚡ Scalable Performance First**: Every design decision ensures that all programs automatically achieve high performance and scalability, naturally handling thousands of simultaneous HTTP requests through Go's goroutines.
 
 **🔒 Static Type Safety**: Compile-time type checking prevents runtime errors and enables aggressive optimization through Go transpilation.
 
 **🔗 Go Ecosystem Integration**: Seamless interoperability with existing Go libraries, frameworks, and infrastructure.
 
-**🧩 Functional Programming**: Immutable data structures, pure functions, and functional composition as primary paradigms that AI can reliably generate and that provide thread-safety for concurrent HTTP handling.
+**🧩 Functional Programming**: Immutable data structures, pure functions, and functional composition as primary paradigms that AI can reliably generate and that provide automatic thread-safety for all programs.
 
 ### AI-Friendly Design Goals
 
@@ -28,19 +28,19 @@ Vex is a statically-typed functional programming language designed specifically 
 
 **Predictable Structure**: Consistent patterns that AI models can learn once and apply everywhere.
 
-**Minimal Cognitive Load**: Fewer syntax rules mean AI can focus on business logic rather than parsing complexity, while immutable-by-default design eliminates concurrency complexity.
+**Minimal Cognitive Load**: Fewer syntax rules mean AI can focus on business logic rather than parsing complexity, while immutable-by-default design eliminates all concurrency complexity.
 
-### Concurrent HTTP Design Goals
+### Automatic Scalability Design Goals
 
-**Thread-Safe by Default**: Immutable data structures eliminate the possibility of race conditions when handling multiple simultaneous requests.
+**Thread-Safe by Default**: Immutable data structures make it impossible to have race conditions - all programs safely handle multiple simultaneous requests.
 
-**Goroutine-Per-Request**: Each HTTP request automatically runs in its own lightweight Go goroutine, enabling thousands of concurrent connections.
+**Automatic Parallelization**: Every HTTP request runs in its own lightweight Go goroutine without any special syntax or configuration.
 
-**Stateless Patterns**: Functional design naturally supports stateless request handling, essential for horizontal scaling.
+**Natural Statelessness**: Functional design inherently creates stateless request handling, perfect for horizontal scaling.
 
-**Non-Blocking Operations**: Built-in async patterns for database calls, HTTP requests, and I/O operations.
+**Built-in Non-Blocking**: All I/O operations are naturally non-blocking through Go's runtime and standard libraries.
 
-**Resource Management**: Automatic connection pooling, request timeouts, and resource cleanup.
+**Zero-Configuration Scaling**: No pools to configure, no limits to set - programs automatically scale to available resources.
 
 ## Phase 1: Core Type System Implementation
 

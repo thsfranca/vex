@@ -71,11 +71,11 @@ vex/
 Vex aims to be a functional programming language optimized for AI generation and concurrent HTTP handling with:
 
 - **AI-friendly syntax**: S-expressions provide uniform, predictable structure for AI models
-- **Concurrent-by-design**: Functional immutability + Go goroutines = safe concurrent HTTP handling
+- **Thread-safe by design**: Functional immutability means every program safely handles concurrent requests
 - **Static typing** with type inference for performance and thread safety  
 - **Semantic annotations**: Built-in metadata to guide AI code generation
 - **Go transpilation** for native performance, concurrency, and ecosystem access
-- **HTTP service focus** with built-in patterns for concurrent web APIs and authentication
+- **HTTP service focus** with built-in patterns for scalable web APIs and authentication
 - **Composable patterns**: Simple building blocks that AI can combine into scalable solutions
 
 ### 🎯 **Perfect for AI Code Generation + Concurrent HTTP**
@@ -83,28 +83,27 @@ Vex aims to be a functional programming language optimized for AI generation and
 Vex's design makes it ideal for AI-assisted development of concurrent web services:
 
 ```vex
-;; AI can easily generate concurrent HTTP handlers:
+;; AI can easily generate HTTP handlers that are naturally concurrent:
 (defn api-endpoint [request]
   (-> request
       (validate-input)
-      (process-data-async)      ; Runs concurrently
+      (process-data)            ; Always thread-safe by design
       (format-response)))
 
-;; AI can generate complete concurrent HTTP servers:
+;; AI can generate HTTP servers that handle thousands of requests:
 (http-server
   :port 8080
-  :concurrent true              ; Each request = new goroutine
   :routes [
-    (GET "/users" get-users)    ; Handles multiple requests simultaneously
-    (POST "/data" process-data) ; Thread-safe by immutable design
+    (GET "/users" get-users)    ; Each request runs in its own goroutine
+    (POST "/data" process-data) ; Thread-safe through immutable design
   ])
 ```
 
 The uniform S-expression structure + functional design means AI models can:
-- **Learn patterns quickly**: Same structure for all operations, concurrent or not
-- **Generate thread-safe code**: Immutable data = no concurrency bugs
-- **Scale automatically**: Go's goroutines handle thousands of concurrent requests
-- **Focus on logic**: Less cognitive load on syntax AND concurrency management
+- **Learn patterns quickly**: Same structure for all operations
+- **Generate thread-safe code automatically**: Immutable data = no concurrency bugs
+- **Scale automatically**: Every program handles thousands of concurrent requests
+- **Focus on logic**: No syntax complexity, no concurrency complexity
 
 ### Current Status: Basic Transpiler Working ✅
 
@@ -182,48 +181,45 @@ make help              # Display detailed help
 Here's what AI-friendly Vex programs might look like when fully implemented:
 
 ```vex
-;; AI can easily generate concurrent HTTP endpoints with semantic hints
+;; AI can easily generate HTTP endpoints that are inherently thread-safe
 (defn get-user-profile
   ^{:http-endpoint "/api/users/:id"
     :method "GET"
     :auth-required true
-    :concurrent-safe true         ; Immutable data = thread-safe
     :returns "application/json"}
   [request]
   (-> request
       (extract-user-id)
-      (fetch-user-from-db-async)   ; Non-blocking database call
+      (fetch-user-from-db)         ; Always non-blocking
       (format-json-response)))
 
-;; AI generates authentication that handles concurrent logins
+;; AI generates authentication that naturally handles thousands of logins
 (defn login-endpoint
   ^{:purpose "authenticate-user"
-    :security "high" 
-    :concurrent true              ; Multiple users can login simultaneously
+    :security "high"
     :returns "jwt-token"}
   [request]
   (-> request
-      (validate-credentials-async)
+      (validate-credentials)
       (create-jwt-token)
       (json-response)))
 
-;; AI can compose concurrent systems that handle thousands of requests
+;; AI composes systems that automatically scale to handle any load
 (http-server
   :port 8080
-  :max-concurrent 10000         ; Handle 10K simultaneous requests  
   :routes [
-    (GET "/api/users" list-users :jwt-auth)      ; Each request = new goroutine
-    (POST "/api/login" login-endpoint)           ; Concurrent logins supported
-    (PUT "/api/users/:id" update-user :jwt-auth) ; Thread-safe updates
+    (GET "/api/users" list-users :jwt-auth)      ; Scales to millions of requests
+    (POST "/api/login" login-endpoint)           ; Thread-safe by design
+    (PUT "/api/users/:id" update-user :jwt-auth) ; No concurrency complexity
   ])
 ```
 
-**Why AI + concurrency work perfectly together:**
-- **Uniform structure**: Everything is `(operation args...)` - concurrent or not
-- **Immutable by default**: No shared mutable state = no concurrency bugs
-- **Functional composition**: `(-> data transform1 transform2)` naturally thread-safe
-- **Clear patterns**: AI learns one pattern, applies it to concurrent systems
-- **Go's goroutines**: AI-generated code automatically scales to millions of requests
+**Why AI-generated Vex code is naturally scalable:**
+- **Uniform structure**: Everything is `(operation args...)` - always thread-safe
+- **Immutable by default**: No shared mutable state = impossible to have concurrency bugs
+- **Functional composition**: `(-> data transform1 transform2)` is inherently thread-safe
+- **One pattern**: AI learns simple patterns that automatically scale
+- **Go's goroutines**: Every AI-generated program scales to millions of requests
 
 ## Grammar Rules
 

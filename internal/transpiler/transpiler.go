@@ -26,33 +26,33 @@ func New() *Transpiler {
 func (t *Transpiler) TranspileFromInput(input string) (string, error) {
 	// Create input stream from the source code
 	inputStream := antlr.NewInputStream(input)
-	
+
 	// Create lexer
 	lexer := parser.NewVexLexer(inputStream)
-	
+
 	// Create token stream
 	tokenStream := antlr.NewCommonTokenStream(lexer, 0)
-	
+
 	// Create parser
 	vexParser := parser.NewVexParser(tokenStream)
-	
+
 	// Add error listener to catch syntax errors
 	errorListener := &ErrorListener{}
 	vexParser.RemoveErrorListeners()
 	vexParser.AddErrorListener(errorListener)
-	
+
 	// Parse starting from the 'program' rule (root rule)
 	tree := vexParser.Program()
-	
+
 	// Check for parse errors
 	if errorListener.hasError {
 		return "", fmt.Errorf("syntax error: %s", errorListener.errorMsg)
 	}
-	
+
 	// Create AST visitor and traverse the tree
 	visitor := NewASTVisitor()
 	tree.Accept(visitor)
-	
+
 	// Generate final Go code
 	return t.generateGoCodeWithContent(visitor.GetGeneratedCode()), nil
 }
@@ -64,7 +64,7 @@ func (t *Transpiler) TranspileFromFile(filename string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read file %s: %w", filename, err)
 	}
-	
+
 	// Transpile the content
 	return t.TranspileFromInput(string(content))
 }
@@ -77,7 +77,7 @@ func (t *Transpiler) generateGoCode() string {
 	result.WriteString("func main() {\n")
 	result.WriteString(t.output.String())
 	result.WriteString("}\n")
-	
+
 	return result.String()
 }
 
@@ -96,7 +96,7 @@ func (t *Transpiler) generateGoCodeWithContent(content string) string {
 		}
 	}
 	result.WriteString("}\n")
-	
+
 	return result.String()
 }
 

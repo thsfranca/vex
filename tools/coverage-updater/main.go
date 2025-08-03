@@ -10,13 +10,13 @@ import (
 )
 
 type Component struct {
-	Name       string
-	Target     int
-	TestPath   string
-	CoverFile  string
-	DirPath    string
+	Name        string
+	Target      int
+	TestPath    string
+	CoverFile   string
+	DirPath     string
 	Implemented bool
-	Coverage   float64
+	Coverage    float64
 }
 
 func main() {
@@ -62,7 +62,7 @@ func generateCoverage() {
 	for i := range components {
 		comp := &components[i]
 		fmt.Printf("Running %s coverage analysis...\n", comp.Name)
-		
+
 		// Check if component is implemented
 		if _, err := os.Stat(comp.DirPath); err == nil {
 			comp.Implemented = true
@@ -180,12 +180,12 @@ func generateStatus(coverage float64, target int, implemented bool) string {
 	if !implemented {
 		return "⏳ *Not implemented yet*"
 	}
-	
+
 	if coverage >= float64(target) {
 		return fmt.Sprintf("[SUCCESS] %.1f%%", coverage)
 	}
-	
-			return fmt.Sprintf("[ERROR] %.1f%% (below %d%%)", coverage, target)
+
+	return fmt.Sprintf("[ERROR] %.1f%% (below %d%%)", coverage, target)
 }
 
 func getEnv(key, defaultValue string) string {

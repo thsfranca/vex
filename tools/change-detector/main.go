@@ -42,13 +42,13 @@ func analyzeMarkfileChanges() {
 	}
 
 	diff := string(output)
-	
+
 	// Check if Makefile diff contains Go-related patterns
 	goPattern := regexp.MustCompile(`(go (build|test|mod|generate)|GOPATH|GOOS|GOARCH|\.go|antlr.*-Dlanguage=Go)`)
-	
+
 	if goPattern.MatchString(diff) {
 		fmt.Println("✅ Found Go-related Makefile changes:")
-		
+
 		// Show matching lines
 		lines := strings.Split(diff, "\n")
 		for _, line := range lines {
@@ -56,12 +56,12 @@ func analyzeMarkfileChanges() {
 				fmt.Println(line)
 			}
 		}
-		
+
 		fmt.Println("go-related=true")
 	} else {
 		fmt.Println("⚠️ Makefile changes appear to be non-Go related (tooling, documentation, etc.)")
 		fmt.Println("Changed lines preview:")
-		
+
 		// Show first 20 lines of diff
 		lines := strings.Split(diff, "\n")
 		for i, line := range lines {
@@ -70,7 +70,7 @@ func analyzeMarkfileChanges() {
 			}
 			fmt.Println(line)
 		}
-		
+
 		fmt.Println("go-related=false")
 	}
 }
@@ -97,11 +97,11 @@ func getEnvOrArg(envVar string, argIndex int, defaultValue string) string {
 	if value := os.Getenv(envVar); value != "" {
 		return value
 	}
-	
+
 	// Then try command line argument
 	if len(os.Args) > argIndex {
 		return os.Args[argIndex]
 	}
-	
+
 	return defaultValue
 }

@@ -43,14 +43,14 @@ func (v *ASTVisitor) VisitList(ctx *parser.ListContext) interface{} {
 
 	// Skip opening parenthesis, process content, skip closing parenthesis
 	content := children[1 : len(children)-1]
-	
+
 	if len(content) == 0 {
 		return nil
 	}
 
 	// Check if this is a special form (function call, def, etc.)
 	firstChild := content[0]
-	
+
 	// Get the text of the first element
 	var firstElement string
 	if symbolCtx, ok := firstChild.(*antlr.TerminalNodeImpl); ok {
@@ -118,24 +118,24 @@ func (v *ASTVisitor) evaluateExpression(node antlr.Tree) string {
 	switch ctx := node.(type) {
 	case *antlr.TerminalNodeImpl:
 		text := ctx.GetText()
-		
+
 		// Check if it's a string literal
 		if strings.HasPrefix(text, "\"") && strings.HasSuffix(text, "\"") {
 			return text // Already properly quoted
 		}
-		
+
 		// Check if it's a number
 		if isNumber(text) {
 			return text
 		}
-		
+
 		// Otherwise, it's a symbol/identifier
 		return text
-		
+
 	case *parser.ListContext:
 		// Handle nested lists - for now, just return placeholder
 		return "/* nested list */"
-		
+
 	default:
 		return "/* unknown */"
 	}

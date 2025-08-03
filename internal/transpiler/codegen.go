@@ -35,7 +35,7 @@ func (cg *CodeGenerator) EmitSymbol(symbol string) {
 }
 
 // EmitVariableDefinition generates Go code for variable definition
-// (def x 10) -> x := 10 
+// (def x 10) -> x := 10
 // TODO: This should only be called if semantic analysis determines the variable is used later
 // Otherwise, Go will produce "declared and not used" errors, which is correct behavior
 func (cg *CodeGenerator) EmitVariableDefinition(name, value string) {
@@ -55,7 +55,7 @@ func (cg *CodeGenerator) EmitArithmeticExpression(operator string, operands []st
 		cg.writeIndented(fmt.Sprintf("// Invalid arithmetic expression with %d operands\n", len(operands)))
 		return
 	}
-	
+
 	// Convert Lisp prefix notation to Go infix notation
 	goOperator := convertOperator(operator)
 	expression := strings.Join(operands, fmt.Sprintf(" %s ", goOperator))

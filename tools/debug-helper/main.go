@@ -41,7 +41,7 @@ func main() {
 func showDebugInfo() {
 	fmt.Println("🔍 DEBUG INFORMATION")
 	fmt.Println("===================")
-	
+
 	// Environment info
 	fmt.Printf("Test type: %s\n", getEnv("TEST_TYPE", "unknown"))
 	fmt.Printf("Debug mode: %s\n", getEnv("DEBUG_MODE", "false"))
@@ -85,11 +85,11 @@ func simulateSkip() {
 
 func buildOnly() {
 	fmt.Println("🔨 Building Go packages...")
-	
+
 	// Check if there are any main.go files
 	cmd := exec.Command("find", ".", "-name", "main.go")
 	output, err := cmd.Output()
-	
+
 	if err != nil || strings.TrimSpace(string(output)) == "" {
 		fmt.Println("ℹ️ No main.go files found - nothing to build")
 		return
@@ -100,22 +100,22 @@ func buildOnly() {
 	cmd = exec.Command("go", "build", "./...")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		fmt.Printf("❌ Build failed: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	fmt.Println("✅ Build completed successfully")
 }
 
 func testOnly() {
 	fmt.Println("🧪 Running tests...")
-	
+
 	// Check if there are any test files
 	cmd := exec.Command("find", ".", "-name", "*_test.go")
 	output, err := cmd.Output()
-	
+
 	if err != nil || strings.TrimSpace(string(output)) == "" {
 		fmt.Println("ℹ️ No test files found - nothing to test")
 		return
@@ -126,29 +126,29 @@ func testOnly() {
 	cmd = exec.Command("go", "test", "-v", "./...")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		fmt.Printf("❌ Tests failed: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	fmt.Println("✅ Tests completed successfully")
 }
 
 func lintOnly() {
 	fmt.Println("🔍 Running linting...")
-	
+
 	// Run go vet
 	fmt.Println("Running go vet...")
 	cmd := exec.Command("go", "vet", "./...")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		fmt.Printf("❌ Linting failed: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	fmt.Println("✅ Linting completed successfully")
 }
 

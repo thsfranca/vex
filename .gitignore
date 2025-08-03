@@ -1,8 +1,10 @@
 # Generated parser files
 tools/gen/
 tools/grammar/vex_*.go
-tools/grammar/Vex.*
-tools/grammar/VexLexer.*
+tools/grammar/Vex.interp
+tools/grammar/Vex.tokens
+tools/grammar/VexLexer.interp
+tools/grammar/VexLexer.tokens
 
 # Compiled binaries  
 bin/
@@ -12,7 +14,7 @@ tools/*/[!.]*
 !tools/*/*.mod
 !tools/*/*.sum
 !tools/*/*.sh
-!tools/grammar/Vex.g4
+
 
 # ANTLR generated files
 *.interp

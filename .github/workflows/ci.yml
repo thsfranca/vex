@@ -45,29 +45,11 @@ jobs:
     - name: Analyze Makefile changes for Go relevance
       id: makefile-analysis
       if: ${{ steps.changes.outputs.makefile-changes == 'true' }}
-      run: |
-        cd tools/change-detector
-        go build -o change-detector .
-        output=$(./change-detector makefile-analysis)
-        echo "$output"
-        GO_RELATED=$(echo "$output" | grep "go-related=" | cut -d'=' -f2)
-        echo "go-related=$GO_RELATED" >> $GITHUB_OUTPUT
+      run: .github/scripts/ci/makefile-analysis.sh
         
     - name: Final Go files decision
       id: final-decision  
-      run: |
-        cd tools/change-detector
-        if [ ! -f change-detector ]; then
-          go build -o change-detector .
-        fi
-        
-        BASIC_GO="${{ steps.changes.outputs.go-files }}"
-        MAKEFILE_GO="${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
-        
-        output=$(./change-detector final-decision "$BASIC_GO" "$MAKEFILE_GO")
-        echo "$output"
-        GO_FILES=$(echo "$output" | grep "go-files=" | cut -d'=' -f2)
-        echo "go-files=$GO_FILES" >> $GITHUB_OUTPUT
+      run: .github/scripts/ci/final-go-decision.sh "${{ steps.changes.outputs.go-files }}" "${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
 
   # Fast skip job for non-Go changes  
   skip-build:
@@ -113,20 +95,15 @@ jobs:
         
     - name: Install ANTLR
       if: steps.antlr-cache.outputs.cache-hit != 'true'
-      run: |
-        wget https://www.antlr.org/download/antlr-${{ env.ANTLR_VERSION }}-complete.jar -O /tmp/antlr.jar
-        sudo mv /tmp/antlr.jar /usr/local/lib/
+      env:
+        ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
+      run: .github/scripts/ci/install-antlr.sh
         
     - name: Setup ANTLR binary
-      run: |
-        echo '#!/bin/bash' | sudo tee /usr/local/bin/antlr4
-        echo 'java -jar /usr/local/lib/antlr.jar "$@"' | sudo tee -a /usr/local/bin/antlr4
-        sudo chmod +x /usr/local/bin/antlr4
+      run: .github/scripts/ci/setup-antlr-binary.sh
         
     - name: Install Go dependencies
-      run: |
-        go mod download || echo "No modules to download"
-        go mod tidy || echo "No go.mod yet"
+      run: .github/scripts/ci/install-go-deps.sh
         
     # Cache parser generation
     - name: Cache generated parsers
@@ -138,10 +115,7 @@ jobs:
         
     - name: Generate parsers
       if: steps.parser-cache.outputs.cache-hit != 'true'
-      run: |
-        if [ -f "tools/grammar/Vex.g4" ]; then
-          make go || echo "Parser generation failed, continuing..."
-        fi
+      run: .github/scripts/ci/generate-parsers.sh
         
     - name: Run Go tests
       run: .github/scripts/ci/run-tests.sh
@@ -177,41 +151,17 @@ jobs:
           ${{ runner.os }}-go-${{ env.GO_VERSION }}-
           
     - name: Install Go dependencies
-      run: |
-        go mod download || echo "No modules to download"
-        go mod tidy || echo "No go.mod yet"
+      run: .github/scripts/ci/install-go-deps.sh
         
     - name: Install coverage tools
-      run: |
-        go install github.com/axw/gocov/gocov@latest
-        go install github.com/AlekSi/gocov-xml@latest
+      run: .github/scripts/ci/install-coverage-tools.sh
         
     - name: Run Go tests with coverage
-      run: |
-        mkdir -p coverage
-        .github/scripts/ci/run-coverage.sh
+      run: .github/scripts/ci/run-coverage-full.sh
         
     - name: Calculate coverage
       id: coverage
-      run: |
-        if [ -f "coverage/total.out" ] && [ -s "coverage/total.out" ]; then
-          TOTAL_COV=$(go tool cover -func=coverage/total.out | grep "total:" | awk '{print $3}' | sed 's/%//' || echo "0")
-          echo "total-coverage=$TOTAL_COV" >> $GITHUB_OUTPUT
-          echo "[COVERAGE] Coverage: $TOTAL_COV%"
-          
-          # Coverage requirements based on project maturity
-          GO_FILE_COUNT=$(find . -name "*.go" -not -name "*_test.go" | wc -l)
-          if [ $GO_FILE_COUNT -lt 5 ]; then
-            echo "⚠️ Early development - no coverage requirements yet"
-          elif [ $GO_FILE_COUNT -lt 20 ]; then
-            echo "📈 Growing project - aim for 40%+ coverage"
-          else
-            echo "🎯 Mature project - aim for 70%+ coverage"
-          fi
-        else
-          echo "total-coverage=0" >> $GITHUB_OUTPUT
-          echo "[COVERAGE] No coverage data available"
-        fi
+      run: .github/scripts/ci/calculate-coverage.sh
         
     - name: Upload coverage artifacts
       uses: actions/upload-artifact@v4
@@ -247,9 +197,7 @@ jobs:
           ${{ runner.os }}-go-${{ env.GO_VERSION }}-
           
     - name: Install Go dependencies
-      run: |
-        go mod download || echo "No modules to download"
-        go mod tidy || echo "No go.mod yet"
+      run: .github/scripts/ci/install-go-deps.sh
         
     # Cache linting tools
     - name: Cache linting tools
@@ -259,9 +207,7 @@ jobs:
         key: ${{ runner.os }}-go-tools-${{ env.GO_VERSION }}-lint
         
     - name: Install Go linting tools
-      run: |
-        go install golang.org/x/tools/cmd/goimports@latest
-        go install golang.org/x/lint/golint@latest
+      run: .github/scripts/ci/install-go-linting-tools.sh
         
     - name: Check formatting (changed files only)
       env:

@@ -35,9 +35,7 @@ jobs:
     if: ${{ needs.detect-changes.outputs.extension-files == 'false' }}
     steps:
     - name: Skip VSCode extension validation
-      run: |
-        echo "[SKIP] Skipping VSCode extension validation - no extension files changed"
-        echo "Changed files are only: Go code, CI workflows, docs, etc."
+      run: .github/scripts/extension/skip-validation.sh
 
   # Main extension validation
   validate:
@@ -56,15 +54,10 @@ jobs:
         cache-dependency-path: 'vscode-extension/package.json'
         
     - name: Install VSCode extension dependencies
-      run: |
-        cd vscode-extension
-        npm install
+      run: .github/scripts/extension/install-dependencies.sh
         
     - name: Install extension development tools
-      run: |
-        npm install -g eslint prettier
-        # Install specific vsce version that's compatible with Node 20
-        npm install -g @vscode/vsce@latest
+      run: .github/scripts/extension/install-dev-tools.sh
         
     - name: Lint VSCode extension JavaScript
       run: .github/scripts/extension/lint-javascript.sh
@@ -87,23 +80,13 @@ jobs:
         go-version: '1.21'
 
     - name: Test syntax highlighting with sample Vex code
-      run: |
-        cd vscode-extension
-        # Build and use extension tester
-        cd ../tools/extension-tester
-        go build -o extension-tester .
-        cd ../../vscode-extension
-        ../tools/extension-tester/extension-tester create-samples
+      run: .github/scripts/extension/test-syntax-highlighting.sh
         
     - name: Package VSCode extension (.vsix)
-      run: |
-        cd vscode-extension
-        ../tools/extension-tester/extension-tester package
+      run: .github/scripts/extension/package-extension.sh
         
     - name: Verify VSCode extension package integrity
-      run: |
-        cd vscode-extension
-        ../tools/extension-tester/extension-tester verify
+      run: .github/scripts/extension/verify-package.sh
         
     - name: Upload VSCode extension artifact
       uses: actions/upload-artifact@v4
@@ -124,11 +107,4 @@ jobs:
         go-version: '1.21'
 
     - name: Report VSCode extension validation results
-      env:
-        EXTENSION_FILES: ${{ needs.detect-changes.outputs.extension-files }}
-        VALIDATE_RESULT: ${{ needs.validate.result }}
-        SKIP_RESULT: ${{ needs.skip-validation.result }}
-      run: |
-        cd tools/extension-tester
-        go build -o extension-tester .
-        ./extension-tester summary >> $GITHUB_STEP_SUMMARY
+      run: .github/scripts/extension/generate-summary.sh "${{ needs.detect-changes.outputs.extension-files }}" "${{ needs.validate.result }}" "${{ needs.skip-validation.result }}"

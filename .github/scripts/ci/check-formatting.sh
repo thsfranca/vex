@@ -8,11 +8,13 @@ fi
 
 echo "[CHECK] Checking Go code formatting..."
 
-# Get list of changed Go files in this PR
-if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+# Get list of changed Go files
+if [ -n "$GITHUB_BASE_SHA" ]; then
     CHANGED_GO_FILES=$(git diff --name-only $GITHUB_BASE_SHA..HEAD | grep '\.go$' || true)
+    echo "Checking changed files since $GITHUB_BASE_SHA"
 else
     CHANGED_GO_FILES=$(find . -name "*.go")
+    echo "No base SHA available - checking all Go files"
 fi
 
 if [ -n "$CHANGED_GO_FILES" ]; then

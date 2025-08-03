@@ -57,6 +57,9 @@ jobs:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.go-files == 'false' }}
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
     - name: Skip Go workflows
       run: .github/scripts/ci/skip-build.sh
 

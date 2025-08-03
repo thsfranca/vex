@@ -30,10 +30,11 @@ tools/*/[!.]*
 ehthumbs.db
 Thumbs.db
 
-# Backup files
+# Backup and temporary files
 *~
 *.bak
 *.backup
+*.tmp
 
 # VSCode Extension Build Artifacts
 vscode-extension/*.vsix

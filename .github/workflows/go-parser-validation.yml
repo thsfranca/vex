@@ -73,29 +73,29 @@ jobs:
       - name: Generate Go parser (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          echo "🔨 Generating Go parser on ${{ matrix.os }}..."
+          echo "[BUILD] Generating Go parser on ${{ matrix.os }}..."
           cd tools/grammar
           antlr4 -Dlanguage=Go -listener -visitor Vex.g4 -o ../gen/go/
-          echo "✅ Go parser generation completed"
+          echo "[SUCCESS] Go parser generation completed"
 
       - name: Generate Go parser (Windows)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          Write-Host "🔨 Generating Go parser on ${{ matrix.os }}..."
+          Write-Host "[BUILD] Generating Go parser on ${{ matrix.os }}..."
           cd tools/grammar
           antlr4.bat -Dlanguage=Go -listener -visitor Vex.g4 -o ../gen/go/
-          Write-Host "✅ Go parser generation completed"
+          Write-Host "[SUCCESS] Go parser generation completed"
 
       # Verify generated Go files
       - name: Verify generated Go files
         run: |
-          echo "🔍 Verifying generated Go parser files..."
+          echo "[CHECK] Verifying generated Go parser files..."
           
           if [ -f "tools/gen/go/vex_lexer.go" ] && [ -f "tools/gen/go/vex_parser.go" ]; then
-            echo "✅ Go parser files generated successfully"
+            echo "[SUCCESS] Go parser files generated successfully"
           else
-            echo "❌ Missing Go parser files"
+            echo "[ERROR] Missing Go parser files"
             ls -la tools/gen/go/ || echo "Directory doesn't exist"
             exit 1
           fi
@@ -104,14 +104,14 @@ jobs:
       # Test Go compilation
       - name: Test Go compilation
         run: |
-          echo "🧪 Testing Go parser compilation..."
+          echo "[TEST] Testing Go parser compilation..."
           cd tools/gen/go
           go mod init vex-parser-test || true
           go mod tidy || true
           if go build .; then
-            echo "✅ Go parser compiles successfully"
+            echo "[SUCCESS] Go parser compiles successfully"
           else
-            echo "❌ Go parser compilation failed"
+            echo "[ERROR] Go parser compilation failed"
             exit 1
           fi
 
@@ -132,14 +132,14 @@ jobs:
     steps:
       - name: Check results
         run: |
-          echo "🏁 Go parser generation summary:"
+          echo "[SUMMARY] Go parser generation summary:"
           
           if [ "${{ needs.test-go-parser-generation.result }}" = "success" ]; then
-            echo "✅ Go parser generated successfully on all platforms"
-            echo "🎉 Vex grammar is ready for Go transpilation!"
+            echo "[SUCCESS] Go parser generated successfully on all platforms"
+            echo "[INFO] Vex grammar is ready for Go transpilation!"
           else
-            echo "❌ Go parser generation failed on some platforms"
-            echo "💡 Check the job logs and artifacts for debugging"
+            echo "[ERROR] Go parser generation failed on some platforms"
+            echo "[INFO] Check the job logs and artifacts for debugging"
             exit 1
           fi
 

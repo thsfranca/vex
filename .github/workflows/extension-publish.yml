@@ -1,0 +1,72 @@
+---
+name: Publish VSCode Extension
+
+on:
+  push:
+    tags:
+      - 'extension-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'vscode-extension/package.json'
+
+      - name: Install dependencies
+        run: |
+          cd vscode-extension
+          npm install
+
+      - name: Extract version from tag
+        id: extract-version
+        run: |
+          VERSION=$(echo "${{ github.ref_name }}" | sed 's/extension-v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update package.json version
+        run: |
+          cd vscode-extension
+          npm version ${{ steps.extract-version.outputs.version }} --no-git-tag-version
+
+      - name: Package extension
+        run: |
+          cd vscode-extension
+          npx vsce package
+
+      - name: Create GitHub Release and Upload VSIX
+        run: |
+          # Create release from the tag
+          gh release create "${{ github.ref_name }}" \
+            --title "Extension v${{ steps.extract-version.outputs.version }}" \
+            --notes "VSCode Extension release v${{ steps.extract-version.outputs.version }}" \
+            vscode-extension/fugo-minimal-${{ steps.extract-version.outputs.version }}.vsix
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Uncomment when ready to publish to marketplace
+      # - name: Publish to VSCode Marketplace
+      #   if: github.event.release.prerelease == false
+      #   run: |
+      #     cd vscode-extension
+      #     npx vsce publish --packagePath fugo-minimal-${{ steps.extract-version.outputs.version }}.vsix
+      #   env:
+      #     VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
+
+      - name: Commit version update back to main
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add vscode-extension/package.json
+          git commit -m "chore: bump extension version to ${{ steps.extract-version.outputs.version }}" || exit 0
+          git push origin main

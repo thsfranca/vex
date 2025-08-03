@@ -1,0 +1,48 @@
+---
+name: Update CHANGELOG
+
+'on':
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  update-changelog:
+    # Only run for main Fugo releases (not extension releases)
+    if: ${{ !startsWith(github.event.release.tag_name, 'extension-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update CHANGELOG
+        run: |
+          # Get the latest release info
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+          RELEASE_NAME="${{ github.event.release.name }}"
+          RELEASE_BODY="${{ github.event.release.body }}"
+          RELEASE_DATE=$(date +%Y-%m-%d)
+
+          # Prepare the new entry and insert it
+          {
+            echo ""
+            echo "## [$RELEASE_TAG] - $RELEASE_DATE"
+            echo ""
+            echo "$RELEASE_BODY"
+            echo ""
+          } > /tmp/new_entry.md
+
+          # Insert after [Unreleased] section
+          sed -i '/## \[Unreleased\]/r /tmp/new_entry.md' CHANGELOG.md
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add CHANGELOG.md
+          git commit -m "docs: update CHANGELOG for ${{ github.event.release.tag_name }}" || exit 0
+          git push

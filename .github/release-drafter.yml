@@ -73,6 +73,12 @@ template: |
   **Target**: Go transpilation
   **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
 
+# Configuration to update CHANGELOG.md
+include-pre-releases: false
+commitish: main
+
+update-release-notes: true
+
 autolabeler:
   - label: 'documentation'
     files:

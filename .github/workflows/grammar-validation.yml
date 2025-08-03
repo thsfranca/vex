@@ -32,14 +32,7 @@ jobs:
               
       - name: Decide if validation needed
         id: decision
-        run: |
-          if [ "${{ steps.changes.outputs.grammar-changed }}" == "true" ]; then
-            echo "needs-validation=true" >> $GITHUB_OUTPUT
-            echo "🧪 Validation will run: Grammar or examples changed"
-          else
-            echo "needs-validation=false" >> $GITHUB_OUTPUT
-            echo "⏭️ Validation will be skipped: No relevant changes"
-          fi
+        run: .github/scripts/validation/decide-validation-needed.sh "${{ steps.changes.outputs.grammar-changed }}"
 
   validate-grammar:
     runs-on: ubuntu-latest

@@ -9,7 +9,8 @@ import (
 
 // MacroExpander handles macro expansion for Vex source code
 type MacroExpander struct {
-	macros map[string]MacroExpanderFunc
+	macros      map[string]MacroExpanderFunc
+	regexCache  map[string]*regexp.Regexp
 }
 
 // MacroExpanderFunc represents a macro that transforms source code
@@ -18,7 +19,8 @@ type MacroExpanderFunc func(match string, args []string) (string, error)
 // NewMacroExpander creates a new macro expander with built-in macros
 func NewMacroExpander() *MacroExpander {
 	expander := &MacroExpander{
-		macros: make(map[string]MacroExpanderFunc),
+		macros:     make(map[string]MacroExpanderFunc, 4),  // Pre-allocate for common built-ins
+		regexCache: make(map[string]*regexp.Regexp, 4),     // Pre-allocate for common macros
 	}
 	
 	// Register built-in macros
@@ -50,9 +52,14 @@ func (me *MacroExpander) ExpandMacros(source string) (string, error) {
 
 // expandMacroInSource expands a specific macro in the source code
 func (me *MacroExpander) expandMacroInSource(source, macroName string, macroFunc MacroExpanderFunc) (string, error) {
-	// For http-server and others: (macro-name (...))
-	pattern := fmt.Sprintf(`\(%s[^)]*\([^)]*\)[^)]*\)`, regexp.QuoteMeta(macroName))
-	re := regexp.MustCompile(pattern)
+	// Check if we have a cached regex for this macro
+	re, exists := me.regexCache[macroName]
+	if !exists {
+		// Compile and cache the regex pattern for this macro
+		pattern := `\(` + regexp.QuoteMeta(macroName) + `[^)]*\([^)]*\)[^)]*\)`
+		re = regexp.MustCompile(pattern)
+		me.regexCache[macroName] = re
+	}
 	
 	// Find all matches
 	return re.ReplaceAllStringFunc(source, func(match string) string {

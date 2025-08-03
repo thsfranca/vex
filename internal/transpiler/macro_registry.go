@@ -23,7 +23,7 @@ type MacroRegistry struct {
 // NewMacroRegistry creates a new macro registry
 func NewMacroRegistry() *MacroRegistry {
 	return &MacroRegistry{
-		macros: make(map[string]*MacroDefinition),
+		macros: make(map[string]*MacroDefinition, 8), // Pre-allocate for common user macros
 	}
 }
 
@@ -56,7 +56,7 @@ func (mr *MacroRegistry) ExpandMacro(name string, args []antlr.Tree) (string, er
 	}
 
 	// Create substitution map
-	substitutions := make(map[string]string)
+	substitutions := make(map[string]string, len(macro.Parameters)) // Pre-allocate for exact parameter count
 	
 	// Map arguments to parameters
 	for i, param := range macro.Parameters {

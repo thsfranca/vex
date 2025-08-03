@@ -1,6 +1,15 @@
 # Generated parser files
 tools/gen/
 
+# Compiled binaries  
+bin/
+tools/*/[!.]*
+!tools/*/*.go
+!tools/*/*.md
+!tools/*/*.mod
+!tools/*/*.sum
+!tools/*/*.sh
+
 # ANTLR generated files
 *.interp
 *.tokens

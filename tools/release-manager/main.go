@@ -56,7 +56,7 @@ func checkLabels(labelsJSON string) {
 
 	// Check for release labels in priority order
 	releaseTypes := []string{"major", "minor", "patch", "alpha", "beta", "rc"}
-	
+
 	for _, releaseType := range releaseTypes {
 		labelName := "release:" + releaseType
 		for _, label := range labels {
@@ -87,7 +87,7 @@ func bumpVersion(releaseType string) {
 	// Parse version using regex
 	versionRegex := regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)(-([a-zA-Z]+)\.(\d+))?$`)
 	matches := versionRegex.FindStringSubmatch(currentVersion)
-	
+
 	if matches == nil {
 		fmt.Fprintf(os.Stderr, "❌ Invalid version format: %s\n", currentVersion)
 		os.Exit(1)
@@ -96,7 +96,7 @@ func bumpVersion(releaseType string) {
 	major, _ := strconv.Atoi(matches[1])
 	minor, _ := strconv.Atoi(matches[2])
 	patch, _ := strconv.Atoi(matches[3])
-	
+
 	var prereleaseName string
 	var prereleaseNum int
 	if matches[4] != "" { // Has prerelease

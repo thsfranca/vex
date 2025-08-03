@@ -12,14 +12,11 @@ import (
 
 // Transpiler handles the conversion from Vex AST to Go code
 type Transpiler struct {
-	output strings.Builder
 }
 
 // New creates a new transpiler instance
 func New() *Transpiler {
-	return &Transpiler{
-		output: strings.Builder{},
-	}
+	return &Transpiler{}
 }
 
 // TranspileFromInput transpiles Vex source code to Go code
@@ -76,36 +73,7 @@ func (t *Transpiler) TranspileFromFile(filename string) (string, error) {
 	return t.TranspileFromInput(string(content))
 }
 
-// generateGoCode generates the final Go code
-func (t *Transpiler) generateGoCode() string {
-	// Add basic Go package structure
-	var result strings.Builder
-	result.WriteString("package main\n\n")
-	result.WriteString("func main() {\n")
-	result.WriteString(t.output.String())
-	result.WriteString("}\n")
 
-	return result.String()
-}
-
-// generateGoCodeWithContent generates Go code with the provided content
-func (t *Transpiler) generateGoCodeWithContent(content string) string {
-	var result strings.Builder
-	result.WriteString("package main\n\n")
-	result.WriteString("func main() {\n")
-	if content != "" {
-		// Add indentation to the content
-		lines := strings.Split(content, "\n")
-		for _, line := range lines {
-			if strings.TrimSpace(line) != "" {
-				result.WriteString("\t" + line + "\n")
-			}
-		}
-	}
-	result.WriteString("}\n")
-
-	return result.String()
-}
 
 // generateGoCodeWithVisitor generates Go code using visitor data (imports + content)
 func (t *Transpiler) generateGoCodeWithVisitor(visitor *ASTVisitor) string {
@@ -143,7 +111,7 @@ func (t *Transpiler) generateGoCodeWithVisitor(visitor *ASTVisitor) string {
 
 // Reset clears the transpiler state for reuse
 func (t *Transpiler) Reset() {
-	t.output.Reset()
+	// No state to reset in current implementation
 }
 
 // ErrorListener captures syntax errors during parsing

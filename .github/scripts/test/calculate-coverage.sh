@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e
 
+# Ensure we're using bash 4+ for associative arrays
+if [ "${BASH_VERSION%%.*}" -lt 4 ]; then
+    echo "This script requires bash 4.0 or later for associative arrays"
+    echo "Current bash version: $BASH_VERSION"
+    exit 1
+fi
+
 # Component coverage thresholds
 declare -A COMPONENT_THRESHOLDS=(
     ["parser"]="95"
@@ -233,8 +240,13 @@ EOF
 create_pr_coverage_report
 
 # Output location for GitHub Actions
-echo "COVERAGE_REPORT_FILE=coverage-report.md" >> $GITHUB_OUTPUT
-echo "COVERAGE_STATUS=$([ "$VALIDATION_FAILED" = true ] && echo "failed" || echo "passed")" >> $GITHUB_OUTPUT
+if [ -n "$GITHUB_OUTPUT" ]; then
+    echo "COVERAGE_REPORT_FILE=coverage-report.md" >> $GITHUB_OUTPUT
+    echo "COVERAGE_STATUS=$([ "$VALIDATION_FAILED" = true ] && echo "failed" || echo "passed")" >> $GITHUB_OUTPUT
+else
+    echo "COVERAGE_REPORT_FILE=coverage-report.md"
+    echo "COVERAGE_STATUS=$([ "$VALIDATION_FAILED" = true ] && echo "failed" || echo "passed")"
+fi
 
 # Fail if any component is below threshold
 if [ "$VALIDATION_FAILED" = true ]; then

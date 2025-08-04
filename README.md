@@ -5,7 +5,7 @@
 </div>
 
 [![CI](https://github.com/thsfranca/vex/actions/workflows/ci.yml/badge.svg)](https://github.com/thsfranca/vex/actions/workflows/ci.yml)
-[![Test Coverage](https://github.com/thsfranca/vex/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/thsfranca/vex/actions/workflows/test-coverage.yml)
+[![Coverage](https://github.com/thsfranca/vex/actions/workflows/update-readme-coverage.yml/badge.svg)](https://github.com/thsfranca/vex/actions/workflows/update-readme-coverage.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/thsfranca/vex)](https://goreportcard.com/report/github.com/thsfranca/vex)
 [![Release](https://img.shields.io/github/v/release/thsfranca/vex)](https://github.com/thsfranca/vex/releases)
 

@@ -24,10 +24,10 @@ func (s *Symbol) Equals(other *Symbol) bool {
 
 // SymbolTable manages symbol interning and lookup
 type SymbolTable struct {
-	mu           sync.RWMutex
-	symbols      map[string]*Symbol // name -> symbol mapping
-	symbolsByID  map[int]*Symbol    // ID -> symbol mapping
-	nextID       int
+	mu          sync.RWMutex
+	symbols     map[string]*Symbol // name -> symbol mapping
+	symbolsByID map[int]*Symbol    // ID -> symbol mapping
+	nextID      int
 }
 
 // NewSymbolTable creates a new symbol table
@@ -73,7 +73,7 @@ func (st *SymbolTable) Intern(name string) *Symbol {
 func (st *SymbolTable) Lookup(name string) (*Symbol, bool) {
 	st.mu.RLock()
 	defer st.mu.RUnlock()
-	
+
 	symbol, exists := st.symbols[name]
 	return symbol, exists
 }
@@ -82,7 +82,7 @@ func (st *SymbolTable) Lookup(name string) (*Symbol, bool) {
 func (st *SymbolTable) GetByID(id int) (*Symbol, bool) {
 	st.mu.RLock()
 	defer st.mu.RUnlock()
-	
+
 	symbol, exists := st.symbolsByID[id]
 	return symbol, exists
 }
@@ -98,7 +98,7 @@ func (st *SymbolTable) Size() int {
 func (st *SymbolTable) AllSymbols() []*Symbol {
 	st.mu.RLock()
 	defer st.mu.RUnlock()
-	
+
 	symbols := make([]*Symbol, 0, len(st.symbols))
 	for _, symbol := range st.symbols {
 		symbols = append(symbols, symbol)
@@ -108,20 +108,20 @@ func (st *SymbolTable) AllSymbols() []*Symbol {
 
 // Namespace represents a namespace for symbol resolution
 type Namespace struct {
-	Name         string
-	Parent       *Namespace
-	bindings     map[string]*Binding
-	symbolTable  *SymbolTable
-	mu           sync.RWMutex
+	Name        string
+	Parent      *Namespace
+	bindings    map[string]*Binding
+	symbolTable *SymbolTable
+	mu          sync.RWMutex
 }
 
 // Binding represents a binding of a symbol to a type and value information
 type Binding struct {
-	Symbol   *Symbol
-	Type     VexType
-	IsMutable bool
+	Symbol     *Symbol
+	Type       VexType
+	IsMutable  bool
 	IsFunction bool
-	Namespace *Namespace
+	Namespace  *Namespace
 }
 
 // NewNamespace creates a new namespace
@@ -188,7 +188,7 @@ func (ns *Namespace) Resolve(name string) (*Binding, bool) {
 func (ns *Namespace) LocalResolve(name string) (*Binding, bool) {
 	ns.mu.RLock()
 	defer ns.mu.RUnlock()
-	
+
 	binding, exists := ns.bindings[name]
 	return binding, exists
 }
@@ -203,7 +203,7 @@ func (ns *Namespace) IsBound(name string) bool {
 func (ns *Namespace) GetLocalBindings() map[string]*Binding {
 	ns.mu.RLock()
 	defer ns.mu.RUnlock()
-	
+
 	// Return a copy to avoid concurrent access issues
 	result := make(map[string]*Binding, len(ns.bindings))
 	for name, binding := range ns.bindings {
@@ -224,18 +224,18 @@ type NamespaceManager struct {
 func NewNamespaceManager() *NamespaceManager {
 	symbolTable := NewSymbolTable()
 	globalNS := NewNamespace("global", nil, symbolTable)
-	
+
 	nm := &NamespaceManager{
 		globalSymbolTable: symbolTable,
 		namespaces:        make(map[string]*Namespace, 16),
 		currentNamespace:  globalNS,
 	}
-	
+
 	nm.namespaces["global"] = globalNS
-	
+
 	// Bind built-in symbols and types
 	nm.bindBuiltins(globalNS)
-	
+
 	return nm
 }
 
@@ -247,13 +247,13 @@ func (nm *NamespaceManager) bindBuiltins(globalNS *Namespace) {
 	globalNS.Bind("string", StringType, false)
 	globalNS.Bind("bool", BoolType, false)
 	globalNS.Bind("symbol", SymbolType, false)
-	
+
 	// Built-in functions (arithmetic operators)
 	globalNS.BindFunction("+", NewFunctionType([]VexType{IntType, IntType}, IntType))
 	globalNS.BindFunction("-", NewFunctionType([]VexType{IntType, IntType}, IntType))
 	globalNS.BindFunction("*", NewFunctionType([]VexType{IntType, IntType}, IntType))
 	globalNS.BindFunction("/", NewFunctionType([]VexType{IntType, IntType}, IntType))
-	
+
 	// Built-in boolean values
 	globalNS.Bind("true", BoolType, false)
 	globalNS.Bind("false", BoolType, false)
@@ -263,11 +263,11 @@ func (nm *NamespaceManager) bindBuiltins(globalNS *Namespace) {
 func (nm *NamespaceManager) CreateNamespace(name string, parent *Namespace) *Namespace {
 	nm.mu.Lock()
 	defer nm.mu.Unlock()
-	
+
 	if parent == nil {
 		parent = nm.namespaces["global"]
 	}
-	
+
 	ns := NewNamespace(name, parent, nm.globalSymbolTable)
 	nm.namespaces[name] = ns
 	return ns
@@ -277,7 +277,7 @@ func (nm *NamespaceManager) CreateNamespace(name string, parent *Namespace) *Nam
 func (nm *NamespaceManager) GetNamespace(name string) (*Namespace, bool) {
 	nm.mu.RLock()
 	defer nm.mu.RUnlock()
-	
+
 	ns, exists := nm.namespaces[name]
 	return ns, exists
 }
@@ -286,12 +286,12 @@ func (nm *NamespaceManager) GetNamespace(name string) (*Namespace, bool) {
 func (nm *NamespaceManager) SetCurrentNamespace(name string) error {
 	nm.mu.RLock()
 	defer nm.mu.RUnlock()
-	
+
 	ns, exists := nm.namespaces[name]
 	if !exists {
 		return fmt.Errorf("namespace %s not found", name)
 	}
-	
+
 	nm.currentNamespace = ns
 	return nil
 }
@@ -307,7 +307,7 @@ func (nm *NamespaceManager) GetCurrentNamespace() *Namespace {
 func (nm *NamespaceManager) ResolveQualified(qualifiedName string) (*Binding, error) {
 	nm.mu.RLock()
 	defer nm.mu.RUnlock()
-	
+
 	// Parse qualified name (e.g., "http/Server" -> namespace="http", name="Server")
 	parts := parseQualifiedName(qualifiedName)
 	if len(parts) == 1 {
@@ -318,7 +318,7 @@ func (nm *NamespaceManager) ResolveQualified(qualifiedName string) (*Binding, er
 		}
 		return binding, nil
 	}
-	
+
 	if len(parts) == 2 {
 		// Qualified name
 		nsName, symbolName := parts[0], parts[1]
@@ -326,14 +326,14 @@ func (nm *NamespaceManager) ResolveQualified(qualifiedName string) (*Binding, er
 		if !exists {
 			return nil, fmt.Errorf("namespace %s not found", nsName)
 		}
-		
+
 		binding, exists := ns.Resolve(symbolName)
 		if !exists {
 			return nil, fmt.Errorf("symbol %s not found in namespace %s", symbolName, nsName)
 		}
 		return binding, nil
 	}
-	
+
 	return nil, fmt.Errorf("invalid qualified name: %s", qualifiedName)
 }
 
@@ -343,21 +343,21 @@ func parseQualifiedName(qualified string) []string {
 	// Could be enhanced for more complex namespace resolution
 	result := make([]string, 0, 2)
 	slashIndex := -1
-	
+
 	for i, r := range qualified {
 		if r == '/' {
 			slashIndex = i
 			break
 		}
 	}
-	
+
 	if slashIndex == -1 {
 		result = append(result, qualified)
 	} else {
 		result = append(result, qualified[:slashIndex])
 		result = append(result, qualified[slashIndex+1:])
 	}
-	
+
 	return result
 }
 

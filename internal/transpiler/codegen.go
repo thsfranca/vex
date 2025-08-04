@@ -20,8 +20,8 @@ var stringSlicePool = sync.Pool{
 type CodeGenerator struct {
 	indentLevel   int
 	buffer        strings.Builder
-	imports       map[string]bool // Track unique imports
-	indentCache   []string        // Cache for indent strings
+	imports       map[string]bool   // Track unique imports
+	indentCache   []string          // Cache for indent strings
 	operatorCache map[string]string // Cache for operator conversions
 }
 
@@ -30,9 +30,9 @@ func NewCodeGenerator() *CodeGenerator {
 	cg := &CodeGenerator{
 		indentLevel:   0,
 		buffer:        strings.Builder{},
-		imports:       make(map[string]bool, 8),              // Pre-allocate for common imports
-		indentCache:   make([]string, 0, 10),                // Pre-allocate for common indentation levels
-		operatorCache: make(map[string]string, 4),          // Cache for +, -, *, /
+		imports:       make(map[string]bool, 8),   // Pre-allocate for common imports
+		indentCache:   make([]string, 0, 10),      // Pre-allocate for common indentation levels
+		operatorCache: make(map[string]string, 4), // Cache for +, -, *, /
 	}
 	cg.buffer.Grow(1024) // Pre-allocate capacity for typical Go code generation
 	return cg
@@ -77,7 +77,7 @@ func (cg *CodeGenerator) EmitArithmeticExpression(operator string, operands []st
 
 	// Convert Lisp prefix notation to Go infix notation
 	goOperator := cg.convertOperator(operator)
-	expression := strings.Join(operands, " " + goOperator + " ")
+	expression := strings.Join(operands, " "+goOperator+" ")
 	cg.writeIndented("_ = " + expression + "\n")
 }
 
@@ -86,7 +86,7 @@ func (cg *CodeGenerator) EmitArithmeticExpression(operator string, operands []st
 func (cg *CodeGenerator) EmitImport(importPath string) {
 	// Clean the import path (remove quotes if they exist, then add them back)
 	cleanPath := strings.Trim(importPath, "\"")
-	cg.imports["\"" + cleanPath + "\""] = true
+	cg.imports["\""+cleanPath+"\""] = true
 }
 
 // EmitMethodCall generates Go method calls
@@ -108,10 +108,10 @@ func (cg *CodeGenerator) EmitSlashNotationCall(packageName, functionName string,
 func (cg *CodeGenerator) EmitFunctionLiteral(params []string, bodyElements []antlr.Tree, visitor *ASTVisitor) string {
 	var result strings.Builder
 	result.Grow(128) // Pre-allocate capacity for typical function literals
-	
+
 	// Start function literal
 	result.WriteString("func(")
-	
+
 	// Add parameters with types
 	if len(params) == 2 {
 		// Assume HTTP handler signature for 2 parameters
@@ -127,9 +127,9 @@ func (cg *CodeGenerator) EmitFunctionLiteral(params []string, bodyElements []ant
 			result.WriteString(param + " interface{}")
 		}
 	}
-	
+
 	result.WriteString(") {\n")
-	
+
 	// Generate function body by processing each body element
 	for _, bodyElement := range bodyElements {
 		bodyCode := cg.processFunctionBodyElement(bodyElement, visitor)
@@ -137,9 +137,9 @@ func (cg *CodeGenerator) EmitFunctionLiteral(params []string, bodyElements []ant
 			result.WriteString("\t" + bodyCode + "\n")
 		}
 	}
-	
+
 	result.WriteString("}")
-	
+
 	return result.String()
 }
 
@@ -166,12 +166,12 @@ func (cg *CodeGenerator) processFunctionBodyElement(element antlr.Tree, visitor 
 		if len(children) < 3 { // Need at least ( symbol )
 			return ""
 		}
-		
+
 		// Get the first element (function/method name)
 		firstChild := children[1] // Skip opening parenthesis
 		if terminalNode, ok := firstChild.(*antlr.TerminalNodeImpl); ok {
 			firstElement := terminalNode.GetText()
-			
+
 			// Extract arguments (skip opening paren, function name, closing paren)
 			args := getStringSlice()
 			defer putStringSlice(args)
@@ -179,7 +179,7 @@ func (cg *CodeGenerator) processFunctionBodyElement(element antlr.Tree, visitor 
 				argValue := visitor.evaluateExpression(children[i])
 				args = append(args, argValue)
 			}
-			
+
 			if strings.HasPrefix(firstElement, ".") {
 				// Method call: (.WriteString w "Hello!")
 				if len(args) >= 1 {
@@ -194,16 +194,14 @@ func (cg *CodeGenerator) processFunctionBodyElement(element antlr.Tree, visitor 
 				return firstElement + "(" + argsStr + ")"
 			}
 		}
-		
+
 	default:
 		// Use the visitor's evaluateExpression for everything else
 		return visitor.evaluateExpression(element)
 	}
-	
+
 	return ""
 }
-
-
 
 // convertOperator converts Vex operators to Go operators (with caching)
 func (cg *CodeGenerator) convertOperator(vexOp string) string {
@@ -211,7 +209,7 @@ func (cg *CodeGenerator) convertOperator(vexOp string) string {
 	if goOp, exists := cg.operatorCache[vexOp]; exists {
 		return goOp
 	}
-	
+
 	// Compute and cache result
 	var goOp string
 	switch vexOp {
@@ -226,7 +224,7 @@ func (cg *CodeGenerator) convertOperator(vexOp string) string {
 	default:
 		goOp = vexOp // fallback
 	}
-	
+
 	cg.operatorCache[vexOp] = goOp
 	return goOp
 }
@@ -278,10 +276,10 @@ func (cg *CodeGenerator) GetImports() []string {
 func (cg *CodeGenerator) Reset() {
 	cg.buffer.Reset()
 	cg.indentLevel = 0
-	cg.imports = make(map[string]bool, 8)                   // Pre-allocate for common imports
+	cg.imports = make(map[string]bool, 8) // Pre-allocate for common imports
 	// Keep caches but clear them to avoid memory leaks
-	cg.indentCache = cg.indentCache[:0]                     // Keep capacity, reset length
-	cg.operatorCache = make(map[string]string, 4)          // Cache for +, -, *, /
+	cg.indentCache = cg.indentCache[:0]           // Keep capacity, reset length
+	cg.operatorCache = make(map[string]string, 4) // Cache for +, -, *, /
 }
 
 // Typed code generation methods for semantic visitor
@@ -303,7 +301,7 @@ func (cg *CodeGenerator) EmitTypedVariableDefinition(name, value string, vexType
 // EmitTypedFunction generates Go code for typed function definition
 func (cg *CodeGenerator) EmitTypedFunction(name string, paramNames []string, paramTypes []VexType, returnType VexType) {
 	cg.writeIndented("func " + name + "(")
-	
+
 	// Generate parameter list with types
 	for i, paramName := range paramNames {
 		if i > 0 {
@@ -315,14 +313,14 @@ func (cg *CodeGenerator) EmitTypedFunction(name string, paramNames []string, par
 		}
 		cg.buffer.WriteString(paramName + " " + paramType)
 	}
-	
+
 	cg.buffer.WriteString(") ")
-	
+
 	// Add return type if not unknown
 	if returnType.GoType() != "interface{}" {
 		cg.buffer.WriteString(returnType.GoType() + " ")
 	}
-	
+
 	cg.buffer.WriteString("{\n")
 	cg.IncreaseIndent()
 	// Function body will be added by subsequent calls
@@ -331,7 +329,7 @@ func (cg *CodeGenerator) EmitTypedFunction(name string, paramNames []string, par
 // EmitTypedFunctionLiteral generates Go code for typed function literal
 func (cg *CodeGenerator) EmitTypedFunctionLiteral(paramNames []string, paramTypes []VexType, returnType VexType) {
 	cg.writeIndented("func(")
-	
+
 	// Generate parameter list with types
 	for i, paramName := range paramNames {
 		if i > 0 {
@@ -343,14 +341,14 @@ func (cg *CodeGenerator) EmitTypedFunctionLiteral(paramNames []string, paramType
 		}
 		cg.buffer.WriteString(paramName + " " + paramType)
 	}
-	
+
 	cg.buffer.WriteString(") ")
-	
+
 	// Add return type if not unknown
 	if returnType.GoType() != "interface{}" {
 		cg.buffer.WriteString(returnType.GoType() + " ")
 	}
-	
+
 	cg.buffer.WriteString("{\n")
 	// Function body will be handled separately
 }
@@ -361,7 +359,7 @@ func (cg *CodeGenerator) EmitTypedArithmeticExpression(operator string, operands
 		cg.writeIndented("// Invalid arithmetic expression\n")
 		return
 	}
-	
+
 	// Build expression with proper type casting if needed
 	var expr string
 	if resultType.Equals(FloatType) {
@@ -371,7 +369,7 @@ func (cg *CodeGenerator) EmitTypedArithmeticExpression(operator string, operands
 		// Regular integer arithmetic
 		expr = cg.buildIntArithmetic(operator, operands)
 	}
-	
+
 	cg.writeIndented("_ = " + expr + "\n")
 }
 
@@ -400,7 +398,7 @@ func (cg *CodeGenerator) EmitTypedMethodCall(receiver, method string, args []str
 		// Could add type assertion here if needed
 		typedReceiver = receiver
 	}
-	
+
 	cg.writeIndented("_ = " + typedReceiver + "." + method + "(")
 	for i, arg := range args {
 		if i > 0 {
@@ -414,7 +412,7 @@ func (cg *CodeGenerator) EmitTypedMethodCall(receiver, method string, args []str
 // EmitTypedSlashNotationCall generates Go code for typed package function call
 func (cg *CodeGenerator) EmitTypedSlashNotationCall(packageName, funcName string, args []string, argTypes []VexType) {
 	cg.EmitImport("\"" + packageName + "\"")
-	
+
 	// Don't assign function calls to _ - just execute them as statements
 	cg.writeIndented(packageName + "." + funcName + "(")
 	for i, arg := range args {
@@ -434,7 +432,7 @@ func (cg *CodeGenerator) EmitTypedFunctionCall(functionName string, args []strin
 	} else {
 		expr = functionName + "("
 	}
-	
+
 	for i, arg := range args {
 		if i > 0 {
 			expr += ", "
@@ -442,7 +440,7 @@ func (cg *CodeGenerator) EmitTypedFunctionCall(functionName string, args []strin
 		expr += arg
 	}
 	expr += ")"
-	
+
 	cg.writeIndented("_ = " + expr + "\n")
 }
 
@@ -466,7 +464,7 @@ func (cg *CodeGenerator) EmitArray() {
 // buildFloatArithmetic builds float arithmetic expressions
 func (cg *CodeGenerator) buildFloatArithmetic(operator string, operands []string) string {
 	goOperator := cg.convertOperator(operator)
-	
+
 	// Ensure all operands are float64
 	floatOperands := make([]string, len(operands))
 	for i, operand := range operands {
@@ -476,25 +474,25 @@ func (cg *CodeGenerator) buildFloatArithmetic(operator string, operands []string
 			floatOperands[i] = "float64(" + operand + ")"
 		}
 	}
-	
+
 	// Build left-associative expression
 	result := floatOperands[0]
 	for i := 1; i < len(floatOperands); i++ {
 		result = "(" + result + " " + goOperator + " " + floatOperands[i] + ")"
 	}
-	
+
 	return result
 }
 
 // buildIntArithmetic builds integer arithmetic expressions
 func (cg *CodeGenerator) buildIntArithmetic(operator string, operands []string) string {
 	goOperator := cg.convertOperator(operator)
-	
+
 	// Build left-associative expression
 	result := operands[0]
 	for i := 1; i < len(operands); i++ {
 		result = "(" + result + " " + goOperator + " " + operands[i] + ")"
 	}
-	
+
 	return result
 }

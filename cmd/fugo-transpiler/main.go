@@ -139,7 +139,7 @@ func runCommand(args []string) {
 	tmpDir := os.TempDir()
 	baseName := strings.TrimSuffix(filepath.Base(*inputFile), filepath.Ext(*inputFile))
 	tmpGoFile := filepath.Join(tmpDir, baseName+"_temp.go")
-	
+
 	// Write Go code to temporary file
 	err = ioutil.WriteFile(tmpGoFile, []byte(goCode), 0644)
 	if err != nil {
@@ -159,20 +159,20 @@ func runCommand(args []string) {
 	cmd := exec.Command("go", "build", "-o", strings.TrimSuffix(tmpGoFile, ".go"), tmpGoFile)
 	var buildErr error
 	buildOutput, buildErr := cmd.CombinedOutput()
-	
+
 	if buildErr != nil {
 		fmt.Fprintf(os.Stderr, "❌ Build error: %v\n%s", buildErr, string(buildOutput))
 		os.Exit(1)
 	}
-	
+
 	// If build succeeded, run the executable
 	executable := strings.TrimSuffix(tmpGoFile, ".go")
 	defer os.Remove(executable) // Clean up executable
-	
+
 	runCmd := exec.Command(executable)
 	runCmd.Stdout = os.Stdout
 	runCmd.Stderr = os.Stderr
-	
+
 	err = runCmd.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Execution error: %v\n", err)

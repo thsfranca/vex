@@ -103,10 +103,10 @@ func (mc *MacroCollector) processMacroDefinition(content []antlr.Tree) error {
 	if len(content) > 2 {
 		template := content[2]
 		templateStr := mc.reconstructTemplate(template)
-		
+
 		// Debug: print macro registration
 		fmt.Printf("DEBUG: Registering macro '%s' with params %v and template: %s\n", macroName, params, templateStr)
-		
+
 		// Register the macro with the expander using a string-based expansion function
 		mc.expander.RegisterStringMacro(macroName, params, templateStr)
 	}

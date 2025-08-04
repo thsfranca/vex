@@ -26,7 +26,7 @@ type SemanticVisitor struct {
 func NewSemanticVisitor() *SemanticVisitor {
 	namespaceManager := NewNamespaceManager()
 	typeChecker := NewTypeChecker(namespaceManager)
-	
+
 	return &SemanticVisitor{
 		codeGen:          NewCodeGenerator(),
 		macroRegistry:    NewMacroRegistry(),
@@ -41,23 +41,23 @@ func NewSemanticVisitor() *SemanticVisitor {
 // AnalyzeProgram performs complete semantic analysis on a program
 func (sv *SemanticVisitor) AnalyzeProgram(programCtx *parser.ProgramContext) error {
 	sv.errors = sv.errors[:0] // Reset errors
-	
+
 	// Step 1: Perform type checking
 	typeErrors, err := sv.typeChecker.CheckProgram(programCtx)
 	if err != nil {
 		return fmt.Errorf("type checking failed: %w", err)
 	}
-	
+
 	// Convert type errors to string errors
 	for _, typeErr := range typeErrors {
 		sv.errors = append(sv.errors, typeErr.String())
 	}
-	
+
 	// Step 2: If type checking passed, generate code with type information
 	if len(typeErrors) == 0 {
 		programCtx.Accept(sv)
 	}
-	
+
 	return nil
 }
 
@@ -103,7 +103,7 @@ func (sv *SemanticVisitor) visitWithTypeInfo(node antlr.Tree) VexType {
 		sv.addError(fmt.Sprintf("Type inference failed: %s", err.Error()))
 		inferredType = NewUnknownType(0)
 	}
-	
+
 	// Visit the node for code generation
 	switch ctx := node.(type) {
 	case parser.IListContext:
@@ -113,7 +113,7 @@ func (sv *SemanticVisitor) visitWithTypeInfo(node antlr.Tree) VexType {
 	case *antlr.TerminalNodeImpl:
 		// Terminal nodes don't need visiting
 	}
-	
+
 	return inferredType
 }
 
@@ -123,7 +123,7 @@ func (sv *SemanticVisitor) VisitList(ctx *parser.ListContext) interface{} {
 	oldNode := sv.currentNode
 	sv.currentNode = ctx
 	defer func() { sv.currentNode = oldNode }()
-	
+
 	children := ctx.GetChildren()
 	if len(children) < 3 { // '(' ... ')'
 		return nil
@@ -177,14 +177,14 @@ func (sv *SemanticVisitor) VisitArray(ctx *parser.ArrayContext) interface{} {
 	if err != nil {
 		sv.addError(fmt.Sprintf("Array type inference failed: %s", err.Error()))
 	}
-	
+
 	// Generate Go slice code with proper type
 	if listType, ok := arrayType.(*ListType); ok {
 		sv.codeGen.EmitTypedArray(listType)
 	} else {
 		sv.codeGen.EmitArray() // Fallback to generic array
 	}
-	
+
 	return sv.VisitChildren(ctx)
 }
 
@@ -206,16 +206,14 @@ func (sv *SemanticVisitor) handleTypedDefinition(content []antlr.Tree) {
 
 	// Infer the type of the value
 	valueType := sv.visitWithTypeInfo(content[2])
-	
+
 	// Generate typed Go code
 	value := sv.evaluateExpressionWithType(content[2], valueType)
 	sv.codeGen.EmitTypedVariableDefinition(varName, value, valueType)
-	
+
 	// Update namespace binding
 	sv.namespaceManager.GetCurrentNamespace().Bind(varName, valueType, false)
 }
-
-
 
 // handleTypedFunctionLiteral handles function literals with type inference
 func (sv *SemanticVisitor) handleTypedFunctionLiteral(content []antlr.Tree) {
@@ -248,22 +246,22 @@ func (sv *SemanticVisitor) handleTypedArithmetic(operator string, operands []ant
 	// Infer types of all operands
 	var operandTypes []VexType
 	var operandValues []string
-	
+
 	for i, operand := range operands {
 		operandType := sv.visitWithTypeInfo(operand)
 		operandTypes = append(operandTypes, operandType)
-		
+
 		// Validate numeric type
 		if !sv.isNumericType(operandType) {
 			sv.addError(fmt.Sprintf("Arithmetic operand %d must be numeric, got %s", i, operandType.String()))
 		}
-		
+
 		operandValues = append(operandValues, sv.evaluateExpressionWithType(operand, operandType))
 	}
 
 	// Determine result type (promote int to float if needed)
 	resultType := sv.determineArithmeticResultType(operandTypes)
-	
+
 	// Generate typed arithmetic expression
 	sv.codeGen.EmitTypedArithmeticExpression(operator, operandValues, resultType)
 }
@@ -286,7 +284,7 @@ func (sv *SemanticVisitor) handleTypedConditional(content []antlr.Tree) {
 	elseType := sv.visitWithTypeInfo(content[2])
 
 	if !thenType.IsAssignableFrom(elseType) {
-		sv.addError(fmt.Sprintf("Conditional branch type mismatch: then=%s, else=%s", 
+		sv.addError(fmt.Sprintf("Conditional branch type mismatch: then=%s, else=%s",
 			thenType.String(), elseType.String()))
 	}
 
@@ -294,7 +292,7 @@ func (sv *SemanticVisitor) handleTypedConditional(content []antlr.Tree) {
 	condition := sv.evaluateExpressionWithType(content[0], conditionType)
 	thenBranch := sv.evaluateExpressionWithType(content[1], thenType)
 	elseBranch := sv.evaluateExpressionWithType(content[2], elseType)
-	
+
 	sv.codeGen.EmitTypedConditional(condition, thenBranch, elseBranch, thenType)
 }
 
@@ -368,7 +366,7 @@ func (sv *SemanticVisitor) handleTypedFunctionCall(functionName string, content 
 
 	// Check argument count
 	if len(content) != len(funcType.Parameters) {
-		sv.addError(fmt.Sprintf("Function %s expects %d arguments, got %d", 
+		sv.addError(fmt.Sprintf("Function %s expects %d arguments, got %d",
 			functionName, len(funcType.Parameters), len(content)))
 		return
 	}
@@ -378,12 +376,12 @@ func (sv *SemanticVisitor) handleTypedFunctionCall(functionName string, content 
 	for i, arg := range content {
 		argType := sv.visitWithTypeInfo(arg)
 		expectedType := funcType.Parameters[i]
-		
+
 		if !expectedType.IsAssignableFrom(argType) {
-			sv.addError(fmt.Sprintf("Argument %d to %s: expected %s, got %s", 
+			sv.addError(fmt.Sprintf("Argument %d to %s: expected %s, got %s",
 				i, functionName, expectedType.String(), argType.String()))
 		}
-		
+
 		args = append(args, sv.evaluateExpressionWithType(arg, argType))
 	}
 
@@ -440,7 +438,7 @@ func (sv *SemanticVisitor) handleMacroDefinition(content []antlr.Tree) {
 	if len(content) > 2 {
 		template := content[2] // For now, just take the first body element
 		sv.macroRegistry.RegisterMacro(macroName, params, template)
-		
+
 		// Don't generate any Go code for macro definitions
 		sv.codeGen.writeIndented("// Registered macro: " + macroName + "\n")
 	}
@@ -561,7 +559,7 @@ func (sv *SemanticVisitor) getNodePosition(node antlr.Tree) (int, int) {
 	if node == nil {
 		return 0, 0
 	}
-	
+
 	switch ctx := node.(type) {
 	case *antlr.TerminalNodeImpl:
 		token := ctx.GetSymbol()

@@ -27,13 +27,13 @@ func (t *Transpiler) TranspileFromInput(input string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("macro registration failed: %w", err)
 	}
-	
+
 	// Phase 2: Macro expansion (now includes user-defined macros)
 	expandedInput, err := expander.ExpandMacros(input)
 	if err != nil {
 		return "", fmt.Errorf("macro expansion failed: %w", err)
 	}
-	
+
 	// Debug output removed - macro system is working
 
 	// Create input stream from the expanded source code
@@ -63,18 +63,18 @@ func (t *Transpiler) TranspileFromInput(input string) (string, error) {
 
 	// Create semantic visitor with type system integration
 	semanticVisitor := NewSemanticVisitor()
-	
+
 	// Perform semantic analysis and type checking
 	programCtx, ok := tree.(*parser.ProgramContext)
 	if !ok {
 		return "", fmt.Errorf("expected ProgramContext, got %T", tree)
 	}
-	
+
 	err = semanticVisitor.AnalyzeProgram(programCtx)
 	if err != nil {
 		return "", fmt.Errorf("semantic analysis failed: %w", err)
 	}
-	
+
 	// Check for semantic errors
 	if semanticVisitor.HasErrors() {
 		errorMsg := strings.Join(semanticVisitor.GetErrors(), "; ")
@@ -97,15 +97,13 @@ func (t *Transpiler) TranspileFromFile(filename string) (string, error) {
 	return t.TranspileFromInput(string(content))
 }
 
-
-
 // generateGoCodeWithVisitor generates Go code using visitor data (imports + content)
 func (t *Transpiler) generateGoCodeWithVisitor(visitor *ASTVisitor) string {
 	var result strings.Builder
-	
+
 	// Package declaration
 	result.WriteString("package main\n\n")
-	
+
 	// Add imports at the top
 	codeGen := visitor.GetCodeGenerator()
 	imports := codeGen.GetImports()
@@ -115,7 +113,7 @@ func (t *Transpiler) generateGoCodeWithVisitor(visitor *ASTVisitor) string {
 		}
 		result.WriteString("\n")
 	}
-	
+
 	// Main function with the generated code
 	result.WriteString("func main() {\n")
 	content := visitor.GetGeneratedCode()
@@ -141,42 +139,42 @@ func (t *Transpiler) Reset() {
 // registerUserDefinedMacros pre-processes source to find and register user-defined macros
 func (t *Transpiler) registerUserDefinedMacros(input string, expander *MacroExpander) error {
 	fmt.Printf("DEBUG: Starting macro registration for input: %s\n", input)
-	
+
 	// Create a temporary parse to find macro definitions
 	inputStream := antlr.NewInputStream(input)
 	lexer := parser.NewVexLexer(inputStream)
 	tokenStream := antlr.NewCommonTokenStream(lexer, 0)
 	vexParser := parser.NewVexParser(tokenStream)
-	
+
 	// Add error listener but allow parsing to continue for macro collection
 	errorListener := &ErrorListener{}
 	vexParser.RemoveErrorListeners()
 	vexParser.AddErrorListener(errorListener)
-	
+
 	// Parse the program
 	tree := vexParser.Program()
-	
+
 	// If there are syntax errors, we can't register macros safely
 	if errorListener.hasError {
 		return fmt.Errorf("syntax error prevents macro registration: %s", errorListener.errorMsg)
 	}
-	
+
 	fmt.Printf("DEBUG: Successfully parsed for macro collection\n")
-	
+
 	// Create a macro registry collector
 	macroCollector := NewMacroCollector(expander)
-	
+
 	// Walk the tree to find macro definitions
 	programCtx, ok := tree.(*parser.ProgramContext)
 	if !ok {
 		return fmt.Errorf("expected ProgramContext for macro collection, got %T", tree)
 	}
-	
+
 	err := macroCollector.CollectMacros(programCtx)
 	if err != nil {
 		return err
 	}
-	
+
 	fmt.Printf("DEBUG: Macro collection completed\n")
 	return nil
 }
@@ -184,10 +182,10 @@ func (t *Transpiler) registerUserDefinedMacros(input string, expander *MacroExpa
 // generateGoCodeWithSemanticVisitor generates Go code using semantic visitor with type information
 func (t *Transpiler) generateGoCodeWithSemanticVisitor(semanticVisitor *SemanticVisitor) string {
 	var result strings.Builder
-	
+
 	// Package declaration
 	result.WriteString("package main\n\n")
-	
+
 	// Add imports at the top
 	codeGen := semanticVisitor.GetCodeGenerator()
 	imports := codeGen.GetImports()
@@ -197,7 +195,7 @@ func (t *Transpiler) generateGoCodeWithSemanticVisitor(semanticVisitor *Semantic
 		}
 		result.WriteString("\n")
 	}
-	
+
 	// Main function with the generated code
 	result.WriteString("func main() {\n")
 	content := semanticVisitor.GetGeneratedCode()

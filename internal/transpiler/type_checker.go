@@ -49,35 +49,35 @@ func NewTypeChecker(namespaceManager *NamespaceManager) *TypeChecker {
 // CheckProgram performs comprehensive type checking on a program
 func (tc *TypeChecker) CheckProgram(programCtx *parser.ProgramContext) ([]TypeError, error) {
 	tc.errors = tc.errors[:0] // Reset errors
-	
+
 	// Pass 1: Symbol collection and basic binding
 	tc.currentPass = 1
 	err := tc.collectSymbols(programCtx)
 	if err != nil {
 		return tc.errors, err
 	}
-	
+
 	// Pass 2: Type inference and constraint generation
 	tc.currentPass = 2
 	err = tc.performTypeInference(programCtx)
 	if err != nil {
 		return tc.errors, err
 	}
-	
+
 	// Pass 3: Type compatibility validation
 	tc.currentPass = 3
 	err = tc.validateTypeCompatibility(programCtx)
 	if err != nil {
 		return tc.errors, err
 	}
-	
+
 	// Pass 4: Semantic validation (immutability, etc.)
 	tc.currentPass = 4
 	err = tc.validateSemantics(programCtx)
 	if err != nil {
 		return tc.errors, err
 	}
-	
+
 	return tc.errors, nil
 }
 
@@ -100,19 +100,19 @@ func (tc *TypeChecker) collectSymbolsFromList(listCtx *parser.ListContext) error
 	if len(children) < 3 {
 		return nil
 	}
-	
+
 	content := children[1 : len(children)-1]
 	if len(content) == 0 {
 		return nil
 	}
-	
+
 	// Get the first element
 	firstChild := content[0]
 	var firstElement string
 	if symbolCtx, ok := firstChild.(*antlr.TerminalNodeImpl); ok {
 		firstElement = symbolCtx.GetText()
 	}
-	
+
 	switch firstElement {
 	case "def":
 		return tc.collectVariableDefinition(content)
@@ -129,7 +129,7 @@ func (tc *TypeChecker) collectSymbolsFromList(listCtx *parser.ListContext) error
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -139,7 +139,7 @@ func (tc *TypeChecker) collectVariableDefinition(content []antlr.Tree) error {
 		tc.addError("Invalid variable definition: expected (def name value)", "unknown")
 		return nil
 	}
-	
+
 	// Get variable name
 	var varName string
 	if symbolCtx, ok := content[1].(*antlr.TerminalNodeImpl); ok {
@@ -148,15 +148,13 @@ func (tc *TypeChecker) collectVariableDefinition(content []antlr.Tree) error {
 		tc.addError("Variable name must be a symbol", "unknown")
 		return nil
 	}
-	
+
 	// Pre-bind with unknown type (will be inferred later)
 	currentNS := tc.namespaceManager.GetCurrentNamespace()
 	currentNS.Bind(varName, NewUnknownType(tc.typeInference.getNextUnknownID()), false)
-	
+
 	return nil
 }
-
-
 
 // collectTypeDefinition collects type definitions for symbol table
 func (tc *TypeChecker) collectTypeDefinition(content []antlr.Tree) error {
@@ -164,7 +162,7 @@ func (tc *TypeChecker) collectTypeDefinition(content []antlr.Tree) error {
 		tc.addError("Invalid type definition: expected (deftype name definition)", "unknown")
 		return nil
 	}
-	
+
 	// Get type name
 	var typeName string
 	if symbolCtx, ok := content[1].(*antlr.TerminalNodeImpl); ok {
@@ -173,12 +171,12 @@ func (tc *TypeChecker) collectTypeDefinition(content []antlr.Tree) error {
 		tc.addError("Type name must be a symbol", "unknown")
 		return nil
 	}
-	
+
 	// TODO: Implement custom type definitions
 	// For now, just register as a symbol type
 	currentNS := tc.namespaceManager.GetCurrentNamespace()
 	currentNS.Bind(typeName, SymbolType, false)
-	
+
 	return nil
 }
 
@@ -222,19 +220,19 @@ func (tc *TypeChecker) validateListTypes(listCtx *parser.ListContext) error {
 	if len(children) < 3 {
 		return nil
 	}
-	
+
 	content := children[1 : len(children)-1]
 	if len(content) == 0 {
 		return nil
 	}
-	
+
 	// Get the first element
 	firstChild := content[0]
 	var firstElement string
 	if symbolCtx, ok := firstChild.(*antlr.TerminalNodeImpl); ok {
 		firstElement = symbolCtx.GetText()
 	}
-	
+
 	switch firstElement {
 	case "def":
 		return tc.validateDefinitionTypes(content)
@@ -249,7 +247,7 @@ func (tc *TypeChecker) validateListTypes(listCtx *parser.ListContext) error {
 				return tc.validateFunctionCallTypes(binding, content[1:])
 			}
 		}
-		
+
 		// Recursively validate nested expressions
 		for _, child := range content {
 			err := tc.validateExpressionTypes(child)
@@ -258,7 +256,7 @@ func (tc *TypeChecker) validateListTypes(listCtx *parser.ListContext) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -268,19 +266,19 @@ func (tc *TypeChecker) validateArrayTypes(arrayCtx *parser.ArrayContext) error {
 	if len(children) < 3 {
 		return nil
 	}
-	
+
 	content := children[1 : len(children)-1]
 	if len(content) == 0 {
 		return nil
 	}
-	
+
 	// Get the type of the first element
 	firstType, err := tc.typeInference.InferTypes(content[0])
 	if err != nil {
 		tc.addError(fmt.Sprintf("Cannot infer type of array element: %s", err.Error()), "array")
 		return nil
 	}
-	
+
 	// Validate that all elements have compatible types
 	for i := 1; i < len(content); i++ {
 		elementType, err := tc.typeInference.InferTypes(content[i])
@@ -288,13 +286,13 @@ func (tc *TypeChecker) validateArrayTypes(arrayCtx *parser.ArrayContext) error {
 			tc.addError(fmt.Sprintf("Cannot infer type of array element %d: %s", i, err.Error()), "array")
 			continue
 		}
-		
+
 		if !firstType.IsAssignableFrom(elementType) {
-			tc.addError(fmt.Sprintf("Array element type mismatch: expected %s, got %s", 
+			tc.addError(fmt.Sprintf("Array element type mismatch: expected %s, got %s",
 				firstType.String(), elementType.String()), "array")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -304,7 +302,7 @@ func (tc *TypeChecker) validateDefinitionTypes(content []antlr.Tree) error {
 		tc.addError("Invalid definition: expected (def name value)", "definition")
 		return nil
 	}
-	
+
 	// Get variable name
 	var varName string
 	if symbolCtx, ok := content[1].(*antlr.TerminalNodeImpl); ok {
@@ -313,18 +311,18 @@ func (tc *TypeChecker) validateDefinitionTypes(content []antlr.Tree) error {
 		tc.addErrorWithNode("Variable name must be a symbol", "definition", content[1])
 		return nil
 	}
-	
+
 	// Infer the value type
 	valueType, err := tc.typeInference.InferTypes(content[2])
 	if err != nil {
 		tc.addErrorWithNode(fmt.Sprintf("Cannot infer type of variable %s: %s", varName, err.Error()), "definition", content[2])
 		return nil
 	}
-	
+
 	// Update the binding with the inferred type
 	currentNS := tc.namespaceManager.GetCurrentNamespace()
 	currentNS.Bind(varName, valueType, false)
-	
+
 	return nil
 }
 
@@ -334,21 +332,21 @@ func (tc *TypeChecker) validateArithmeticTypes(operator string, operands []antlr
 		tc.addError(fmt.Sprintf("Arithmetic operation %s requires at least 2 operands", operator), "arithmetic")
 		return nil
 	}
-	
+
 	for i, operand := range operands {
 		operandType, err := tc.typeInference.InferTypes(operand)
 		if err != nil {
 			tc.addError(fmt.Sprintf("Cannot infer type of operand %d in %s: %s", i, operator, err.Error()), "arithmetic")
 			continue
 		}
-		
+
 		// Check if operand is numeric
 		if !tc.isNumericType(operandType) {
-			tc.addError(fmt.Sprintf("Arithmetic operation %s requires numeric operands, got %s", 
+			tc.addError(fmt.Sprintf("Arithmetic operation %s requires numeric operands, got %s",
 				operator, operandType.String()), "arithmetic")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -358,7 +356,7 @@ func (tc *TypeChecker) validateConditionalTypes(content []antlr.Tree) error {
 		tc.addError("Conditional requires condition, then-branch, and else-branch", "conditional")
 		return nil
 	}
-	
+
 	// Validate condition type
 	conditionType, err := tc.typeInference.InferTypes(content[0])
 	if err != nil {
@@ -366,25 +364,25 @@ func (tc *TypeChecker) validateConditionalTypes(content []antlr.Tree) error {
 	} else if !conditionType.Equals(BoolType) {
 		tc.addError(fmt.Sprintf("Condition must be boolean, got %s", conditionType.String()), "conditional")
 	}
-	
+
 	// Validate branch types
 	thenType, err := tc.typeInference.InferTypes(content[1])
 	if err != nil {
 		tc.addError(fmt.Sprintf("Cannot infer then-branch type: %s", err.Error()), "conditional")
 		return nil
 	}
-	
+
 	elseType, err := tc.typeInference.InferTypes(content[2])
 	if err != nil {
 		tc.addError(fmt.Sprintf("Cannot infer else-branch type: %s", err.Error()), "conditional")
 		return nil
 	}
-	
+
 	if !thenType.IsAssignableFrom(elseType) {
-		tc.addError(fmt.Sprintf("Conditional branch type mismatch: then-branch is %s, else-branch is %s", 
+		tc.addError(fmt.Sprintf("Conditional branch type mismatch: then-branch is %s, else-branch is %s",
 			thenType.String(), elseType.String()), "conditional")
 	}
-	
+
 	return nil
 }
 
@@ -395,29 +393,29 @@ func (tc *TypeChecker) validateFunctionCallTypes(funcBinding *Binding, args []an
 		tc.addError(fmt.Sprintf("Symbol %s is not a function", funcBinding.Symbol.Name), "function-call")
 		return nil
 	}
-	
+
 	if len(args) != len(funcType.Parameters) {
-		tc.addError(fmt.Sprintf("Function %s expects %d arguments, got %d", 
+		tc.addError(fmt.Sprintf("Function %s expects %d arguments, got %d",
 			funcBinding.Symbol.Name, len(funcType.Parameters), len(args)), "function-call")
 		return nil
 	}
-	
+
 	// Validate each argument type
 	for i, arg := range args {
 		argType, err := tc.typeInference.InferTypes(arg)
 		if err != nil {
-			tc.addError(fmt.Sprintf("Cannot infer type of argument %d to function %s: %s", 
+			tc.addError(fmt.Sprintf("Cannot infer type of argument %d to function %s: %s",
 				i, funcBinding.Symbol.Name, err.Error()), "function-call")
 			continue
 		}
-		
+
 		expectedType := funcType.Parameters[i]
 		if !expectedType.IsAssignableFrom(argType) {
-			tc.addError(fmt.Sprintf("Argument %d to function %s: expected %s, got %s", 
+			tc.addError(fmt.Sprintf("Argument %d to function %s: expected %s, got %s",
 				i, funcBinding.Symbol.Name, expectedType.String(), argType.String()), "function-call")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -448,19 +446,19 @@ func (tc *TypeChecker) validateListSemantics(listCtx *parser.ListContext) error 
 	if len(children) < 3 {
 		return nil
 	}
-	
+
 	content := children[1 : len(children)-1]
 	if len(content) == 0 {
 		return nil
 	}
-	
+
 	// Get the first element
 	firstChild := content[0]
 	var firstElement string
 	if symbolCtx, ok := firstChild.(*antlr.TerminalNodeImpl); ok {
 		firstElement = symbolCtx.GetText()
 	}
-	
+
 	switch firstElement {
 	case "set!":
 		return tc.validateMutationSemantics(content[1:])
@@ -473,7 +471,7 @@ func (tc *TypeChecker) validateListSemantics(listCtx *parser.ListContext) error 
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -483,7 +481,7 @@ func (tc *TypeChecker) validateMutationSemantics(content []antlr.Tree) error {
 		tc.addError("Invalid mutation: expected (set! var value)", "mutation")
 		return nil
 	}
-	
+
 	// Get variable name
 	var varName string
 	if symbolCtx, ok := content[0].(*antlr.TerminalNodeImpl); ok {
@@ -492,7 +490,7 @@ func (tc *TypeChecker) validateMutationSemantics(content []antlr.Tree) error {
 		tc.addError("Mutation target must be a symbol", "mutation")
 		return nil
 	}
-	
+
 	// Check if variable is mutable
 	currentNS := tc.namespaceManager.GetCurrentNamespace()
 	if binding, exists := currentNS.Resolve(varName); exists {
@@ -502,7 +500,7 @@ func (tc *TypeChecker) validateMutationSemantics(content []antlr.Tree) error {
 	} else {
 		tc.addError(fmt.Sprintf("Undefined variable %s in mutation", varName), "mutation")
 	}
-	
+
 	return nil
 }
 
@@ -536,7 +534,7 @@ func (tc *TypeChecker) getNodePosition(node antlr.Tree) (int, int) {
 	if node == nil {
 		return 0, 0
 	}
-	
+
 	switch ctx := node.(type) {
 	case *antlr.TerminalNodeImpl:
 		token := ctx.GetSymbol()
@@ -586,13 +584,13 @@ func (tc *TypeChecker) FormatErrors() string {
 	if len(tc.errors) == 0 {
 		return "No type errors"
 	}
-	
+
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("Found %d type error(s):\n", len(tc.errors)))
-	
+
 	for i, err := range tc.errors {
 		builder.WriteString(fmt.Sprintf("  %d. %s\n", i+1, err.String()))
 	}
-	
+
 	return builder.String()
 }

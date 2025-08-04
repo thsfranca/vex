@@ -78,7 +78,7 @@ func bumpVersion(releaseType string) {
 	versionPaths := []string{"../../VERSION", "VERSION"}
 	var versionBytes []byte
 	var err error
-	
+
 	for _, path := range versionPaths {
 		versionBytes, err = os.ReadFile(path)
 		if err == nil {
@@ -86,7 +86,7 @@ func bumpVersion(releaseType string) {
 			break
 		}
 	}
-	
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading VERSION file from any path: %v\n", err)
 		os.Exit(1)
@@ -147,7 +147,7 @@ func bumpVersion(releaseType string) {
 	// Use the same path logic for writing
 	writePaths := []string{"../../VERSION", "VERSION"}
 	var writeErr error
-	
+
 	for _, path := range writePaths {
 		writeErr = os.WriteFile(path, []byte(newVersion), 0644)
 		if writeErr == nil {
@@ -155,7 +155,7 @@ func bumpVersion(releaseType string) {
 			break
 		}
 	}
-	
+
 	if writeErr != nil {
 		fmt.Fprintf(os.Stderr, "Error writing VERSION file to any path: %v\n", writeErr)
 		os.Exit(1)

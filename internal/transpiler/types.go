@@ -34,8 +34,8 @@ const (
 
 // PrimitiveType represents primitive types in Vex
 type PrimitiveType struct {
-	Kind     string // "int", "float", "string", "bool"
-	goType   string
+	Kind   string // "int", "float", "string", "bool"
+	goType string
 }
 
 // Built-in primitive types
@@ -134,7 +134,7 @@ func (mt *MapType) GoType() string {
 func (mt *MapType) IsAssignableFrom(other VexType) bool {
 	if otherMap, ok := other.(*MapType); ok {
 		return mt.KeyType.IsAssignableFrom(otherMap.KeyType) &&
-			   mt.ValueType.IsAssignableFrom(otherMap.ValueType)
+			mt.ValueType.IsAssignableFrom(otherMap.ValueType)
 	}
 	return false
 }
@@ -143,7 +143,7 @@ func (mt *MapType) IsAssignableFrom(other VexType) bool {
 func (mt *MapType) Equals(other VexType) bool {
 	if otherMap, ok := other.(*MapType); ok {
 		return mt.KeyType.Equals(otherMap.KeyType) &&
-			   mt.ValueType.Equals(otherMap.ValueType)
+			mt.ValueType.Equals(otherMap.ValueType)
 	}
 	return false
 }
@@ -286,21 +286,21 @@ func (tu *TypeUtils) InferLiteralType(value string) VexType {
 	if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
 		return StringType
 	}
-	
+
 	// Check if it's a number
 	if isInteger(value) {
 		return IntType
 	}
-	
+
 	if isFloat(value) {
 		return FloatType
 	}
-	
+
 	// Check boolean
 	if value == "true" || value == "false" {
 		return BoolType
 	}
-	
+
 	// Default to symbol type for identifiers
 	return SymbolType
 }
@@ -310,7 +310,7 @@ func isInteger(s string) bool {
 	if s == "" {
 		return false
 	}
-	
+
 	// Handle negative numbers
 	start := 0
 	if s[0] == '-' || s[0] == '+' {
@@ -319,7 +319,7 @@ func isInteger(s string) bool {
 			return false
 		}
 	}
-	
+
 	for i := start; i < len(s); i++ {
 		if s[i] < '0' || s[i] > '9' {
 			return false
@@ -333,10 +333,10 @@ func isFloat(s string) bool {
 	if s == "" {
 		return false
 	}
-	
+
 	dotCount := 0
 	start := 0
-	
+
 	// Handle negative numbers
 	if s[0] == '-' || s[0] == '+' {
 		start = 1
@@ -344,7 +344,7 @@ func isFloat(s string) bool {
 			return false
 		}
 	}
-	
+
 	for i := start; i < len(s); i++ {
 		if s[i] == '.' {
 			dotCount++
@@ -355,7 +355,7 @@ func isFloat(s string) bool {
 			return false
 		}
 	}
-	
+
 	return dotCount == 1 // Must have exactly one dot to be a float
 }
 
@@ -388,12 +388,12 @@ func (tu *TypeUtils) UnifyTypes(type1, type2 VexType) (VexType, error) {
 	if _, ok := type2.(*UnknownType); ok {
 		return type1, nil
 	}
-	
+
 	// If types are equal, return either one
 	if type1.Equals(type2) {
 		return type1, nil
 	}
-	
+
 	// Handle specific unification cases
 	if reflect.TypeOf(type1) == reflect.TypeOf(type2) {
 		switch t1 := type1.(type) {
@@ -404,7 +404,7 @@ func (tu *TypeUtils) UnifyTypes(type1, type2 VexType) (VexType, error) {
 				return nil, err
 			}
 			return NewListType(unifiedElement), nil
-			
+
 		case *MapType:
 			t2 := type2.(*MapType)
 			unifiedKey, err := tu.UnifyTypes(t1.KeyType, t2.KeyType)
@@ -418,6 +418,6 @@ func (tu *TypeUtils) UnifyTypes(type1, type2 VexType) (VexType, error) {
 			return NewMapType(unifiedKey, unifiedValue), nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("cannot unify types %s and %s", type1.String(), type2.String())
 }

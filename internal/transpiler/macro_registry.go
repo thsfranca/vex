@@ -57,7 +57,7 @@ func (mr *MacroRegistry) ExpandMacro(name string, args []antlr.Tree) (string, er
 
 	// Create substitution map
 	substitutions := make(map[string]string, len(macro.Parameters)) // Pre-allocate for exact parameter count
-	
+
 	// Map arguments to parameters
 	for i, param := range macro.Parameters {
 		if i < len(args) {
@@ -69,7 +69,7 @@ func (mr *MacroRegistry) ExpandMacro(name string, args []antlr.Tree) (string, er
 
 	// Expand the template with substitutions
 	expanded := expandTemplate(macro.Template, substitutions)
-	
+
 	return expanded, nil
 }
 
@@ -78,7 +78,7 @@ func nodeToString(node antlr.Tree) string {
 	if terminalNode, ok := node.(*antlr.TerminalNodeImpl); ok {
 		return terminalNode.GetText()
 	}
-	
+
 	// For complex nodes, reconstruct the source
 	return reconstructSource(node)
 }
@@ -94,27 +94,27 @@ func reconstructSource(node antlr.Tree) string {
 		if len(children) == 0 {
 			return ""
 		}
-		
+
 		var result strings.Builder
 		lastWasBracket := false
-		
+
 		for i, child := range children {
 			// Check if child is a terminal node before calling GetText
 			childText := ""
 			if terminalChild, ok := child.(*antlr.TerminalNodeImpl); ok {
 				childText = terminalChild.GetText()
 			}
-			
+
 			// Add space before non-bracket tokens, but not if:
 			// - This is the first token
 			// - The previous token was an opening bracket
 			// - This token is a closing bracket
 			isBracket := childText == "(" || childText == ")" || childText == "[" || childText == "]"
-			
+
 			if i > 0 && !lastWasBracket && !isBracket {
 				result.WriteString(" ")
 			}
-			
+
 			result.WriteString(reconstructSource(child))
 			lastWasBracket = (childText == "(" || childText == "[")
 		}
@@ -127,12 +127,12 @@ func expandTemplate(template antlr.Tree, substitutions map[string]string) string
 	// For now, simple string-based substitution
 	// A full implementation would handle proper AST transformation
 	templateStr := reconstructSource(template)
-	
+
 	// Apply substitutions
 	for param, value := range substitutions {
 		// Handle template syntax: ~param becomes the value
 		templateStr = strings.ReplaceAll(templateStr, "~"+param, value)
 	}
-	
+
 	return templateStr
 }

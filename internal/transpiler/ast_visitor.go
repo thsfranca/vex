@@ -149,13 +149,13 @@ func (v *ASTVisitor) handleMethodCall(methodName string, content []antlr.Tree) {
 
 	// Get the receiver (first argument)
 	receiver := v.evaluateExpression(content[0])
-	
+
 	// Get the method arguments
 	var args []string
 	for _, arg := range content[1:] {
 		args = append(args, v.evaluateExpression(arg))
 	}
-	
+
 	v.codeGen.EmitMethodCall(receiver, methodName[1:], args) // Remove the dot from method name
 }
 
@@ -167,16 +167,16 @@ func (v *ASTVisitor) handleSlashNotationCall(packageFunction string, content []a
 		v.codeGen.writeIndented("// Invalid slash notation: " + packageFunction + "\n")
 		return
 	}
-	
+
 	packageName := parts[0]
 	functionName := parts[1]
-	
+
 	// Get the function arguments
 	var args []string
 	for _, arg := range content {
 		args = append(args, v.evaluateExpression(arg))
 	}
-	
+
 	v.codeGen.EmitSlashNotationCall(packageName, functionName, args)
 }
 
@@ -210,7 +210,7 @@ func (v *ASTVisitor) handleMacroDefinition(content []antlr.Tree) {
 	if len(content) > 2 {
 		template := content[2] // For now, just take the first body element
 		v.macroRegistry.RegisterMacro(macroName, params, template)
-		
+
 		// Don't generate any Go code for macro definitions
 		v.codeGen.writeIndented("// Registered macro: " + macroName + "\n")
 	}
@@ -241,7 +241,7 @@ func (v *ASTVisitor) handleFunctionLiteral(content []antlr.Tree) {
 
 	// First element should be parameter list (array)
 	paramList := content[0]
-	
+
 	// Extract parameter names
 	var params []string
 	if arrayCtx, ok := paramList.(*parser.ArrayContext); ok {
@@ -256,7 +256,7 @@ func (v *ASTVisitor) handleFunctionLiteral(content []antlr.Tree) {
 
 	// Function body (rest of the arguments)
 	bodyElements := content[1:]
-	
+
 	functionLiteral := v.codeGen.EmitFunctionLiteral(params, bodyElements, v)
 	// This returns a function literal expression, but we need to handle it as a value
 	v.codeGen.EmitExpressionStatement(functionLiteral)
@@ -349,11 +349,11 @@ func (v *ASTVisitor) evaluateArithmeticExpression(operator string, operands []an
 		value := v.evaluateExpression(operand)
 		goOperands = append(goOperands, value)
 	}
-	
+
 	if len(goOperands) < 2 {
 		return "/* invalid arithmetic */"
 	}
-	
+
 	goOperator := v.codeGen.convertOperator(operator)
 	return strings.Join(goOperands, " "+goOperator+" ")
 }
@@ -363,10 +363,10 @@ func (v *ASTVisitor) evaluateMethodCall(methodName string, args []antlr.Tree) st
 	if len(args) < 1 {
 		return "/* invalid method call */"
 	}
-	
+
 	// First argument is the receiver
 	receiver := v.evaluateExpression(args[0])
-	
+
 	// Rest are method arguments
 	methodArgs := getStringSlice()
 	defer putStringSlice(methodArgs)
@@ -374,7 +374,7 @@ func (v *ASTVisitor) evaluateMethodCall(methodName string, args []antlr.Tree) st
 		argValue := v.evaluateExpression(args[i])
 		methodArgs = append(methodArgs, argValue)
 	}
-	
+
 	argsStr := strings.Join(methodArgs, ", ")
 	return receiver + "." + methodName[1:] + "(" + argsStr + ")"
 }
@@ -385,17 +385,17 @@ func (v *ASTVisitor) evaluateSlashNotationCall(packageFunction string, args []an
 	if len(parts) != 2 {
 		return "/* invalid slash notation */"
 	}
-	
+
 	packageName := parts[0]
 	functionName := parts[1]
-	
+
 	// Extract arguments
 	var goArgs []string
 	for _, arg := range args {
 		argValue := v.evaluateExpression(arg)
 		goArgs = append(goArgs, argValue)
 	}
-	
+
 	argsStr := strings.Join(goArgs, ", ")
 	return packageName + "." + functionName + "(" + argsStr + ")"
 }
@@ -407,7 +407,7 @@ func (v *ASTVisitor) evaluateFunctionCall(functionName string, args []antlr.Tree
 		argValue := v.evaluateExpression(arg)
 		goArgs = append(goArgs, argValue)
 	}
-	
+
 	argsStr := strings.Join(goArgs, ", ")
 	return functionName + "(" + argsStr + ")"
 }
@@ -420,7 +420,7 @@ func (v *ASTVisitor) evaluateFunctionLiteral(content []antlr.Tree) string {
 
 	// First element should be parameter list (array)
 	paramList := content[0]
-	
+
 	// Extract parameter names
 	var params []string
 	if arrayCtx, ok := paramList.(*parser.ArrayContext); ok {
@@ -435,7 +435,7 @@ func (v *ASTVisitor) evaluateFunctionLiteral(content []antlr.Tree) string {
 
 	// Function body (rest of the arguments)
 	bodyElements := content[1:]
-	
+
 	// Create a temporary code generator to generate the function literal
 	tempCodeGen := NewCodeGenerator()
 	return tempCodeGen.EmitFunctionLiteral(params, bodyElements, v)
@@ -448,13 +448,13 @@ func (v *ASTVisitor) processExpandedCode(expandedCode string) error {
 	lexer := parser.NewVexLexer(inputStream)
 	tokenStream := antlr.NewCommonTokenStream(lexer, 0)
 	vexParser := parser.NewVexParser(tokenStream)
-	
+
 	// Parse the expanded code
 	tree := vexParser.List() // Parse as a single list expression
-	
+
 	// Visit the parsed tree with the current visitor
 	tree.Accept(v)
-	
+
 	return nil
 }
 

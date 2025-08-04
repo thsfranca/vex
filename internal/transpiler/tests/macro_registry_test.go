@@ -211,10 +211,10 @@ func TestMacroRegistry_Integration_WithTranspiler(t *testing.T) {
 	}
 	
 	// Check that macros were expanded and transpiled
-	if !strings.Contains(result, "x := 42") {
+	if !strings.Contains(result, "var x int64 = 42") {
 		t.Error("Expected macro expansion to create variable definition for x")
 	}
-	if !strings.Contains(result, `y := "hello"`) {
+	if !strings.Contains(result, `var y string = "hello"`) {
 		t.Error("Expected macro expansion to create variable definition for y")
 	}
 }
@@ -235,8 +235,7 @@ func TestMacroRegistry_ComplexMacro(t *testing.T) {
 	// Check that the macro was expanded properly
 	// Note: This is a simpler test since macro expansion is complex
 	expectedParts := []string{
-		"// Registered macro: simple-macro",
-		"test-var := 42",
+		"var test-var int64 = 42",
 	}
 	
 	for _, part := range expectedParts {

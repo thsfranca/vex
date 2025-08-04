@@ -1,0 +1,4 @@
+;; Simple constants example
+(def name "Vex")
+(def version 1)
+(def ready true)

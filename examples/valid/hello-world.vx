@@ -1,0 +1,5 @@
+;; Simple hello world example
+(import "fmt")
+
+(def message "Hello, Vex!")
+(fmt/Println message)

@@ -1,0 +1,10 @@
+;; Simple test of defn macro
+(macro defn [name params body]
+  (def ~name (fn ~params ~body)))
+
+;; Define a simple function
+(defn add [x y]
+  (+ x y))
+
+;; Use numbers directly to test
+(add 5 3)

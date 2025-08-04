@@ -283,3 +283,218 @@ func (cg *CodeGenerator) Reset() {
 	cg.indentCache = cg.indentCache[:0]                     // Keep capacity, reset length
 	cg.operatorCache = make(map[string]string, 4)          // Cache for +, -, *, /
 }
+
+// Typed code generation methods for semantic visitor
+
+// EmitTypedVariableDefinition generates Go code for typed variable definition
+func (cg *CodeGenerator) EmitTypedVariableDefinition(name, value string, vexType VexType) {
+	goType := vexType.GoType()
+	if goType == "interface{}" {
+		// Use type inference if type is unknown
+		cg.writeIndented(name + " := " + value + "\n")
+	} else {
+		// Use explicit type declaration
+		cg.writeIndented("var " + name + " " + goType + " = " + value + "\n")
+	}
+	// Add a dummy usage to prevent "declared and not used" errors
+	cg.writeIndented("_ = " + name + "\n")
+}
+
+// EmitTypedFunction generates Go code for typed function definition
+func (cg *CodeGenerator) EmitTypedFunction(name string, paramNames []string, paramTypes []VexType, returnType VexType) {
+	cg.writeIndented("func " + name + "(")
+	
+	// Generate parameter list with types
+	for i, paramName := range paramNames {
+		if i > 0 {
+			cg.buffer.WriteString(", ")
+		}
+		paramType := "interface{}"
+		if i < len(paramTypes) && paramTypes[i].GoType() != "interface{}" {
+			paramType = paramTypes[i].GoType()
+		}
+		cg.buffer.WriteString(paramName + " " + paramType)
+	}
+	
+	cg.buffer.WriteString(") ")
+	
+	// Add return type if not unknown
+	if returnType.GoType() != "interface{}" {
+		cg.buffer.WriteString(returnType.GoType() + " ")
+	}
+	
+	cg.buffer.WriteString("{\n")
+	cg.IncreaseIndent()
+	// Function body will be added by subsequent calls
+}
+
+// EmitTypedFunctionLiteral generates Go code for typed function literal
+func (cg *CodeGenerator) EmitTypedFunctionLiteral(paramNames []string, paramTypes []VexType, returnType VexType) {
+	cg.writeIndented("func(")
+	
+	// Generate parameter list with types
+	for i, paramName := range paramNames {
+		if i > 0 {
+			cg.buffer.WriteString(", ")
+		}
+		paramType := "interface{}"
+		if i < len(paramTypes) && paramTypes[i].GoType() != "interface{}" {
+			paramType = paramTypes[i].GoType()
+		}
+		cg.buffer.WriteString(paramName + " " + paramType)
+	}
+	
+	cg.buffer.WriteString(") ")
+	
+	// Add return type if not unknown
+	if returnType.GoType() != "interface{}" {
+		cg.buffer.WriteString(returnType.GoType() + " ")
+	}
+	
+	cg.buffer.WriteString("{\n")
+	// Function body will be handled separately
+}
+
+// EmitTypedArithmeticExpression generates Go code for typed arithmetic
+func (cg *CodeGenerator) EmitTypedArithmeticExpression(operator string, operands []string, resultType VexType) {
+	if len(operands) < 2 {
+		cg.writeIndented("// Invalid arithmetic expression\n")
+		return
+	}
+	
+	// Build expression with proper type casting if needed
+	var expr string
+	if resultType.Equals(FloatType) {
+		// Ensure float operations
+		expr = cg.buildFloatArithmetic(operator, operands)
+	} else {
+		// Regular integer arithmetic
+		expr = cg.buildIntArithmetic(operator, operands)
+	}
+	
+	cg.writeIndented("_ = " + expr + "\n")
+}
+
+// EmitTypedConditional generates Go code for typed conditional expression
+func (cg *CodeGenerator) EmitTypedConditional(condition, thenBranch, elseBranch string, resultType VexType) {
+	cg.writeIndented("func() " + resultType.GoType() + " {\n")
+	cg.IncreaseIndent()
+	cg.writeIndented("if " + condition + " {\n")
+	cg.IncreaseIndent()
+	cg.writeIndented("return " + thenBranch + "\n")
+	cg.DecreaseIndent()
+	cg.writeIndented("} else {\n")
+	cg.IncreaseIndent()
+	cg.writeIndented("return " + elseBranch + "\n")
+	cg.DecreaseIndent()
+	cg.writeIndented("}\n")
+	cg.DecreaseIndent()
+	cg.writeIndented("}()\n")
+}
+
+// EmitTypedMethodCall generates Go code for typed method call
+func (cg *CodeGenerator) EmitTypedMethodCall(receiver, method string, args []string, receiverType VexType, argTypes []VexType) {
+	// Add type assertions if needed
+	typedReceiver := receiver
+	if receiverType.GoType() != "interface{}" {
+		// Could add type assertion here if needed
+		typedReceiver = receiver
+	}
+	
+	cg.writeIndented("_ = " + typedReceiver + "." + method + "(")
+	for i, arg := range args {
+		if i > 0 {
+			cg.buffer.WriteString(", ")
+		}
+		cg.buffer.WriteString(arg)
+	}
+	cg.buffer.WriteString(")\n")
+}
+
+// EmitTypedSlashNotationCall generates Go code for typed package function call
+func (cg *CodeGenerator) EmitTypedSlashNotationCall(packageName, funcName string, args []string, argTypes []VexType) {
+	cg.EmitImport("\"" + packageName + "\"")
+	
+	// Don't assign function calls to _ - just execute them as statements
+	cg.writeIndented(packageName + "." + funcName + "(")
+	for i, arg := range args {
+		if i > 0 {
+			cg.buffer.WriteString(", ")
+		}
+		cg.buffer.WriteString(arg)
+	}
+	cg.buffer.WriteString(")\n")
+}
+
+// EmitTypedFunctionCall generates Go code for typed function call
+func (cg *CodeGenerator) EmitTypedFunctionCall(functionName string, args []string, returnType VexType) {
+	var expr string
+	if returnType.GoType() == "interface{}" {
+		expr = functionName + "("
+	} else {
+		expr = functionName + "("
+	}
+	
+	for i, arg := range args {
+		if i > 0 {
+			expr += ", "
+		}
+		expr += arg
+	}
+	expr += ")"
+	
+	cg.writeIndented("_ = " + expr + "\n")
+}
+
+// EmitTypedArray generates Go code for typed array literal
+func (cg *CodeGenerator) EmitTypedArray(listType *ListType) {
+	elementType := listType.ElementType.GoType()
+	if elementType == "interface{}" {
+		cg.writeIndented("_ = []interface{}{}\n")
+	} else {
+		cg.writeIndented("_ = []" + elementType + "{}\n")
+	}
+}
+
+// EmitArray generates Go code for generic array literal (fallback)
+func (cg *CodeGenerator) EmitArray() {
+	cg.writeIndented("_ = []interface{}{}\n")
+}
+
+// Helper methods for typed arithmetic
+
+// buildFloatArithmetic builds float arithmetic expressions
+func (cg *CodeGenerator) buildFloatArithmetic(operator string, operands []string) string {
+	goOperator := cg.convertOperator(operator)
+	
+	// Ensure all operands are float64
+	floatOperands := make([]string, len(operands))
+	for i, operand := range operands {
+		if strings.Contains(operand, ".") {
+			floatOperands[i] = operand
+		} else {
+			floatOperands[i] = "float64(" + operand + ")"
+		}
+	}
+	
+	// Build left-associative expression
+	result := floatOperands[0]
+	for i := 1; i < len(floatOperands); i++ {
+		result = "(" + result + " " + goOperator + " " + floatOperands[i] + ")"
+	}
+	
+	return result
+}
+
+// buildIntArithmetic builds integer arithmetic expressions
+func (cg *CodeGenerator) buildIntArithmetic(operator string, operands []string) string {
+	goOperator := cg.convertOperator(operator)
+	
+	// Build left-associative expression
+	result := operands[0]
+	for i := 1; i < len(operands); i++ {
+		result = "(" + result + " " + goOperator + " " + operands[i] + ")"
+	}
+	
+	return result
+}

@@ -1,0 +1,4 @@
+;; Debug macro expansion
+(macro simple [x] (def result ~x))
+
+(simple 42)

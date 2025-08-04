@@ -32,27 +32,39 @@ func TestMainFunction(t *testing.T) {
 			expectedStderr: "Usage:",
 		},
 		{
-			name:           "Help message",
-			args:           []string{"-input"},
+			name:           "Unknown command",
+			args:           []string{"unknown"},
 			expectError:    true,
-			expectedStderr: "flag needs an argument",
+			expectedStderr: "Unknown command:",
+		},
+		{
+			name:           "Transpile without input",
+			args:           []string{"transpile"},
+			expectError:    true,
+			expectedStderr: "Error: -input flag is required",
 		},
 		{
 			name:         "Simple transpilation",
-			args:         []string{"-input", "test.vex"},
+			args:         []string{"transpile", "-input", "test.vex"},
 			inputFile:    "test.vex",
 			inputContent: "(def x 42)",
 			expectError:  false,
-			expectedStdout: "x := 42",
+			expectedStdout: "var x int64 = 42",
 		},
 		{
-			name:         "Verbose output",
-			args:         []string{"-input", "test.vex", "-verbose"},
+			name:         "Verbose transpilation",
+			args:         []string{"transpile", "-input", "test.vex", "-verbose"},
 			inputFile:    "test.vex",
 			inputContent: "(def x 42)",
 			expectError:  false,
-			expectedStdout: "x := 42",
+			expectedStdout: "var x int64 = 42",
 			expectedStderr: "Transpiling:",
+		},
+		{
+			name:           "Run without input",
+			args:           []string{"run"},
+			expectError:    true,
+			expectedStderr: "Error: -input flag is required",
 		},
 	}
 
@@ -131,7 +143,7 @@ func TestMainFunction_OutputFile(t *testing.T) {
 	outputFile := filepath.Join(tempDir, "output.go")
 	
 	// Run transpiler
-	cmd := exec.Command(binaryPath, "-input", inputFile, "-output", outputFile)
+	cmd := exec.Command(binaryPath, "transpile", "-input", inputFile, "-output", outputFile)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	
@@ -153,7 +165,8 @@ func TestMainFunction_OutputFile(t *testing.T) {
 	
 	expectedParts := []string{
 		"package main",
-		`greeting := "Hello World"`,
+		`var greeting string = "Hello World"`,
+		"_ = greeting",
 		"fmt.Println(greeting)",
 	}
 	
@@ -170,7 +183,7 @@ func TestMainFunction_NonExistentFile(t *testing.T) {
 	defer os.Remove(binaryPath)
 	
 	// Try to transpile a non-existent file
-	cmd := exec.Command(binaryPath, "-input", "nonexistent.vex")
+	cmd := exec.Command(binaryPath, "transpile", "-input", "nonexistent.vex")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	
@@ -202,7 +215,7 @@ func TestMainFunction_InvalidVexSyntax(t *testing.T) {
 	}
 	
 	// Run transpiler
-	cmd := exec.Command(binaryPath, "-input", inputFile)
+	cmd := exec.Command(binaryPath, "transpile", "-input", inputFile)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	
@@ -234,7 +247,7 @@ func TestMainFunction_OutputFileWriteError(t *testing.T) {
 	// Try to write to a directory (should fail)
 	outputFile := filepath.Join(tempDir, "nonexistent_dir", "output.go")
 	
-	cmd := exec.Command(binaryPath, "-input", inputFile, "-output", outputFile)
+	cmd := exec.Command(binaryPath, "transpile", "-input", inputFile, "-output", outputFile)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	
@@ -266,7 +279,7 @@ func TestMainFunction_VerboseOutput(t *testing.T) {
 	}
 	
 	// Run with verbose flag
-	cmd := exec.Command(binaryPath, "-input", inputFile, "-output", outputFile, "-verbose")
+	cmd := exec.Command(binaryPath, "transpile", "-input", inputFile, "-output", outputFile, "-verbose")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	
@@ -303,7 +316,7 @@ func TestMainFunction_StdoutOutput(t *testing.T) {
 	}
 	
 	// Run without output file (should write to stdout)
-	cmd := exec.Command(binaryPath, "-input", inputFile)
+	cmd := exec.Command(binaryPath, "transpile", "-input", inputFile)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	
@@ -317,7 +330,8 @@ func TestMainFunction_StdoutOutput(t *testing.T) {
 	// Check that Go code was written to stdout
 	expectedParts := []string{
 		"package main",
-		`message := "Hello stdout"`,
+		`var message string = "Hello stdout"`,
+		"_ = message",
 		"func main() {",
 	}
 	
@@ -374,16 +388,22 @@ func TestMainErrorHandling(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name:        "Missing input flag",
+			name:        "Missing command",
 			args:        []string{},
 			expectError: true,
 			errorMsg:    "Usage:",
 		},
 		{
-			name:        "Input flag without value",
-			args:        []string{"-input"},
+			name:        "Unknown command",
+			args:        []string{"badcommand"},
 			expectError: true,
-			errorMsg:    "flag needs an argument",
+			errorMsg:    "Unknown command:",
+		},
+		{
+			name:        "Transpile without input",
+			args:        []string{"transpile"},
+			expectError: true,
+			errorMsg:    "Error: -input flag is required",
 		},
 	}
 
@@ -462,4 +482,79 @@ func captureOutput(f func()) (stdout, stderr string) {
 	stderr = <-errCh
 	
 	return stdout, stderr
+}
+
+// TestRunCommand tests the vex run command
+func TestRunCommand(t *testing.T) {
+	// Build the binary for testing
+	binaryPath := buildTestBinary(t)
+	defer os.Remove(binaryPath)
+	
+	tempDir := t.TempDir()
+	
+	testCases := []struct {
+		name           string
+		inputContent   string
+		expectError    bool
+		expectedStdout string
+		expectedStderr string
+	}{
+		{
+			name:         "Simple constant definition",
+			inputContent: "(def x 42)",
+			expectError:  false,
+		},
+		{
+			name:           "Hello world",
+			inputContent:   "(import \"fmt\")\n(def message \"Hello from Vex!\")\n(fmt/Println message)",
+			expectError:    false,
+			expectedStdout: "Hello from Vex!",
+		},
+		{
+			name:           "Simple macro",
+			inputContent:   "(import \"fmt\")\n(macro say [text] (fmt/Println ~text))\n(say \"Macro works!\")",
+			expectError:    false,
+			expectedStdout: "Macro works!",
+		},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create input file
+			inputFile := filepath.Join(tempDir, "test.vx")
+			err := os.WriteFile(inputFile, []byte(tc.inputContent), 0644)
+			if err != nil {
+				t.Fatalf("Failed to create input file: %v", err)
+			}
+			
+			// Run the command
+			cmd := exec.Command(binaryPath, "run", "-input", inputFile)
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+			
+			err = cmd.Run()
+			
+			// Check error expectation
+			if tc.expectError && err == nil {
+				t.Error("Expected command to fail, but it succeeded")
+			}
+			if !tc.expectError && err != nil {
+				t.Errorf("Expected command to succeed, but it failed: %v\nStderr: %s", err, stderr.String())
+			}
+			
+			// Check output expectations
+			if tc.expectedStdout != "" {
+				if !strings.Contains(stdout.String(), tc.expectedStdout) {
+					t.Errorf("Expected stdout to contain: %s\nActual stdout: %s", tc.expectedStdout, stdout.String())
+				}
+			}
+			
+			if tc.expectedStderr != "" {
+				if !strings.Contains(stderr.String(), tc.expectedStderr) {
+					t.Errorf("Expected stderr to contain: %s\nActual stderr: %s", tc.expectedStderr, stderr.String())
+				}
+			}
+		})
+	}
 }

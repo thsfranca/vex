@@ -1,0 +1,11 @@
+;; Simple multi-pass test without type issues
+
+;; Meta-macro that creates other macros
+(macro defmacro [name params body]
+  (macro ~name ~params ~body))
+
+;; Use meta-macro to create a simple macro
+(defmacro identity [x] (def result ~x))
+
+;; Use the generated macro
+(identity 42)

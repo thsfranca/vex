@@ -1,0 +1,10 @@
+;; Working example that compiles and runs
+;; This uses the macro system we built
+(macro defn [name params body]
+  (def ~name (fn ~params ~body)))
+
+;; Define a simple function
+(defn identity [x] x)
+
+;; Create some values (these will be unused but that's ok for demo)
+(def result 42)

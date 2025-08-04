@@ -1,0 +1,5 @@
+;; Debug defn macro specifically
+(macro defn [name params body]
+  (def ~name (fn ~params ~body)))
+
+(defn add [x y] (+ x y))

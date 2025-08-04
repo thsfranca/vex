@@ -1,0 +1,7 @@
+;; Test multiple simple macros
+(macro first [x] (def result1 ~x))
+(macro second [y] (def result2 ~y))
+
+;; Use them
+(first 42)
+(second 24)

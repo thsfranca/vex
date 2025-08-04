@@ -1,0 +1,11 @@
+;; This demonstrates why removing macro definitions can be unsafe
+
+;; Meta-macro that generates other macros
+(macro defmacro [name params body]
+  (macro ~name ~params ~body))
+
+;; This creates a new macro definition at expansion time
+(defmacro square [x] (* ~x ~x))
+
+;; This should work, but fails because 'square' macro is never registered
+(square 5)

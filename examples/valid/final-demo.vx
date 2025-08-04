@@ -1,0 +1,16 @@
+;; Final demo showing Vex working end-to-end
+(import "fmt")
+
+;; Define a simple macro
+(macro say [text] (fmt/Println ~text))
+
+;; Use the macro
+(say "✅ Vex transpiler is working!")
+(say "✅ Multi-pass macro expansion works!")
+(say "✅ The 'vex run' command works!")
+
+;; Define some variables
+(def success true)
+(def count 3)
+
+(say "🎉 All systems operational!")

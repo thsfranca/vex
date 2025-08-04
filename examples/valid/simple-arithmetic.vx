@@ -1,0 +1,4 @@
+;; Simple arithmetic example
+(def x 10)
+(def y 5)
+(def result (+ x y))

@@ -1,0 +1,10 @@
+;; Test potentially unsafe cases for macro removal
+
+;; Case 1: Macro definition in comment
+;; This comment mentions (macro foo [x] x) but it's just text
+
+;; Case 2: Macro definition in string  
+(def description "This describes (macro bar [y] y) syntax")
+
+;; Case 3: What looks like nested macro (but isn't really)
+(def example (list 'macro 'nested '[z] 'z))

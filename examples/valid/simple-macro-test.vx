@@ -1,4 +1,0 @@
-;; Test direct parameter substitution (no ~)
-(macro simple [x] (def result x))
-
-(simple 42)

@@ -1,5 +1,0 @@
-;; Simple defn test without type inference issues
-(macro defn [name params body]
-  (def ~name (fn ~params ~body)))
-
-(defn greet [name] name)

@@ -9,9 +9,8 @@
 - [ ] **Test coverage maintained** - No component drops below quality thresholds:
   - Parser: 95%+ (critical language component)
   - Transpiler: 90%+ (core functionality)  
-  - Type System: 85%+ (type safety)
+  - Types: 85%+ (type system implementation)
   - Standard Library: 80%+ (user-facing features)
-  - Overall: 75%+ (project baseline)
 - [ ] **Code builds successfully** - All Go code compiles
 - [ ] **Examples still work** - Existing Vex programs parse correctly
 
@@ -26,8 +25,16 @@
 
 If this PR adds new language features:
 - [ ] **Grammar updated** (`tools/grammar/Vex.g4`) if syntax changes
-- [ ] **Examples added** to demonstrate usage
+- [ ] **Examples added** to `examples/valid/` to demonstrate usage
+- [ ] **Parser regenerated** if grammar changes (`make go`)
 - [ ] **Issue reference** - Links to milestone issue (e.g., `Closes #1`)
+
+### 🔧 For Infrastructure Changes
+
+If this PR modifies CI/CD, workflows, or tools:
+- [ ] **Tools built successfully** (`make build-tools`)
+- [ ] **Workflow tested** - Changes tested in CI environment
+- [ ] **Documentation updated** if automation changes
 
 ---
 

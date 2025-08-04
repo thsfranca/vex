@@ -21,6 +21,9 @@ echo "📝 Creating release notes..."
 
 cd tools/release-manager
 
+# Build the release-manager tool
+go build -o release-manager .
+
 # Create PR data JSON for the tool using jq to properly escape values
 PR_DATA=$(jq -n \
   --arg number "$PR_NUMBER" \

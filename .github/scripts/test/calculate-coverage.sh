@@ -129,11 +129,15 @@ done
 # Check total coverage
 if [ -f "coverage/total.out" ] && [ -s "coverage/total.out" ]; then
     TOTAL_COV=$(go tool cover -func=coverage/total.out | grep "total:" | awk '{print $3}' | sed 's/%//' || echo "0")
-    echo "total-coverage=$TOTAL_COV" >> $GITHUB_OUTPUT
+    if [ -n "$GITHUB_OUTPUT" ]; then
+        echo "total-coverage=$TOTAL_COV" >> $GITHUB_OUTPUT
+    fi
     echo "[COVERAGE] Total coverage: $TOTAL_COV%"
     COVERAGE_REPORT="${COVERAGE_REPORT}  - Total: ${TOTAL_COV}%\n"
 else
-    echo "total-coverage=0" >> $GITHUB_OUTPUT
+    if [ -n "$GITHUB_OUTPUT" ]; then
+        echo "total-coverage=0" >> $GITHUB_OUTPUT
+    fi
     echo "[COVERAGE] No total coverage data available"
     COVERAGE_REPORT="${COVERAGE_REPORT}  - Total: No data\n"
 fi

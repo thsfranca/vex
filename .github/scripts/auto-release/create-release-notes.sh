@@ -21,17 +21,20 @@ echo "📝 Creating release notes..."
 
 cd tools/release-manager
 
-# Create PR data JSON for the tool
-PR_DATA=$(cat << EOF
-{
-  "number": $PR_NUMBER,
-  "title": "$PR_TITLE",
-  "body": "$PR_BODY",
-  "author": "$PR_AUTHOR",
-  "release_type": "$RELEASE_TYPE"
-}
-EOF
-)
+# Create PR data JSON for the tool using jq to properly escape values
+PR_DATA=$(jq -n \
+  --arg number "$PR_NUMBER" \
+  --arg title "$PR_TITLE" \
+  --arg body "$PR_BODY" \
+  --arg author "$PR_AUTHOR" \
+  --arg release_type "$RELEASE_TYPE" \
+  '{
+    number: ($number | tonumber),
+    title: $title,
+    body: $body,
+    author: $author,
+    release_type: $release_type
+  }')
 
 # Create release notes via tool
 ./release-manager create-notes "$PR_DATA"

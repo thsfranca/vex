@@ -3,6 +3,7 @@ package transpiler
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -34,7 +35,7 @@ func (t *Transpiler) TranspileFromInput(input string) (string, error) {
 
 	// Parse the program
 	tree := vexParser.Program()
-	
+
 	// Reset output, imports, and modules
 	t.output.Reset()
 	t.imports = make(map[string]bool)
@@ -50,9 +51,14 @@ func (t *Transpiler) TranspileFromInput(input string) (string, error) {
 
 // TranspileFromFile transpiles a Vex file to Go
 func (t *Transpiler) TranspileFromFile(filename string) (string, error) {
-	// Simple file reading would go here
-	// For now, just return an error
-	return "", fmt.Errorf("file transpilation not implemented yet")
+	// Read the file content
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return "", fmt.Errorf("error reading file %s: %v", filename, err)
+	}
+	
+	// Use the existing TranspileFromInput method
+	return t.TranspileFromInput(string(content))
 }
 
 // visitProgram processes the top-level program
@@ -444,10 +450,10 @@ func (t *Transpiler) evaluateCollectionOp(op string, args []string) string {
 // generateGoCode wraps the generated code in a proper Go program
 func (t *Transpiler) generateGoCode() string {
 	var result strings.Builder
-	
+
 	// Package declaration
 	result.WriteString("package main\n\n")
-	
+
 	// Add collected imports
 	content := t.output.String()
 	
@@ -464,21 +470,21 @@ func (t *Transpiler) generateGoCode() string {
 	if len(t.imports) > 0 {
 		result.WriteString("\n")
 	}
-	
+
 	// Main function
 	result.WriteString("func main() {\n")
 	
 	// Add the generated code with indentation, but skip any import statements
 	lines := strings.Split(strings.TrimSpace(content), "\n")
-	for _, line := range lines {
+		for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed != "" && !strings.HasPrefix(trimmed, "import ") {
-			result.WriteString("\t" + line + "\n")
+				result.WriteString("\t" + line + "\n")
 		}
 	}
 	
 	result.WriteString("}\n")
-	
+
 	return result.String()
 }
 

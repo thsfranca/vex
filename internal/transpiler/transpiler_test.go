@@ -1,6 +1,8 @@
 package transpiler
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -354,5 +356,293 @@ func TestTranspiler_ComplexDependencyProgram(t *testing.T) {
 	// Check last expression
 	if !strings.Contains(result, "// Last expression") {
 		t.Error("Expected last expression to be marked with comment")
+	}
+}
+
+func TestTranspiler_TranspileFromFile(t *testing.T) {
+	// Create a temporary file
+	tempFile := filepath.Join(t.TempDir(), "test.vx")
+	content := `(import "fmt")
+(def x 42)
+(fmt/Println "Hello World")`
+	
+	err := os.WriteFile(tempFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+
+	tr := New()
+	result, err := tr.TranspileFromFile(tempFile)
+	
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	expectedParts := []string{
+		"package main",
+		`import "fmt"`,
+		"func main() {",
+		"var x = 42",
+		"fmt.Println",
+		"}",
+	}
+
+	for _, expected := range expectedParts {
+		if !strings.Contains(result, expected) {
+			t.Errorf("Expected output to contain: %s\nActual output:\n%s", expected, result)
+		}
+	}
+}
+
+func TestTranspiler_TranspileFromFile_NonExistent(t *testing.T) {
+	tr := New()
+	_, err := tr.TranspileFromFile("nonexistent.vx")
+	
+	if err == nil {
+		t.Error("Expected error for nonexistent file, but got success")
+	}
+}
+
+func TestTranspiler_ArrayHandling(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Simple array in list context",
+			input:    `(def arr [1 2 3])`,
+			expected: `[]interface{}{1, 2, 3}`,
+		},
+		{
+			name:     "Array with strings",
+			input:    `(def arr ["hello" "world"])`,
+			expected: `[]interface{}{"hello", "world"}`,
+		},
+		{
+			name:     "Empty array",
+			input:    `(def arr [])`,
+			expected: `[]interface{}{}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := New()
+			result, err := tr.TranspileFromInput(tt.input)
+			
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestTranspiler_FunctionCalls(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Simple function call",
+			input:    `(print "hello")`,
+			expected: `_ = print("hello")`,
+		},
+		{
+			name:     "Function call with multiple args",
+			input:    `(add 1 2 3)`,
+			expected: `_ = add(1, 2, 3)`,
+		},
+		{
+			name:     "Nested function calls",
+			input:    `(print (add 1 2))`,
+			expected: `_ = print(add(1, 2))`,
+		},
+		{
+			name:     "Function call as last expression",
+			input:    `(print "hello")`,
+			expected: `_ = print("hello")`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := New()
+			result, err := tr.TranspileFromInput(tt.input)
+			
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestTranspiler_ConditionalStatements(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Simple if statement",
+			input:    `(if true "yes" "no")`,
+			expected: `if true {`,
+		},
+		{
+			name:     "If as expression in definition",
+			input:    `(def result (if true "yes" "no"))`,
+			expected: `func() interface{} { if true { return "yes" } else { return "no" } }()`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := New()
+			result, err := tr.TranspileFromInput(tt.input)
+			
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestTranspiler_DoBlocks(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Simple do block",
+			input:    `(do (print "first") (print "second"))`,
+			expected: `print("first")`,
+		},
+		{
+			name:     "Do as expression in definition",
+			input:    `(def result (do (print "computing") 42))`,
+			expected: `func() interface{} {`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := New()
+			result, err := tr.TranspileFromInput(tt.input)
+			
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestTranspiler_CollectionOperations(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "First operation",
+			input:    `(first [1 2 3])`,
+			expected: `[]interface{}{1, 2, 3}[0]`,
+		},
+		{
+			name:     "Count operation",
+			input:    `(count [1 2 3])`,
+			expected: `len([]interface{}{1, 2, 3})`,
+		},
+		{
+			name:     "Empty check",
+			input:    `(empty? [1 2])`,
+			expected: `len([]interface{}{1, 2}) == 0`,
+		},
+		{
+			name:     "Cons operation",
+			input:    `(cons 0 [1 2 3])`,
+			expected: `append([]interface{}{0}, []interface{}{1, 2, 3}...)`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := New()
+			result, err := tr.TranspileFromInput(tt.input)
+			
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestTranspiler_CollectionOperationsAsExpressions(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "First in variable definition",
+			input:    `(def result (first [1 2 3]))`,
+			expected: `func() interface{} { if len([]interface{}{1, 2, 3}) > 0 { return []interface{}{1, 2, 3}[0] } else { return nil } }()`,
+		},
+		{
+			name:     "Rest in variable definition",
+			input:    `(def result (rest [1 2 3]))`,
+			expected: `func() []interface{} { if len([]interface{}{1, 2, 3}) > 1 { return []interface{}{1, 2, 3}[1:] } else { return []interface{}{} } }()`,
+		},
+		{
+			name:     "Count in variable definition",
+			input:    `(def result (count [1 2 3]))`,
+			expected: `len([]interface{}{1, 2, 3})`,
+		},
+		{
+			name:     "Empty check in variable definition",
+			input:    `(def result (empty? []))`,
+			expected: `len([]interface{}{}) == 0`,
+		},
+		{
+			name:     "Cons in variable definition",
+			input:    `(def result (cons 0 [1 2]))`,
+			expected: `append([]interface{}{0}, []interface{}{1, 2}...)`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := New()
+			result, err := tr.TranspileFromInput(tt.input)
+			
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			}
+		})
 	}
 }

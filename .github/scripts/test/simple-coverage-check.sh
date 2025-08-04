@@ -7,8 +7,8 @@ COVERAGE_FILE="coverage.out"
 
 echo "[COVERAGE] Running simplified coverage analysis..."
 
-# Run tests with coverage
-go test -v -race -coverprofile="$COVERAGE_FILE" -covermode=atomic ./... || {
+# Run tests with coverage, excluding generated parser files
+go test -v -race -coverprofile="$COVERAGE_FILE" -covermode=atomic -coverpkg=./cmd/vex-transpiler,./internal/transpiler ./... || {
     echo "❌ Tests failed during coverage analysis"
     exit 1
 }

@@ -132,7 +132,7 @@ You can transpile and run Vex programs:
 
 ```bash
 # Build the transpiler
-go build -o vex cmd/fugo-transpiler/main.go
+go build -o vex cmd/vex-transpiler/main.go
 
 # Transpile to Go
 echo '(def x (+ 5 3))' > example.vex

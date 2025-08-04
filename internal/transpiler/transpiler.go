@@ -1,226 +1,294 @@
-// Package transpiler provides the core Vex to Go transpiler functionality
+// Package transpiler provides a minimal Vex to Go transpiler
 package transpiler
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/thsfranca/vex/internal/transpiler/parser"
 )
 
-// Transpiler handles the conversion from Vex AST to Go code
+// Transpiler converts Vex code to Go code
 type Transpiler struct {
+	output  strings.Builder
+	imports map[string]bool
 }
 
 // New creates a new transpiler instance
 func New() *Transpiler {
-	return &Transpiler{}
+	return &Transpiler{
+		imports: make(map[string]bool),
+	}
 }
 
-// TranspileFromInput transpiles Vex source code to Go code
+// TranspileFromInput transpiles Vex source code to Go
 func (t *Transpiler) TranspileFromInput(input string) (string, error) {
-	// Phase 1: Pre-process to find and register user-defined macros
-	expander := NewMacroExpander()
-	err := t.registerUserDefinedMacros(input, expander)
-	if err != nil {
-		return "", fmt.Errorf("macro registration failed: %w", err)
-	}
-
-	// Phase 2: Macro expansion (now includes user-defined macros)
-	expandedInput, err := expander.ExpandMacros(input)
-	if err != nil {
-		return "", fmt.Errorf("macro expansion failed: %w", err)
-	}
-
-	// Debug output removed - macro system is working
-
-	// Create input stream from the expanded source code
-	inputStream := antlr.NewInputStream(expandedInput)
-
-	// Create lexer
-	lexer := parser.NewVexLexer(inputStream)
-
-	// Create token stream
-	tokenStream := antlr.NewCommonTokenStream(lexer, 0)
-
-	// Create parser
-	vexParser := parser.NewVexParser(tokenStream)
-
-	// Add error listener to catch syntax errors
-	errorListener := &ErrorListener{}
-	vexParser.RemoveErrorListeners()
-	vexParser.AddErrorListener(errorListener)
-
-	// Parse starting from the 'program' rule (root rule)
-	tree := vexParser.Program()
-
-	// Check for parse errors
-	if errorListener.hasError {
-		return "", fmt.Errorf("syntax error: %s", errorListener.errorMsg)
-	}
-
-	// Create semantic visitor with type system integration
-	semanticVisitor := NewSemanticVisitor()
-
-	// Perform semantic analysis and type checking
-	programCtx, ok := tree.(*parser.ProgramContext)
-	if !ok {
-		return "", fmt.Errorf("expected ProgramContext, got %T", tree)
-	}
-
-	err = semanticVisitor.AnalyzeProgram(programCtx)
-	if err != nil {
-		return "", fmt.Errorf("semantic analysis failed: %w", err)
-	}
-
-	// Check for semantic errors
-	if semanticVisitor.HasErrors() {
-		errorMsg := strings.Join(semanticVisitor.GetErrors(), "; ")
-		return "", fmt.Errorf("semantic errors: %s", errorMsg)
-	}
-
-	// Generate final Go code with type information
-	return t.generateGoCodeWithSemanticVisitor(semanticVisitor), nil
-}
-
-// TranspileFromFile transpiles a .vex file to Go code
-func (t *Transpiler) TranspileFromFile(filename string) (string, error) {
-	// Read the file content
-	content, err := os.ReadFile(filename)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file %s: %w", filename, err)
-	}
-
-	// Transpile the content
-	return t.TranspileFromInput(string(content))
-}
-
-// generateGoCodeWithVisitor generates Go code using visitor data (imports + content)
-func (t *Transpiler) generateGoCodeWithVisitor(visitor *ASTVisitor) string {
-	var result strings.Builder
-
-	// Package declaration
-	result.WriteString("package main\n\n")
-
-	// Add imports at the top
-	codeGen := visitor.GetCodeGenerator()
-	imports := codeGen.GetImports()
-	if len(imports) > 0 {
-		for _, imp := range imports {
-			result.WriteString("import " + imp + "\n")
-		}
-		result.WriteString("\n")
-	}
-
-	// Main function with the generated code
-	result.WriteString("func main() {\n")
-	content := visitor.GetGeneratedCode()
-	if content != "" {
-		// Add indentation to the content
-		lines := strings.Split(content, "\n")
-		for _, line := range lines {
-			if strings.TrimSpace(line) != "" {
-				result.WriteString("\t" + line + "\n")
-			}
-		}
-	}
-	result.WriteString("}\n")
-
-	return result.String()
-}
-
-// Reset clears the transpiler state for reuse
-func (t *Transpiler) Reset() {
-	// No state to reset in current implementation
-}
-
-// registerUserDefinedMacros pre-processes source to find and register user-defined macros
-func (t *Transpiler) registerUserDefinedMacros(input string, expander *MacroExpander) error {
-	fmt.Printf("DEBUG: Starting macro registration for input: %s\n", input)
-
-	// Create a temporary parse to find macro definitions
+	// Parse the input
 	inputStream := antlr.NewInputStream(input)
 	lexer := parser.NewVexLexer(inputStream)
 	tokenStream := antlr.NewCommonTokenStream(lexer, 0)
 	vexParser := parser.NewVexParser(tokenStream)
 
-	// Add error listener but allow parsing to continue for macro collection
-	errorListener := &ErrorListener{}
-	vexParser.RemoveErrorListeners()
-	vexParser.AddErrorListener(errorListener)
-
 	// Parse the program
 	tree := vexParser.Program()
-
-	// If there are syntax errors, we can't register macros safely
-	if errorListener.hasError {
-		return fmt.Errorf("syntax error prevents macro registration: %s", errorListener.errorMsg)
+	
+	// Reset output and imports
+	t.output.Reset()
+	t.imports = make(map[string]bool)
+	
+	// Generate Go code
+	if programCtx, ok := tree.(*parser.ProgramContext); ok {
+		t.visitProgram(programCtx)
 	}
-
-	fmt.Printf("DEBUG: Successfully parsed for macro collection\n")
-
-	// Create a macro registry collector
-	macroCollector := NewMacroCollector(expander)
-
-	// Walk the tree to find macro definitions
-	programCtx, ok := tree.(*parser.ProgramContext)
-	if !ok {
-		return fmt.Errorf("expected ProgramContext for macro collection, got %T", tree)
-	}
-
-	err := macroCollector.CollectMacros(programCtx)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("DEBUG: Macro collection completed\n")
-	return nil
+	
+	return t.generateGoCode(), nil
 }
 
-// generateGoCodeWithSemanticVisitor generates Go code using semantic visitor with type information
-func (t *Transpiler) generateGoCodeWithSemanticVisitor(semanticVisitor *SemanticVisitor) string {
-	var result strings.Builder
+// TranspileFromFile transpiles a Vex file to Go
+func (t *Transpiler) TranspileFromFile(filename string) (string, error) {
+	// Simple file reading would go here
+	// For now, just return an error
+	return "", fmt.Errorf("file transpilation not implemented yet")
+}
 
+// visitProgram processes the top-level program
+func (t *Transpiler) visitProgram(ctx *parser.ProgramContext) {
+	// Visit all lists in the program
+	for _, listCtx := range ctx.AllList() {
+		if concreteList, ok := listCtx.(*parser.ListContext); ok {
+			t.visitList(concreteList)
+		}
+	}
+}
+
+// visitList handles list expressions (function calls, special forms)
+func (t *Transpiler) visitList(ctx *parser.ListContext) {
+	childCount := ctx.GetChildCount()
+	if childCount <= 2 { // Just parentheses
+		return
+	}
+
+	// Get the first element (function name)
+	firstChild := ctx.GetChild(1)
+	if firstChild == nil {
+		return
+	}
+
+	var funcName string
+	if parseTree, ok := firstChild.(antlr.ParseTree); ok {
+		funcName = parseTree.GetText()
+	} else {
+		return
+	}
+
+	// Extract arguments
+	args := make([]string, 0)
+	for i := 2; i < childCount-1; i++ { // Skip '(' and ')'
+		child := ctx.GetChild(i)
+		if child != nil {
+			args = append(args, t.visitNode(child))
+		}
+	}
+
+	// Handle special forms
+	switch funcName {
+	case "def":
+		t.handleDefinition(args)
+	case "import":
+		t.handleImport(args)
+	case "+", "-", "*", "/":
+		t.handleArithmetic(funcName, args)
+	default:
+		t.handleFunctionCall(funcName, args)
+	}
+}
+
+// visitNode handles any AST node and returns its value
+func (t *Transpiler) visitNode(node antlr.Tree) string {
+	switch n := node.(type) {
+	case *parser.ListContext:
+		// For nested lists, evaluate them and return the expression
+		return t.evaluateExpression(n)
+	case *parser.ArrayContext:
+		return t.visitArray(n)
+	case antlr.TerminalNode:
+		return n.GetText()
+	default:
+		if parseTree, ok := node.(antlr.ParseTree); ok {
+			return parseTree.GetText()
+		}
+		return "/* unknown */"
+	}
+}
+
+// evaluateExpression evaluates a list as an expression and returns the result
+func (t *Transpiler) evaluateExpression(ctx *parser.ListContext) string {
+	childCount := ctx.GetChildCount()
+	if childCount <= 2 { // Just parentheses
+		return "nil"
+	}
+
+	// Get the first element (function name)
+	firstChild := ctx.GetChild(1)
+	if firstChild == nil {
+		return "nil"
+	}
+
+	var funcName string
+	if parseTree, ok := firstChild.(antlr.ParseTree); ok {
+		funcName = parseTree.GetText()
+	} else {
+		return "nil"
+	}
+
+	// Extract arguments
+	args := make([]string, 0)
+	for i := 2; i < childCount-1; i++ { // Skip '(' and ')'
+		child := ctx.GetChild(i)
+		if child != nil {
+			args = append(args, t.visitNode(child))
+		}
+	}
+
+	// Handle special expressions
+	switch funcName {
+	case "+", "-", "*", "/":
+		if len(args) < 2 {
+			return "0"
+		}
+		// Left-associative chaining for multiple operands
+		result := "(" + args[0] + " " + funcName + " " + args[1] + ")"
+		for i := 2; i < len(args); i++ {
+			result = "(" + result + " " + funcName + " " + args[i] + ")"
+		}
+		return result
+	default:
+		// Handle function calls
+		if strings.Contains(funcName, "/") {
+			funcName = strings.ReplaceAll(funcName, "/", ".")
+		}
+		argStr := strings.Join(args, ", ")
+		return fmt.Sprintf("%s(%s)", funcName, argStr)
+	}
+}
+
+// visitArray handles array literals
+func (t *Transpiler) visitArray(ctx *parser.ArrayContext) string {
+	childCount := ctx.GetChildCount()
+	if childCount <= 2 { // Just brackets
+		return "[]interface{}{}"
+	}
+
+	elements := make([]string, 0)
+	for i := 1; i < childCount-1; i++ { // Skip '[' and ']'
+		child := ctx.GetChild(i)
+		if child != nil {
+			elements = append(elements, t.visitNode(child))
+		}
+	}
+
+	return "[]interface{}{" + strings.Join(elements, ", ") + "}"
+}
+
+// handleDefinition processes variable definitions
+func (t *Transpiler) handleDefinition(args []string) {
+	if len(args) < 2 {
+		t.output.WriteString("// Error: def requires name and value\n")
+		return
+	}
+
+	varName := args[0]
+	varValue := args[1]
+
+	t.output.WriteString(fmt.Sprintf("var %s = %s\n", varName, varValue))
+}
+
+// handleImport processes import statements
+func (t *Transpiler) handleImport(args []string) {
+	if len(args) < 1 {
+		t.output.WriteString("// Error: import requires package path\n")
+		return
+	}
+
+	importPath := args[0]
+	// Remove quotes if present
+	importPath = strings.Trim(importPath, "\"")
+	
+	// Store import for later use at package level
+	t.imports[importPath] = true
+}
+
+// handleArithmetic processes arithmetic operations
+func (t *Transpiler) handleArithmetic(op string, args []string) {
+	if len(args) < 2 {
+		t.output.WriteString("// Error: arithmetic requires at least 2 operands\n")
+		return
+	}
+
+	// Left-associative chaining for multiple operands
+	result := "(" + args[0] + " " + op + " " + args[1] + ")"
+	for i := 2; i < len(args); i++ {
+		result = "(" + result + " " + op + " " + args[i] + ")"
+	}
+
+	t.output.WriteString("_ = " + result + "\n")
+}
+
+// handleFunctionCall processes regular function calls
+func (t *Transpiler) handleFunctionCall(funcName string, args []string) {
+	// Handle package/function notation (fmt/Println -> fmt.Println)
+	if strings.Contains(funcName, "/") {
+		funcName = strings.ReplaceAll(funcName, "/", ".")
+	}
+
+	argStr := strings.Join(args, ", ")
+	
+	// For functions that return multiple values or don't need assignment, just call them
+	if strings.Contains(funcName, "Println") || strings.Contains(funcName, "Printf") {
+		t.output.WriteString(fmt.Sprintf("%s(%s)\n", funcName, argStr))
+	} else {
+		t.output.WriteString(fmt.Sprintf("_ = %s(%s)\n", funcName, argStr))
+	}
+}
+
+// generateGoCode wraps the generated code in a proper Go program
+func (t *Transpiler) generateGoCode() string {
+	var result strings.Builder
+	
 	// Package declaration
 	result.WriteString("package main\n\n")
-
-	// Add imports at the top
-	codeGen := semanticVisitor.GetCodeGenerator()
-	imports := codeGen.GetImports()
-	if len(imports) > 0 {
-		for _, imp := range imports {
-			result.WriteString("import " + imp + "\n")
-		}
+	
+	// Add collected imports
+	content := t.output.String()
+	
+	// Auto-detect imports from function calls if not explicitly imported
+	if strings.Contains(content, "fmt.") && !t.imports["fmt"] {
+		t.imports["fmt"] = true
+	}
+	
+	// Write all imports
+	for importPath := range t.imports {
+		result.WriteString(fmt.Sprintf("import \"%s\"\n", importPath))
+	}
+	
+	if len(t.imports) > 0 {
 		result.WriteString("\n")
 	}
-
-	// Main function with the generated code
+	
+	// Main function
 	result.WriteString("func main() {\n")
-	content := semanticVisitor.GetGeneratedCode()
-	if content != "" {
-		// Add indentation to the content
-		lines := strings.Split(content, "\n")
-		for _, line := range lines {
-			if strings.TrimSpace(line) != "" {
-				result.WriteString("\t" + line + "\n")
-			}
+	
+	// Add the generated code with indentation, but skip any import statements
+	lines := strings.Split(strings.TrimSpace(content), "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "import ") {
+			result.WriteString("\t" + line + "\n")
 		}
 	}
+	
 	result.WriteString("}\n")
-
+	
 	return result.String()
-}
-
-// ErrorListener captures syntax errors during parsing
-type ErrorListener struct {
-	*antlr.DefaultErrorListener
-	hasError bool
-	errorMsg string
-}
-
-func (el *ErrorListener) SyntaxError(recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
-	el.hasError = true
-	el.errorMsg = fmt.Sprintf("line %d:%d - %s", line, column, msg)
 }

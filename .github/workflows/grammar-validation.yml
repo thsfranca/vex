@@ -32,7 +32,7 @@ jobs:
               
       - name: Decide if validation needed
         id: decision
-        run: .github/scripts/validation/decide-validation-needed.sh "${{ steps.changes.outputs.grammar-changed }}"
+        run: .github/scripts/utils/decide-validation-needed.sh "${{ steps.changes.outputs.grammar-changed }}"
 
   validate-grammar:
     runs-on: ubuntu-latest
@@ -73,11 +73,11 @@ jobs:
         if: ${{ needs.detect-changes.outputs.needs-validation == 'true' && steps.antlr-cache.outputs.cache-hit != 'true' }}
         env:
           ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
-        run: .github/scripts/ci/install-antlr.sh
+        run: .github/scripts/build/install-antlr.sh
 
       - name: Setup ANTLR binary
         if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
-        run: .github/scripts/ci/setup-antlr-binary.sh
+        run: .github/scripts/build/setup-antlr-binary.sh
 
       - name: Validate grammar syntax
         if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
@@ -105,5 +105,5 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Evaluate results
-      run: .github/scripts/validation/evaluate-grammar-results.sh "${{ needs.detect-changes.outputs.grammar-changed }}" "${{ needs.detect-changes.outputs.needs-validation }}" "${{ needs.validate-grammar.result }}"
+      run: .github/scripts/utils/evaluate-grammar-results.sh "${{ needs.detect-changes.outputs.grammar-changed }}" "${{ needs.detect-changes.outputs.needs-validation }}" "${{ needs.validate-grammar.result }}"
 

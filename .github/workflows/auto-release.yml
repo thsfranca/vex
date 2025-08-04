@@ -33,8 +33,8 @@ jobs:
       - name: Check for release labels
         id: check-labels
         run: |
-          chmod +x .github/scripts/auto-release/check-release-labels.sh
-          .github/scripts/auto-release/check-release-labels.sh \
+          chmod +x .github/scripts/release/check-release-labels.sh
+        .github/scripts/release/check-release-labels.sh \
             '${{ toJson(github.event.pull_request.labels.*.name) }}' \
             '${{ github.event.pull_request.number }}' \
             '${{ github.event.pull_request.title }}'
@@ -42,22 +42,22 @@ jobs:
       - name: Configure Git
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
-          chmod +x .github/scripts/auto-release/configure-git.sh
-          .github/scripts/auto-release/configure-git.sh
+          chmod +x .github/scripts/release/configure-git.sh
+        .github/scripts/release/configure-git.sh
 
       - name: Bump version
         if: steps.check-labels.outputs.release-type != 'none'
         id: bump-version
         run: |
-          chmod +x .github/scripts/auto-release/bump-version.sh
-          .github/scripts/auto-release/bump-version.sh \
+          chmod +x .github/scripts/release/auto-bump-version.sh
+        .github/scripts/release/auto-bump-version.sh \
             '${{ steps.check-labels.outputs.release-type }}'
 
       - name: Create release notes
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
-          chmod +x .github/scripts/auto-release/create-release-notes.sh
-          .github/scripts/auto-release/create-release-notes.sh \
+          chmod +x .github/scripts/release/auto-create-release-notes.sh
+        .github/scripts/release/auto-create-release-notes.sh \
             "${{ steps.bump-version.outputs.new-version }}" \
             "${{ steps.bump-version.outputs.old-version }}" \
             "${{ github.event.pull_request.number }}" \
@@ -80,8 +80,8 @@ jobs:
       - name: Success notification
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
-          chmod +x .github/scripts/auto-release/success-notification.sh
-          .github/scripts/auto-release/success-notification.sh \
+          chmod +x .github/scripts/release/success-notification.sh
+        .github/scripts/release/success-notification.sh \
             "${{ steps.bump-version.outputs.old-version }}" \
             "${{ steps.bump-version.outputs.new-version }}" \
             "${{ github.event.pull_request.number }}" \

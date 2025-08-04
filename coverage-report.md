@@ -1,31 +1,30 @@
 ## ❌ Test Coverage Report
 
-**Status:** Coverage thresholds not met
+**Current Coverage:** `0.5%`  
+**Required Threshold:** `80%`  
+**Status:** Coverage below threshold
 
-### 📊 Component Coverage:
-| Component | Current | Threshold | Status |
-|-----------|---------|-----------|--------|
-| types | 0.0% | 85% | ❌ Fail |
-| stdlib | - | 80% | ⚠️ Not implemented |
-| parser | 0.0% | 95% | ❌ Fail |
-| transpiler | 0.6% | 90% | ❌ Fail |
+### 📊 Coverage Summary:
+| Metric | Value | Status |
+|--------|-------|--------|
+| Overall Coverage | 0.5% | ❌ Fail |
+| Required Threshold | 80% | - |
+| Difference | -80% | Below target |
 
-### 🎯 Required Thresholds:
-| Component | Threshold | Purpose |
-|-----------|-----------|---------|
-| Parser | 95%+ | Critical language component |
-| Transpiler | 90%+ | Core functionality |
-| Types | 85%+ | Type system implementation |
-| Standard Library | 80%+ | User-facing features |
+### 🎯 What This Means:
+⚠️ **Action needed:** Please add tests to reach the 80% coverage threshold.
 
 
-### 🔧 How to Fix Coverage Issues:
-1. **Add tests for uncovered code paths**
-2. **Review existing tests for completeness**  
-3. **Consider edge cases and error conditions**
-4. **Test error handling and boundary conditions**
+### 🔧 How to Improve Coverage:
+1. **Run coverage locally:** `go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out`
+2. **Add tests for uncovered code paths**
+3. **Focus on critical functionality first**
+4. **Consider edge cases and error conditions**
 
-This is a learning project - maintaining good test coverage teaches best practices!
+This helps maintain code quality and catch potential bugs early!
+
+### 🔍 Detailed Coverage Report:
+Download the `coverage.html` artifact from this CI run to see line-by-line coverage details.
 
 ---
-*Coverage validation enforced to maintain code quality in this learning project.*
+*Automated coverage validation • Target: 80%+ for quality assurance*

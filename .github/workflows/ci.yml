@@ -169,7 +169,7 @@ jobs:
     - name: Calculate coverage
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       id: coverage
-      run: .github/scripts/test/calculate-coverage.sh
+      run: .github/scripts/test/simple-coverage-check.sh
         
     - name: Comment coverage report on PR
       if: ${{ needs.detect-changes.outputs.go-files == 'true' && github.event_name == 'pull_request' }}

@@ -6,11 +6,10 @@
 ### ✅ Requirements (Automatically Checked)
 
 - [ ] **All tests pass** - CI workflow must be green
-- [ ] **Test coverage maintained** - No component drops below quality thresholds:
-  - Parser: 95%+ (critical language component)
-  - Transpiler: 90%+ (core functionality)  
-  - Types: 85%+ (type system implementation)
-  - Standard Library: 80%+ (user-facing features)
+- [ ] **Test coverage maintained** - Coverage tracking for learning purposes:
+  - **Dynamic targets**: 40%+ for growing project, 70%+ for mature codebase
+  - **Component goals**: Parser (95%), Transpiler (90%), Types (85%), Standard Library (80%)
+  - **Note**: Coverage is tracked and reported but doesn't block PRs in this study project
 - [ ] **Code builds successfully** - All Go code compiles
 - [ ] **Examples still work** - Existing Vex programs parse correctly
 
@@ -38,7 +37,7 @@ If this PR modifies CI/CD, workflows, or tools:
 
 ---
 
-**Note**: PRs are automatically blocked if test coverage drops below thresholds. The coverage check will comment with detailed results and guidance if issues are found.
+**Note**: This is a study project with educational focus. Coverage is tracked and reported for learning purposes but doesn't block PRs. The CI uses adaptive coverage suggestions based on project maturity.
 
 <!-- 
 Quality Philosophy: We maintain high standards because:

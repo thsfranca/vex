@@ -68,8 +68,8 @@ COMMENTS_RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
 # Find existing coverage comment
 EXISTING_COMMENT_ID=$(echo "$COMMENTS_RESPONSE" | grep -B5 -A5 "$COMMENT_MARKER" | grep '"id":' | head -n1 | sed 's/.*"id": *\([0-9]*\).*/\1/' || echo "")
 
-# Prepare the comment body (escape quotes and newlines for JSON)
-COMMENT_BODY=$(cat "$COVERAGE_REPORT" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+# Prepare the comment body for JSON (preserve formatting)
+COMMENT_BODY=$(jq -Rs . "$COVERAGE_REPORT")
 
 if [ -n "$EXISTING_COMMENT_ID" ]; then
     echo "[COVERAGE COMMENT] Found existing coverage comment: $EXISTING_COMMENT_ID"
@@ -80,7 +80,7 @@ if [ -n "$EXISTING_COMMENT_ID" ]; then
         -H "Authorization: token $GITHUB_TOKEN" \
         -H "Accept: application/vnd.github.v3+json" \
         -H "Content-Type: application/json" \
-        -d "{\"body\": \"$COMMENT_BODY\"}" \
+        -d "{\"body\": $COMMENT_BODY}" \
         "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/comments/$EXISTING_COMMENT_ID")
     
     if [ "$HTTP_CODE" = "200" ]; then
@@ -99,7 +99,7 @@ else
         -H "Authorization: token $GITHUB_TOKEN" \
         -H "Accept: application/vnd.github.v3+json" \
         -H "Content-Type: application/json" \
-        -d "{\"body\": \"$COMMENT_BODY\"}" \
+        -d "{\"body\": $COMMENT_BODY}" \
         "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments")
     
     if [ "$HTTP_CODE" = "201" ]; then

@@ -56,7 +56,7 @@ func (t *Transpiler) TranspileFromFile(filename string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error reading file %s: %v", filename, err)
 	}
-	
+
 	// Use the existing TranspileFromInput method
 	return t.TranspileFromInput(string(content))
 }

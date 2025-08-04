@@ -2,4 +2,4 @@
 set -e
 
 mkdir -p coverage
-.github/scripts/ci/run-coverage.sh
+.github/scripts/test/run-coverage.sh

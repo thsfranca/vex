@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'vscode-extension/package.json'
+      - 'vscode-extension/**'
 
 permissions:
   contents: write
@@ -25,26 +25,35 @@ jobs:
       - name: Check if version changed
         id: check
         run: |
+          # Check if package.json exists
+          if [ ! -f "vscode-extension/package.json" ]; then
+            echo "⚠️ Extension package.json not found, skipping release"
+            echo "changed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
           # Get current version
           CURRENT_VERSION=$(jq -r '.version' vscode-extension/package.json)
-          
-          # Get previous version (from previous commit)
-          git checkout HEAD~1 -- vscode-extension/package.json 2>/dev/null || echo "No previous version"
-          PREVIOUS_VERSION=$(jq -r '.version' vscode-extension/package.json 2>/dev/null || echo "0.0.0")
-          
-          # Restore current version
-          git checkout HEAD -- vscode-extension/package.json
-          
-          echo "Previous version: $PREVIOUS_VERSION"
           echo "Current version: $CURRENT_VERSION"
           
-          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+          # Get previous version from git history
+          PREVIOUS_VERSION=""
+          if git show HEAD~1:vscode-extension/package.json >/dev/null 2>&1; then
+            PREVIOUS_VERSION=$(git show HEAD~1:vscode-extension/package.json | jq -r '.version' 2>/dev/null || echo "0.0.0")
+          else
+            PREVIOUS_VERSION="0.0.0"
+          fi
+          
+          echo "Previous version: $PREVIOUS_VERSION"
+          
+          # Check if versions are different
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ] && [ "$CURRENT_VERSION" != "null" ] && [ "$PREVIOUS_VERSION" != "null" ]; then
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-            echo "[SUCCESS] Version changed: $PREVIOUS_VERSION -> $CURRENT_VERSION"
+            echo "✅ Version changed: $PREVIOUS_VERSION -> $CURRENT_VERSION"
           else
             echo "changed=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No version change detected"
+            echo "⚠️ No version change detected (or invalid version data)"
           fi
 
   auto-tag-and-release:
@@ -57,19 +66,29 @@ jobs:
 
       - name: Create extension tag
         run: |
+          VERSION="${{ needs.check-version-change.outputs.new-version }}"
+          TAG="extension-v$VERSION"
+          
+          echo "🏷️ Creating extension release tag: $TAG"
+          
+          # Configure git
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          TAG="extension-v${{ needs.check-version-change.outputs.new-version }}"
-          
           # Check if tag already exists
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists, skipping"
+            echo "⚠️ Tag $TAG already exists, skipping creation"
             exit 0
           fi
           
+          # Validate version format
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            exit 1
+          fi
+          
           # Create and push tag
-          git tag "$TAG"
+          git tag "$TAG" -m "Extension release $VERSION"
           git push origin "$TAG"
           
-          echo "[SUCCESS] Created and pushed tag: $TAG"
+          echo "✅ Successfully created and pushed tag: $TAG"

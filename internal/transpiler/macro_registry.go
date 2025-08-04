@@ -96,6 +96,8 @@ func reconstructSource(node antlr.Tree) string {
 		}
 		
 		var result strings.Builder
+		lastWasBracket := false
+		
 		for i, child := range children {
 			// Check if child is a terminal node before calling GetText
 			childText := ""
@@ -103,11 +105,18 @@ func reconstructSource(node antlr.Tree) string {
 				childText = terminalChild.GetText()
 			}
 			
-			if i > 0 && childText != "(" && childText != ")" && 
-			   childText != "[" && childText != "]" {
+			// Add space before non-bracket tokens, but not if:
+			// - This is the first token
+			// - The previous token was an opening bracket
+			// - This token is a closing bracket
+			isBracket := childText == "(" || childText == ")" || childText == "[" || childText == "]"
+			
+			if i > 0 && !lastWasBracket && !isBracket {
 				result.WriteString(" ")
 			}
+			
 			result.WriteString(reconstructSource(child))
+			lastWasBracket = (childText == "(" || childText == "[")
 		}
 		return result.String()
 	}

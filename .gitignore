@@ -58,3 +58,13 @@ vscode-extension/.vscode-test/
 # Temporary extension files
 vscode-extension/package-lock.json
 vscode-extension/yarn.lock
+# Compiled binary executables
+fugo
+fugo-transpiler  
+vex
+
+# Coverage files
+*.out
+coverage.out
+cli_coverage.out
+

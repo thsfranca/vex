@@ -1,5 +1,0 @@
-(macro defn [name params body]
-  (def ~name (fn ~params ~body)))
-
-(defn hello-handler [w r]
-  (.WriteString w "Hello from macro-defined function!"))

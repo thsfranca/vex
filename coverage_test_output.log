@@ -1,0 +1,521 @@
+=== RUN   TestLoadCoreVex
+=== RUN   TestLoadCoreVex/Valid_core.vx_file
+=== RUN   TestLoadCoreVex/Missing_core.vx_file
+=== RUN   TestLoadCoreVex/Empty_core.vx_file
+--- PASS: TestLoadCoreVex (0.00s)
+    --- PASS: TestLoadCoreVex/Valid_core.vx_file (0.00s)
+    --- PASS: TestLoadCoreVex/Missing_core.vx_file (0.00s)
+    --- PASS: TestLoadCoreVex/Empty_core.vx_file (0.00s)
+=== RUN   TestGenerateGoMod
+=== RUN   TestGenerateGoMod/No_modules
+=== RUN   TestGenerateGoMod/With_third-party_modules
+--- PASS: TestGenerateGoMod (0.00s)
+    --- PASS: TestGenerateGoMod/No_modules (0.00s)
+    --- PASS: TestGenerateGoMod/With_third-party_modules (0.00s)
+=== RUN   TestDownloadDependencies
+--- PASS: TestDownloadDependencies (0.01s)
+=== RUN   TestBuildBinary
+--- PASS: TestBuildBinary (0.14s)
+=== RUN   TestPrintUsage
+Vex - A statically-typed functional programming language
+
+Usage:
+  vex transpile -input <file.vex> [-output <file.go>] [-verbose]
+  vex run -input <file.vex> [-verbose]
+  vex exec <file.vex> [-verbose]
+
+Commands:
+  transpile  Transpile Vex source code to Go
+  run        Transpile and run Vex source code
+  exec       Execute Vex file directly (includes core.vx)
+
+Examples:
+  vex transpile -input example.vex -output example.go
+  vex run -input example.vex
+  vex exec example.vex
+--- PASS: TestPrintUsage (0.00s)
+=== RUN   TestTranspileCommand
+=== RUN   TestTranspileCommand/Valid_Vex_file
+=== RUN   TestTranspileCommand/Non-existent_file
+--- PASS: TestTranspileCommand (0.00s)
+    --- PASS: TestTranspileCommand/Valid_Vex_file (0.00s)
+    --- PASS: TestTranspileCommand/Non-existent_file (0.00s)
+=== RUN   TestRunCommandUnit
+--- PASS: TestRunCommandUnit (0.00s)
+=== RUN   TestLoadCoreVexEdgeCases
+=== RUN   TestLoadCoreVexEdgeCases/Large_core.vx_file
+📚 Loaded core.vx standard library
+=== RUN   TestLoadCoreVexEdgeCases/Verbose_mode
+📚 Loaded core.vx standard library
+--- PASS: TestLoadCoreVexEdgeCases (0.00s)
+    --- PASS: TestLoadCoreVexEdgeCases/Large_core.vx_file (0.00s)
+    --- PASS: TestLoadCoreVexEdgeCases/Verbose_mode (0.00s)
+=== RUN   TestGenerateGoModEdgeCases
+=== RUN   TestGenerateGoModEdgeCases/Many_modules
+=== RUN   TestGenerateGoModEdgeCases/Verbose_mode
+📦 Added dependencies: map[github.com/test/module:v1.0.0]
+--- PASS: TestGenerateGoModEdgeCases (0.00s)
+    --- PASS: TestGenerateGoModEdgeCases/Many_modules (0.00s)
+    --- PASS: TestGenerateGoModEdgeCases/Verbose_mode (0.00s)
+=== RUN   TestDownloadDependenciesEdgeCases
+go: warning: "all" matched no packages
+--- PASS: TestDownloadDependenciesEdgeCases (0.01s)
+=== RUN   TestBuildBinaryEdgeCases
+🔨 Building binary: go build -o ./bin/app ./gen/main.go (in /var/folders/1n/9bzccm9d24q5hb5gwq8jds940000gp/T/TestBuildBinaryEdgeCases2974705555/001)
+--- PASS: TestBuildBinaryEdgeCases (0.11s)
+=== RUN   TestTranspileCommandDirect
+=== RUN   TestTranspileCommandDirect/Valid_transpilation
+=== RUN   TestTranspileCommandDirect/Valid_transpilation_with_verbose
+=== RUN   TestTranspileCommandDirect/Non-existent_input_file
+--- PASS: TestTranspileCommandDirect (0.00s)
+    --- PASS: TestTranspileCommandDirect/Valid_transpilation (0.00s)
+    --- PASS: TestTranspileCommandDirect/Valid_transpilation_with_verbose (0.00s)
+    --- PASS: TestTranspileCommandDirect/Non-existent_input_file (0.00s)
+=== RUN   TestRunCommandDirect
+=== RUN   TestRunCommandDirect/Valid_run_command
+=== RUN   TestRunCommandDirect/Valid_run_command_with_verbose
+=== RUN   TestRunCommandDirect/Non-existent_input_file
+--- PASS: TestRunCommandDirect (0.00s)
+    --- PASS: TestRunCommandDirect/Valid_run_command (0.00s)
+    --- PASS: TestRunCommandDirect/Valid_run_command_with_verbose (0.00s)
+    --- PASS: TestRunCommandDirect/Non-existent_input_file (0.00s)
+=== RUN   TestExecCommandDirect
+=== RUN   TestExecCommandDirect/Valid_exec_command
+=== RUN   TestExecCommandDirect/Valid_exec_command_with_verbose
+📚 Loaded core.vx standard library
+=== RUN   TestExecCommandDirect/Non-existent_input_file
+--- PASS: TestExecCommandDirect (0.00s)
+    --- PASS: TestExecCommandDirect/Valid_exec_command (0.00s)
+    --- PASS: TestExecCommandDirect/Valid_exec_command_with_verbose (0.00s)
+    --- PASS: TestExecCommandDirect/Non-existent_input_file (0.00s)
+=== RUN   TestMainFunctionDirect
+=== RUN   TestMainFunctionDirect/No_arguments
+    cli_test.go:711: Would show usage for args: [vex]
+=== RUN   TestMainFunctionDirect/Help_flag
+    cli_test.go:718: Would show help
+=== RUN   TestMainFunctionDirect/Unknown_command
+    cli_test.go:720: Would show unknown command error for: unknown
+=== RUN   TestMainFunctionDirect/Transpile_command_structure
+    cli_test.go:716: Would handle transpile command
+=== RUN   TestMainFunctionDirect/Run_command_structure
+    cli_test.go:716: Would handle run command
+=== RUN   TestMainFunctionDirect/Exec_command_structure
+    cli_test.go:716: Would handle exec command
+--- PASS: TestMainFunctionDirect (0.00s)
+    --- PASS: TestMainFunctionDirect/No_arguments (0.00s)
+    --- PASS: TestMainFunctionDirect/Help_flag (0.00s)
+    --- PASS: TestMainFunctionDirect/Unknown_command (0.00s)
+    --- PASS: TestMainFunctionDirect/Transpile_command_structure (0.00s)
+    --- PASS: TestMainFunctionDirect/Run_command_structure (0.00s)
+    --- PASS: TestMainFunctionDirect/Exec_command_structure (0.00s)
+=== RUN   TestTranspilerMissingCoverage
+=== RUN   TestTranspilerMissingCoverage/Test_visitList_with_complex_nesting
+=== RUN   TestTranspilerMissingCoverage/Test_visitNode_with_all_node_types
+=== RUN   TestTranspilerMissingCoverage/Test_handleFunctionCall_edge_cases
+=== RUN   TestTranspilerMissingCoverage/Test_handleCollectionOp_all_variants
+line 1:15 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+line 1:33 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+line 1:53 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+=== RUN   TestTranspilerMissingCoverage/Test_evaluateCollectionOp_directly
+=== RUN   TestTranspilerMissingCoverage/Test_handleIf_with_complex_conditions
+=== RUN   TestTranspilerMissingCoverage/Test_deeply_nested_expressions
+--- PASS: TestTranspilerMissingCoverage (0.00s)
+    --- PASS: TestTranspilerMissingCoverage/Test_visitList_with_complex_nesting (0.00s)
+    --- PASS: TestTranspilerMissingCoverage/Test_visitNode_with_all_node_types (0.00s)
+    --- PASS: TestTranspilerMissingCoverage/Test_handleFunctionCall_edge_cases (0.00s)
+    --- PASS: TestTranspilerMissingCoverage/Test_handleCollectionOp_all_variants (0.00s)
+    --- PASS: TestTranspilerMissingCoverage/Test_evaluateCollectionOp_directly (0.00s)
+    --- PASS: TestTranspilerMissingCoverage/Test_handleIf_with_complex_conditions (0.00s)
+    --- PASS: TestTranspilerMissingCoverage/Test_deeply_nested_expressions (0.00s)
+=== RUN   TestExecCommand_BasicFunctionality
+--- PASS: TestExecCommand_BasicFunctionality (2.19s)
+=== RUN   TestExecCommand_WithStandardLibraryDependencies
+--- PASS: TestExecCommand_WithStandardLibraryDependencies (1.38s)
+=== RUN   TestExecCommand_ImplicitReturns
+=== RUN   TestExecCommand_ImplicitReturns/Variable_definitions_with_implicit_usage
+=== RUN   TestExecCommand_ImplicitReturns/Arithmetic_as_last_expression
+--- PASS: TestExecCommand_ImplicitReturns (2.38s)
+    --- PASS: TestExecCommand_ImplicitReturns/Variable_definitions_with_implicit_usage (1.12s)
+    --- PASS: TestExecCommand_ImplicitReturns/Arithmetic_as_last_expression (1.03s)
+=== RUN   TestExecCommand_ErrorHandling
+=== RUN   TestExecCommand_ErrorHandling/Missing_file_argument
+=== RUN   TestExecCommand_ErrorHandling/Non-existent_file
+=== RUN   TestExecCommand_ErrorHandling/Invalid_Vex_syntax
+--- PASS: TestExecCommand_ErrorHandling (0.54s)
+    --- PASS: TestExecCommand_ErrorHandling/Missing_file_argument (0.19s)
+    --- PASS: TestExecCommand_ErrorHandling/Non-existent_file (0.01s)
+    --- PASS: TestExecCommand_ErrorHandling/Invalid_Vex_syntax (0.06s)
+=== RUN   TestExecCommand_GoModulesGeneration
+--- PASS: TestExecCommand_GoModulesGeneration (1.37s)
+=== RUN   TestMainFunction
+=== RUN   TestMainFunction/No_arguments
+=== RUN   TestMainFunction/Unknown_command
+=== RUN   TestMainFunction/Transpile_without_input
+=== RUN   TestMainFunction/Simple_transpilation
+=== RUN   TestMainFunction/Verbose_transpilation
+=== RUN   TestMainFunction/Run_without_input
+--- PASS: TestMainFunction (0.46s)
+    --- PASS: TestMainFunction/No_arguments (0.18s)
+    --- PASS: TestMainFunction/Unknown_command (0.01s)
+    --- PASS: TestMainFunction/Transpile_without_input (0.01s)
+    --- PASS: TestMainFunction/Simple_transpilation (0.01s)
+    --- PASS: TestMainFunction/Verbose_transpilation (0.01s)
+    --- PASS: TestMainFunction/Run_without_input (0.01s)
+=== RUN   TestMainFunction_OutputFile
+--- PASS: TestMainFunction_OutputFile (0.43s)
+=== RUN   TestMainFunction_NonExistentFile
+--- PASS: TestMainFunction_NonExistentFile (0.43s)
+=== RUN   TestMainFunction_InvalidVexSyntax
+--- PASS: TestMainFunction_InvalidVexSyntax (0.67s)
+=== RUN   TestMainFunction_OutputFileWriteError
+--- PASS: TestMainFunction_OutputFileWriteError (0.63s)
+=== RUN   TestMainFunction_VerboseOutput
+--- PASS: TestMainFunction_VerboseOutput (0.43s)
+=== RUN   TestMainFunction_StdoutOutput
+--- PASS: TestMainFunction_StdoutOutput (0.41s)
+=== RUN   TestFlagParsing
+    main_test.go:379: Flag parsing tested through CLI integration tests
+--- SKIP: TestFlagParsing (0.00s)
+=== RUN   TestMainErrorHandling
+=== RUN   TestMainErrorHandling/Missing_command
+=== RUN   TestMainErrorHandling/Unknown_command
+=== RUN   TestMainErrorHandling/Transpile_without_input
+--- PASS: TestMainErrorHandling (1.25s)
+    --- PASS: TestMainErrorHandling/Missing_command (0.41s)
+    --- PASS: TestMainErrorHandling/Unknown_command (0.42s)
+    --- PASS: TestMainErrorHandling/Transpile_without_input (0.43s)
+=== RUN   TestRunCommand
+=== RUN   TestRunCommand/Simple_constant_definition_that_actually_gets_used
+=== RUN   TestRunCommand/Hello_world_with_function_call
+--- PASS: TestRunCommand (1.05s)
+    --- PASS: TestRunCommand/Simple_constant_definition_that_actually_gets_used (0.47s)
+    --- PASS: TestRunCommand/Hello_world_with_function_call (0.35s)
+PASS
+coverage: 62.3% of statements in ./internal/transpiler
+ok  	github.com/thsfranca/vex/cmd/vex-transpiler	14.434s	coverage: 62.3% of statements in ./internal/transpiler
+=== RUN   TestTranspiler_New
+--- PASS: TestTranspiler_New (0.00s)
+=== RUN   TestTranspiler_SimpleExpressions
+=== RUN   TestTranspiler_SimpleExpressions/Simple_arithmetic
+=== RUN   TestTranspiler_SimpleExpressions/Variable_definition
+=== RUN   TestTranspiler_SimpleExpressions/Multiple_arithmetic_operands
+=== RUN   TestTranspiler_SimpleExpressions/Import_statement
+=== RUN   TestTranspiler_SimpleExpressions/Function_call
+--- PASS: TestTranspiler_SimpleExpressions (0.00s)
+    --- PASS: TestTranspiler_SimpleExpressions/Simple_arithmetic (0.00s)
+    --- PASS: TestTranspiler_SimpleExpressions/Variable_definition (0.00s)
+    --- PASS: TestTranspiler_SimpleExpressions/Multiple_arithmetic_operands (0.00s)
+    --- PASS: TestTranspiler_SimpleExpressions/Import_statement (0.00s)
+    --- PASS: TestTranspiler_SimpleExpressions/Function_call (0.00s)
+=== RUN   TestTranspiler_FullProgram
+--- PASS: TestTranspiler_FullProgram (0.00s)
+=== RUN   TestTranspiler_ImplicitReturns
+=== RUN   TestTranspiler_ImplicitReturns/Last_expression_with_function_call
+=== RUN   TestTranspiler_ImplicitReturns/Last_expression_with_variable_definition
+=== RUN   TestTranspiler_ImplicitReturns/Last_expression_with_arithmetic
+=== RUN   TestTranspiler_ImplicitReturns/Multiple_expressions_-_only_last_is_implicit_return
+--- PASS: TestTranspiler_ImplicitReturns (0.00s)
+    --- PASS: TestTranspiler_ImplicitReturns/Last_expression_with_function_call (0.00s)
+    --- PASS: TestTranspiler_ImplicitReturns/Last_expression_with_variable_definition (0.00s)
+    --- PASS: TestTranspiler_ImplicitReturns/Last_expression_with_arithmetic (0.00s)
+    --- PASS: TestTranspiler_ImplicitReturns/Multiple_expressions_-_only_last_is_implicit_return (0.00s)
+=== RUN   TestTranspiler_DependencyDetection
+=== RUN   TestTranspiler_DependencyDetection/Standard_library_-_fmt
+=== RUN   TestTranspiler_DependencyDetection/Standard_library_-_strings
+=== RUN   TestTranspiler_DependencyDetection/Third_party_-_github.com
+=== RUN   TestTranspiler_DependencyDetection/Third_party_-_golang.org
+=== RUN   TestTranspiler_DependencyDetection/Third_party_-_other_domain
+--- PASS: TestTranspiler_DependencyDetection (0.00s)
+    --- PASS: TestTranspiler_DependencyDetection/Standard_library_-_fmt (0.00s)
+    --- PASS: TestTranspiler_DependencyDetection/Standard_library_-_strings (0.00s)
+    --- PASS: TestTranspiler_DependencyDetection/Third_party_-_github.com (0.00s)
+    --- PASS: TestTranspiler_DependencyDetection/Third_party_-_golang.org (0.00s)
+    --- PASS: TestTranspiler_DependencyDetection/Third_party_-_other_domain (0.00s)
+=== RUN   TestTranspiler_GoModulesDetection
+--- PASS: TestTranspiler_GoModulesDetection (0.00s)
+=== RUN   TestTranspiler_ImportDeduplication
+--- PASS: TestTranspiler_ImportDeduplication (0.00s)
+=== RUN   TestTranspiler_VariableUsage
+=== RUN   TestTranspiler_VariableUsage/Variable_definition_includes_usage
+=== RUN   TestTranspiler_VariableUsage/Multiple_variables_all_used
+--- PASS: TestTranspiler_VariableUsage (0.00s)
+    --- PASS: TestTranspiler_VariableUsage/Variable_definition_includes_usage (0.00s)
+    --- PASS: TestTranspiler_VariableUsage/Multiple_variables_all_used (0.00s)
+=== RUN   TestTranspiler_ComplexDependencyProgram
+--- PASS: TestTranspiler_ComplexDependencyProgram (0.00s)
+=== RUN   TestTranspiler_TranspileFromFile
+--- PASS: TestTranspiler_TranspileFromFile (0.00s)
+=== RUN   TestTranspiler_TranspileFromFile_NonExistent
+--- PASS: TestTranspiler_TranspileFromFile_NonExistent (0.00s)
+=== RUN   TestTranspiler_ArrayHandling
+=== RUN   TestTranspiler_ArrayHandling/Simple_array_in_list_context
+=== RUN   TestTranspiler_ArrayHandling/Array_with_strings
+=== RUN   TestTranspiler_ArrayHandling/Empty_array
+line 1:10 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+--- PASS: TestTranspiler_ArrayHandling (0.00s)
+    --- PASS: TestTranspiler_ArrayHandling/Simple_array_in_list_context (0.00s)
+    --- PASS: TestTranspiler_ArrayHandling/Array_with_strings (0.00s)
+    --- PASS: TestTranspiler_ArrayHandling/Empty_array (0.00s)
+=== RUN   TestTranspiler_FunctionCalls
+=== RUN   TestTranspiler_FunctionCalls/Simple_function_call
+=== RUN   TestTranspiler_FunctionCalls/Function_call_with_multiple_args
+=== RUN   TestTranspiler_FunctionCalls/Nested_function_calls
+=== RUN   TestTranspiler_FunctionCalls/Function_call_as_last_expression
+--- PASS: TestTranspiler_FunctionCalls (0.00s)
+    --- PASS: TestTranspiler_FunctionCalls/Simple_function_call (0.00s)
+    --- PASS: TestTranspiler_FunctionCalls/Function_call_with_multiple_args (0.00s)
+    --- PASS: TestTranspiler_FunctionCalls/Nested_function_calls (0.00s)
+    --- PASS: TestTranspiler_FunctionCalls/Function_call_as_last_expression (0.00s)
+=== RUN   TestTranspiler_ConditionalStatements
+=== RUN   TestTranspiler_ConditionalStatements/Simple_if_statement
+=== RUN   TestTranspiler_ConditionalStatements/If_as_expression_in_definition
+--- PASS: TestTranspiler_ConditionalStatements (0.00s)
+    --- PASS: TestTranspiler_ConditionalStatements/Simple_if_statement (0.00s)
+    --- PASS: TestTranspiler_ConditionalStatements/If_as_expression_in_definition (0.00s)
+=== RUN   TestTranspiler_DoBlocks
+=== RUN   TestTranspiler_DoBlocks/Simple_do_block
+=== RUN   TestTranspiler_DoBlocks/Do_as_expression_in_definition
+--- PASS: TestTranspiler_DoBlocks (0.00s)
+    --- PASS: TestTranspiler_DoBlocks/Simple_do_block (0.00s)
+    --- PASS: TestTranspiler_DoBlocks/Do_as_expression_in_definition (0.00s)
+=== RUN   TestTranspiler_CollectionOperations
+=== RUN   TestTranspiler_CollectionOperations/First_operation
+=== RUN   TestTranspiler_CollectionOperations/Count_operation
+=== RUN   TestTranspiler_CollectionOperations/Empty_check
+=== RUN   TestTranspiler_CollectionOperations/Cons_operation
+--- PASS: TestTranspiler_CollectionOperations (0.00s)
+    --- PASS: TestTranspiler_CollectionOperations/First_operation (0.00s)
+    --- PASS: TestTranspiler_CollectionOperations/Count_operation (0.00s)
+    --- PASS: TestTranspiler_CollectionOperations/Empty_check (0.00s)
+    --- PASS: TestTranspiler_CollectionOperations/Cons_operation (0.00s)
+=== RUN   TestTranspiler_CollectionOperationsAsExpressions
+=== RUN   TestTranspiler_CollectionOperationsAsExpressions/First_in_variable_definition
+=== RUN   TestTranspiler_CollectionOperationsAsExpressions/Rest_in_variable_definition
+=== RUN   TestTranspiler_CollectionOperationsAsExpressions/Count_in_variable_definition
+=== RUN   TestTranspiler_CollectionOperationsAsExpressions/Empty_check_in_variable_definition
+line 1:21 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+=== RUN   TestTranspiler_CollectionOperationsAsExpressions/Cons_in_variable_definition
+--- PASS: TestTranspiler_CollectionOperationsAsExpressions (0.00s)
+    --- PASS: TestTranspiler_CollectionOperationsAsExpressions/First_in_variable_definition (0.00s)
+    --- PASS: TestTranspiler_CollectionOperationsAsExpressions/Rest_in_variable_definition (0.00s)
+    --- PASS: TestTranspiler_CollectionOperationsAsExpressions/Count_in_variable_definition (0.00s)
+    --- PASS: TestTranspiler_CollectionOperationsAsExpressions/Empty_check_in_variable_definition (0.00s)
+    --- PASS: TestTranspiler_CollectionOperationsAsExpressions/Cons_in_variable_definition (0.00s)
+=== RUN   TestTranspiler_EdgeCasesAndErrorConditions
+=== RUN   TestTranspiler_EdgeCasesAndErrorConditions/Empty_input
+line 1:0 mismatched input '<EOF>' expecting '('
+=== RUN   TestTranspiler_EdgeCasesAndErrorConditions/Whitespace_only
+line 2:3 mismatched input '<EOF>' expecting '('
+=== RUN   TestTranspiler_EdgeCasesAndErrorConditions/Single_symbol_(not_parsed_as_S-expression)
+line 1:0 mismatched input 'hello' expecting '('
+=== RUN   TestTranspiler_EdgeCasesAndErrorConditions/Single_string_(not_parsed_as_S-expression)
+line 1:0 mismatched input '"hello world"' expecting '('
+=== RUN   TestTranspiler_EdgeCasesAndErrorConditions/Single_number_(not_parsed_as_S-expression)
+line 1:0 mismatched input '42' expecting '('
+=== RUN   TestTranspiler_EdgeCasesAndErrorConditions/Complex_nested_expressions
+line 1:54 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+=== RUN   TestTranspiler_EdgeCasesAndErrorConditions/Multiple_complex_operations
+=== RUN   TestTranspiler_EdgeCasesAndErrorConditions/Deep_nesting
+=== RUN   TestTranspiler_EdgeCasesAndErrorConditions/Mixed_operations
+--- PASS: TestTranspiler_EdgeCasesAndErrorConditions (0.00s)
+    --- PASS: TestTranspiler_EdgeCasesAndErrorConditions/Empty_input (0.00s)
+    --- PASS: TestTranspiler_EdgeCasesAndErrorConditions/Whitespace_only (0.00s)
+    --- PASS: TestTranspiler_EdgeCasesAndErrorConditions/Single_symbol_(not_parsed_as_S-expression) (0.00s)
+    --- PASS: TestTranspiler_EdgeCasesAndErrorConditions/Single_string_(not_parsed_as_S-expression) (0.00s)
+    --- PASS: TestTranspiler_EdgeCasesAndErrorConditions/Single_number_(not_parsed_as_S-expression) (0.00s)
+    --- PASS: TestTranspiler_EdgeCasesAndErrorConditions/Complex_nested_expressions (0.00s)
+    --- PASS: TestTranspiler_EdgeCasesAndErrorConditions/Multiple_complex_operations (0.00s)
+    --- PASS: TestTranspiler_EdgeCasesAndErrorConditions/Deep_nesting (0.00s)
+    --- PASS: TestTranspiler_EdgeCasesAndErrorConditions/Mixed_operations (0.00s)
+=== RUN   TestTranspiler_ArithmeticEdgeCases
+=== RUN   TestTranspiler_ArithmeticEdgeCases/Subtraction
+=== RUN   TestTranspiler_ArithmeticEdgeCases/Multiplication
+=== RUN   TestTranspiler_ArithmeticEdgeCases/Division
+=== RUN   TestTranspiler_ArithmeticEdgeCases/Complex_arithmetic
+=== RUN   TestTranspiler_ArithmeticEdgeCases/Comparison_operators
+=== RUN   TestTranspiler_ArithmeticEdgeCases/Less_than
+=== RUN   TestTranspiler_ArithmeticEdgeCases/Equality
+--- PASS: TestTranspiler_ArithmeticEdgeCases (0.00s)
+    --- PASS: TestTranspiler_ArithmeticEdgeCases/Subtraction (0.00s)
+    --- PASS: TestTranspiler_ArithmeticEdgeCases/Multiplication (0.00s)
+    --- PASS: TestTranspiler_ArithmeticEdgeCases/Division (0.00s)
+    --- PASS: TestTranspiler_ArithmeticEdgeCases/Complex_arithmetic (0.00s)
+    --- PASS: TestTranspiler_ArithmeticEdgeCases/Comparison_operators (0.00s)
+    --- PASS: TestTranspiler_ArithmeticEdgeCases/Less_than (0.00s)
+    --- PASS: TestTranspiler_ArithmeticEdgeCases/Equality (0.00s)
+=== RUN   TestTranspiler_IfStatementEdgeCases
+=== RUN   TestTranspiler_IfStatementEdgeCases/If_with_function_call_condition
+line 1:13 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+=== RUN   TestTranspiler_IfStatementEdgeCases/If_with_arithmetic_condition
+=== RUN   TestTranspiler_IfStatementEdgeCases/Nested_if_statements
+=== RUN   TestTranspiler_IfStatementEdgeCases/If_in_variable_assignment
+--- PASS: TestTranspiler_IfStatementEdgeCases (0.00s)
+    --- PASS: TestTranspiler_IfStatementEdgeCases/If_with_function_call_condition (0.00s)
+    --- PASS: TestTranspiler_IfStatementEdgeCases/If_with_arithmetic_condition (0.00s)
+    --- PASS: TestTranspiler_IfStatementEdgeCases/Nested_if_statements (0.00s)
+    --- PASS: TestTranspiler_IfStatementEdgeCases/If_in_variable_assignment (0.00s)
+=== RUN   TestTranspiler_DoBlockEdgeCases
+=== RUN   TestTranspiler_DoBlockEdgeCases/Do_with_single_expression
+=== RUN   TestTranspiler_DoBlockEdgeCases/Do_with_variable_definitions
+=== RUN   TestTranspiler_DoBlockEdgeCases/Do_in_variable_assignment
+=== RUN   TestTranspiler_DoBlockEdgeCases/Nested_do_blocks
+--- PASS: TestTranspiler_DoBlockEdgeCases (0.00s)
+    --- PASS: TestTranspiler_DoBlockEdgeCases/Do_with_single_expression (0.00s)
+    --- PASS: TestTranspiler_DoBlockEdgeCases/Do_with_variable_definitions (0.00s)
+    --- PASS: TestTranspiler_DoBlockEdgeCases/Do_in_variable_assignment (0.00s)
+    --- PASS: TestTranspiler_DoBlockEdgeCases/Nested_do_blocks (0.00s)
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/First_with_empty_array
+line 1:8 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/First_with_non-empty_array
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/Rest_with_empty_array
+line 1:7 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/Rest_with_single_element
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/Rest_with_multiple_elements
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/Count_with_empty_array
+line 1:8 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/Count_with_elements
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/Empty_check_with_empty_array
+line 1:9 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/Empty_check_with_non-empty_array
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/Cons_with_empty_list
+line 1:9 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/Cons_with_non-empty_list
+=== RUN   TestTranspiler_HandleCollectionOpComprehensive/Cons_with_string_elements
+--- PASS: TestTranspiler_HandleCollectionOpComprehensive (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/First_with_empty_array (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/First_with_non-empty_array (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/Rest_with_empty_array (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/Rest_with_single_element (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/Rest_with_multiple_elements (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/Count_with_empty_array (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/Count_with_elements (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/Empty_check_with_empty_array (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/Empty_check_with_non-empty_array (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/Cons_with_empty_list (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/Cons_with_non-empty_list (0.00s)
+    --- PASS: TestTranspiler_HandleCollectionOpComprehensive/Cons_with_string_elements (0.00s)
+=== RUN   TestTranspiler_VisitNodeComprehensive
+=== RUN   TestTranspiler_VisitNodeComprehensive/Symbol_nodes
+=== RUN   TestTranspiler_VisitNodeComprehensive/String_nodes
+=== RUN   TestTranspiler_VisitNodeComprehensive/Number_nodes
+=== RUN   TestTranspiler_VisitNodeComprehensive/Decimal_numbers
+=== RUN   TestTranspiler_VisitNodeComprehensive/Negative_numbers
+=== RUN   TestTranspiler_VisitNodeComprehensive/Array_nodes
+=== RUN   TestTranspiler_VisitNodeComprehensive/Nested_array_nodes
+=== RUN   TestTranspiler_VisitNodeComprehensive/Mixed_type_arrays
+=== RUN   TestTranspiler_VisitNodeComprehensive/List_nodes_in_array
+--- PASS: TestTranspiler_VisitNodeComprehensive (0.00s)
+    --- PASS: TestTranspiler_VisitNodeComprehensive/Symbol_nodes (0.00s)
+    --- PASS: TestTranspiler_VisitNodeComprehensive/String_nodes (0.00s)
+    --- PASS: TestTranspiler_VisitNodeComprehensive/Number_nodes (0.00s)
+    --- PASS: TestTranspiler_VisitNodeComprehensive/Decimal_numbers (0.00s)
+    --- PASS: TestTranspiler_VisitNodeComprehensive/Negative_numbers (0.00s)
+    --- PASS: TestTranspiler_VisitNodeComprehensive/Array_nodes (0.00s)
+    --- PASS: TestTranspiler_VisitNodeComprehensive/Nested_array_nodes (0.00s)
+    --- PASS: TestTranspiler_VisitNodeComprehensive/Mixed_type_arrays (0.00s)
+    --- PASS: TestTranspiler_VisitNodeComprehensive/List_nodes_in_array (0.00s)
+=== RUN   TestTranspiler_EvaluateCollectionOpComprehensive
+=== RUN   TestTranspiler_EvaluateCollectionOpComprehensive/First_in_expression_context
+=== RUN   TestTranspiler_EvaluateCollectionOpComprehensive/Rest_in_expression_context
+=== RUN   TestTranspiler_EvaluateCollectionOpComprehensive/Count_in_arithmetic
+=== RUN   TestTranspiler_EvaluateCollectionOpComprehensive/Empty_check_in_if_condition
+line 1:25 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+=== RUN   TestTranspiler_EvaluateCollectionOpComprehensive/Cons_in_nested_expression
+=== RUN   TestTranspiler_EvaluateCollectionOpComprehensive/Chained_collection_operations
+=== RUN   TestTranspiler_EvaluateCollectionOpComprehensive/Collection_ops_with_variables
+--- PASS: TestTranspiler_EvaluateCollectionOpComprehensive (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpComprehensive/First_in_expression_context (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpComprehensive/Rest_in_expression_context (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpComprehensive/Count_in_arithmetic (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpComprehensive/Empty_check_in_if_condition (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpComprehensive/Cons_in_nested_expression (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpComprehensive/Chained_collection_operations (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpComprehensive/Collection_ops_with_variables (0.00s)
+=== RUN   TestTranspiler_HandleFunctionCallComprehensive
+=== RUN   TestTranspiler_HandleFunctionCallComprehensive/Simple_function_call_no_args
+=== RUN   TestTranspiler_HandleFunctionCallComprehensive/Function_call_with_one_arg
+=== RUN   TestTranspiler_HandleFunctionCallComprehensive/Function_call_with_multiple_args
+=== RUN   TestTranspiler_HandleFunctionCallComprehensive/Nested_function_calls
+=== RUN   TestTranspiler_HandleFunctionCallComprehensive/Function_call_with_array_args
+=== RUN   TestTranspiler_HandleFunctionCallComprehensive/Function_call_in_assignment
+=== RUN   TestTranspiler_HandleFunctionCallComprehensive/Namespaced_function_calls
+=== RUN   TestTranspiler_HandleFunctionCallComprehensive/Function_call_with_string_interpolation
+--- PASS: TestTranspiler_HandleFunctionCallComprehensive (0.00s)
+    --- PASS: TestTranspiler_HandleFunctionCallComprehensive/Simple_function_call_no_args (0.00s)
+    --- PASS: TestTranspiler_HandleFunctionCallComprehensive/Function_call_with_one_arg (0.00s)
+    --- PASS: TestTranspiler_HandleFunctionCallComprehensive/Function_call_with_multiple_args (0.00s)
+    --- PASS: TestTranspiler_HandleFunctionCallComprehensive/Nested_function_calls (0.00s)
+    --- PASS: TestTranspiler_HandleFunctionCallComprehensive/Function_call_with_array_args (0.00s)
+    --- PASS: TestTranspiler_HandleFunctionCallComprehensive/Function_call_in_assignment (0.00s)
+    --- PASS: TestTranspiler_HandleFunctionCallComprehensive/Namespaced_function_calls (0.00s)
+    --- PASS: TestTranspiler_HandleFunctionCallComprehensive/Function_call_with_string_interpolation (0.00s)
+=== RUN   TestTranspiler_MissingCoverage_Aggressive
+=== RUN   TestTranspiler_MissingCoverage_Aggressive/Multiple_imports_with_mixed_types
+=== RUN   TestTranspiler_MissingCoverage_Aggressive/Complex_handleDefinition_patterns
+=== RUN   TestTranspiler_MissingCoverage_Aggressive/Deep_nested_arithmetic
+=== RUN   TestTranspiler_MissingCoverage_Aggressive/Complex_visitList_patterns
+=== RUN   TestTranspiler_MissingCoverage_Aggressive/Mixed_expression_types_in_sequence
+=== RUN   TestTranspiler_MissingCoverage_Aggressive/Arithmetic_with_all_operators
+line 1:34 token recognition error at: '%'
+=== RUN   TestTranspiler_MissingCoverage_Aggressive/Function_calls_with_all_collection_ops
+line 1:59 mismatched input ']' expecting {'(', '[', SYMBOL, STRING}
+=== RUN   TestTranspiler_MissingCoverage_Aggressive/If_statements_with_all_branches
+=== RUN   TestTranspiler_MissingCoverage_Aggressive/Do_blocks_with_mixed_content
+=== RUN   TestTranspiler_MissingCoverage_Aggressive/All_node_types_in_arrays
+--- PASS: TestTranspiler_MissingCoverage_Aggressive (0.00s)
+    --- PASS: TestTranspiler_MissingCoverage_Aggressive/Multiple_imports_with_mixed_types (0.00s)
+    --- PASS: TestTranspiler_MissingCoverage_Aggressive/Complex_handleDefinition_patterns (0.00s)
+    --- PASS: TestTranspiler_MissingCoverage_Aggressive/Deep_nested_arithmetic (0.00s)
+    --- PASS: TestTranspiler_MissingCoverage_Aggressive/Complex_visitList_patterns (0.00s)
+    --- PASS: TestTranspiler_MissingCoverage_Aggressive/Mixed_expression_types_in_sequence (0.00s)
+    --- PASS: TestTranspiler_MissingCoverage_Aggressive/Arithmetic_with_all_operators (0.00s)
+    --- PASS: TestTranspiler_MissingCoverage_Aggressive/Function_calls_with_all_collection_ops (0.00s)
+    --- PASS: TestTranspiler_MissingCoverage_Aggressive/If_statements_with_all_branches (0.00s)
+    --- PASS: TestTranspiler_MissingCoverage_Aggressive/Do_blocks_with_mixed_content (0.00s)
+    --- PASS: TestTranspiler_MissingCoverage_Aggressive/All_node_types_in_arrays (0.00s)
+=== RUN   TestTranspiler_ErrorHandlingPaths
+=== RUN   TestTranspiler_ErrorHandlingPaths/First_with_no_arguments_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/Rest_with_no_arguments_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/Cons_with_insufficient_arguments_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/Count_with_no_arguments_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/Empty_check_with_no_arguments_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/Addition_with_no_arguments_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/Addition_with_single_argument_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/Subtraction_with_insufficient_arguments_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/Multiplication_with_single_argument_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/Division_with_no_arguments_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/If_with_no_arguments_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/If_with_only_condition_-_error_handling
+=== RUN   TestTranspiler_ErrorHandlingPaths/Unknown_node_type_fallback
+--- PASS: TestTranspiler_ErrorHandlingPaths (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/First_with_no_arguments_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/Rest_with_no_arguments_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/Cons_with_insufficient_arguments_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/Count_with_no_arguments_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/Empty_check_with_no_arguments_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/Addition_with_no_arguments_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/Addition_with_single_argument_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/Subtraction_with_insufficient_arguments_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/Multiplication_with_single_argument_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/Division_with_no_arguments_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/If_with_no_arguments_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/If_with_only_condition_-_error_handling (0.00s)
+    --- PASS: TestTranspiler_ErrorHandlingPaths/Unknown_node_type_fallback (0.00s)
+=== RUN   TestTranspiler_EvaluateCollectionOpErrorPaths
+=== RUN   TestTranspiler_EvaluateCollectionOpErrorPaths/First_evaluation_with_no_arguments
+=== RUN   TestTranspiler_EvaluateCollectionOpErrorPaths/Rest_evaluation_with_no_arguments
+=== RUN   TestTranspiler_EvaluateCollectionOpErrorPaths/Count_evaluation_with_no_arguments
+=== RUN   TestTranspiler_EvaluateCollectionOpErrorPaths/Empty_check_evaluation_with_no_arguments
+=== RUN   TestTranspiler_EvaluateCollectionOpErrorPaths/Cons_evaluation_with_insufficient_arguments
+--- PASS: TestTranspiler_EvaluateCollectionOpErrorPaths (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpErrorPaths/First_evaluation_with_no_arguments (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpErrorPaths/Rest_evaluation_with_no_arguments (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpErrorPaths/Count_evaluation_with_no_arguments (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpErrorPaths/Empty_check_evaluation_with_no_arguments (0.00s)
+    --- PASS: TestTranspiler_EvaluateCollectionOpErrorPaths/Cons_evaluation_with_insufficient_arguments (0.00s)
+PASS
+coverage: 87.9% of statements in ./internal/transpiler
+ok  	github.com/thsfranca/vex/internal/transpiler	0.689s	coverage: 87.9% of statements in ./internal/transpiler
+?   	github.com/thsfranca/vex/internal/transpiler/parser	[no test files]
+?   	github.com/thsfranca/vex/tools/gen/go	[no test files]

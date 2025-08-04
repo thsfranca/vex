@@ -105,30 +105,40 @@ The uniform S-expression structure + functional design means AI models can:
 - **Scale automatically**: Every program handles thousands of concurrent requests
 - **Focus on logic**: No syntax complexity, no concurrency complexity
 
-### Current Status: Basic Transpiler Working ✅
+### Current Status: Advanced Transpiler with Type System ✅
 
 The project currently includes:
-- **ANTLR4 grammar** for S-expressions, arrays, symbols, and strings
-- **Working transpiler** that converts Vex to executable Go code
-- **CLI tool** (`vex-transpiler`) for command-line transpilation
-- **Basic language features**:
+- **ANTLR4 grammar** for S-expressions, arrays, symbols, strings, and advanced language constructs
+- **Advanced transpiler** with multi-phase compilation pipeline
+- **CLI tool** (`vex`) with `transpile` and `run` commands
+- **Advanced language features**:
   - Variable definitions: `(def x 10)` → `x := 10`
   - Arithmetic expressions: `(+ 1 2)` → `1 + 2`
-  - String and number literals with proper Go output
+  - Import system: `(import "fmt")` → `import "fmt"`
+  - Macro system with user-defined macros
+  - Semantic analysis with type checking and inference
+  - Symbol resolution and namespace management
+  - Type-aware code generation
 - **Comprehensive CI/CD pipeline** with automated quality checks
-- **Automated release process** with PR label-based version management
+- **Automated release process** with PR label-based version management  
 - **Grammar validation system** testing both valid and invalid syntax
+- **VSCode extension** with syntax highlighting and language support
 - **Example programs** demonstrating working features
 
 ### Working Today 🚀
 
-You can transpile basic Vex programs to Go:
+You can transpile and run Vex programs:
 
 ```bash
-# Install and use the transpiler
-go build -o vex-transpiler cmd/vex-transpiler/main.go
+# Build the transpiler
+go build -o vex cmd/fugo-transpiler/main.go
+
+# Transpile to Go
 echo '(def x (+ 5 3))' > example.vex
-./vex-transpiler -input example.vex -output example.go
+./vex transpile -input example.vex -output example.go
+
+# Or transpile and run directly
+./vex run -input example.vex
 ```
 
 Outputs valid Go code:
@@ -140,14 +150,31 @@ func main() {
 }
 ```
 
+Advanced features working:
+```vex
+;; Import Go packages
+(import "fmt")
+
+;; Define variables with complex expressions
+(def result (+ (* 10 5) (- 20 5)))
+
+;; Macro definitions
+(macro debug-print [value] (fmt/Println "DEBUG:" value))
+
+;; Call Go functions
+(fmt/Println "Hello from Vex!")
+```
+
 ### Next Phase 🚧
 
+- **Function definitions** (`defn`) for user-defined functions
 - **AI-friendly HTTP patterns** with semantic annotations for endpoints
-- **Type system** (string, int, float, symbol, list, map) optimized for AI understanding
-- **Function definitions** with intent-based metadata for AI generation
-- **JWT authentication patterns** as the most market-valuable auth method
 - **HTTP server framework** that AI can generate from simple descriptions
-- **Semantic annotations** to guide AI code generation with business logic
+- **JWT authentication patterns** as the most market-valuable auth method
+- **Immutable data structures** with structural sharing
+- **Standard library** for common operations
+
+Note: Type system with inference and checking is already implemented.
 
 ## Usage
 
@@ -160,20 +187,29 @@ func main() {
 ### Development Commands
 
 ```bash
+# Build the transpiler
+make build-transpiler   # Build main Vex CLI tool
+
 # Validate grammar with comprehensive testing
-make validate-grammar    # Test both valid and invalid syntax examples
+make validate-grammar   # Test both valid and invalid syntax examples
 
 # Build all development tools
-make build-tools        # Compile change-detector, coverage-updater, etc.
+make build-tools       # Compile change-detector, coverage-updater, etc.
+
+# Install VSCode extension
+make install-extension # Install Vex language support
 
 # Generate Go parser locally
-make go                 # Creates parser files for local development
+make go                # Creates parser files for local development
+
+# Run all tests
+make test              # Execute test suite
 
 # Clean generated files
-make clean             # Remove all generated artifacts
+make clean            # Remove all generated artifacts
 
 # Show all available commands
-make help              # Display detailed help
+make help             # Display detailed help
 ```
 
 ### Example Vex Code (Vision)
@@ -249,9 +285,9 @@ See [docs/vex-implementation-requirements.md](docs/vex-implementation-requiremen
 
 ## Project Status
 
-**Current Phase**: Basic Go Transpilation (🚧 In Progress)  
-**Next Phase**: Advanced Language Features and Type System  
-**Timeline**: Personal learning project, developed for fun in spare time
+**Current Phase**: Core Language Infrastructure Complete (✅ Phases 1-4 Complete)  
+**Next Phase**: Function Definitions & Control Flow (Phase 5)  
+**Timeline**: Personal study project for learning compiler concepts, developed for fun in spare time
 
 ### Infrastructure Achievements
 
@@ -285,9 +321,10 @@ This project maintains high code quality through automated testing:
 | **Grammar Validation** | 100% | ✅ *Active* | Parser correctness with valid/invalid test cases |
 | **Development Tools** | 90%+ | ✅ *Active* | CI/CD infrastructure reliability |
 | **VSCode Extension** | 85%+ | ✅ *Active* | IDE integration quality |
-| **Parser** | 95%+ | ⏳ *Next phase* | Critical language component |
-| **Transpiler** | 90%+ | ⏳ *Planned* | Core functionality |
-| **Type System** | 85%+ | ⏳ *Planned* | Type safety |
+| **Parser** | 95%+ | ✅ *Complete* | Critical language component |
+| **Transpiler** | 90%+ | ✅ *Complete* | Core functionality with advanced features |
+| **Type System** | 85%+ | ✅ *Complete* | Type inference and checking |
+| **Macro System** | 80%+ | ✅ *Complete* | Metaprogramming capabilities |
 | **Standard Library** | 80%+ | ⏳ *Planned* | User-facing features |
 
 > **Quality Philosophy**: Higher coverage requirements for more critical components. The current infrastructure ensures robust development practices for future language implementation.

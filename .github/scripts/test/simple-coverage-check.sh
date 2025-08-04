@@ -8,10 +8,23 @@ COVERAGE_FILE="coverage.out"
 echo "[COVERAGE] Running simplified coverage analysis..."
 
 # Run tests with coverage, excluding generated parser files
-go test -v -coverprofile="$COVERAGE_FILE" -covermode=atomic -coverpkg=./internal/transpiler ./... || {
-    echo "❌ Tests failed during coverage analysis"
+echo "[DEBUG] Running coverage test command..."
+go test -v -coverprofile="$COVERAGE_FILE" -covermode=atomic -coverpkg=./internal/transpiler ./... > coverage_test_output.log 2>&1
+TEST_EXIT_CODE=$?
+echo "[DEBUG] Test command completed with exit code: $TEST_EXIT_CODE"
+
+# Check if tests actually passed by looking for "PASS" in output and coverage file exists
+if grep -q "PASS" coverage_test_output.log && [ -f "$COVERAGE_FILE" ]; then
+    echo "[COVERAGE] Tests passed successfully"
+    cat coverage_test_output.log
+else
+    echo "❌ Tests failed during coverage analysis (exit code: $TEST_EXIT_CODE)"
+    cat coverage_test_output.log
     exit 1
-}
+fi
+
+# Clean up temporary log file
+rm -f coverage_test_output.log
 
 if [ ! -f "$COVERAGE_FILE" ]; then
     echo "❌ No coverage data generated"

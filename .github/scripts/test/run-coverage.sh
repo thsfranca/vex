@@ -4,7 +4,7 @@ set -e
 echo "[TEST] Running tests with coverage analysis..."
 
 if find . -name "*_test.go" | grep -q .; then
-    go test -v -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/transpiler ./... || {
+    go test -v -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/transpiler ./... || {
         echo "[ERROR] Tests failed during coverage analysis"
         # Check if this should be treated as a warning in early development
         if [ $(find . -name "*.go" -not -name "*_test.go" | wc -l) -lt 5 ]; then

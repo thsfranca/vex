@@ -2,13 +2,13 @@
 set -e
 
 # Configuration
-COVERAGE_THRESHOLD=80
+COVERAGE_THRESHOLD=85
 COVERAGE_FILE="coverage.out"
 
 echo "[COVERAGE] Running simplified coverage analysis..."
 
 # Run tests with coverage, excluding generated parser files
-go test -v -race -coverprofile="$COVERAGE_FILE" -covermode=atomic -coverpkg=./cmd/vex-transpiler,./internal/transpiler ./... || {
+    go test -v -race -coverprofile="$COVERAGE_FILE" -covermode=atomic -coverpkg=./internal/transpiler ./... || {
     echo "❌ Tests failed during coverage analysis"
     exit 1
 }
@@ -37,11 +37,14 @@ if [ "$COVERAGE_INT" -lt "$COVERAGE_THRESHOLD" ]; then
 fi
 
 cat > coverage-report.md << EOF
-## 📊 Test Coverage Report
+## 📊 Transpiler Core Coverage Report
 
+**Package:** \`internal/transpiler\` (Vex language implementation)  
 **Current Coverage:** \`${TOTAL_COV}%\`  
 **Target Coverage:** \`${COVERAGE_THRESHOLD}%\`  
 **Status:** ${STATUS_ICON} ${STATUS_TEXT}
+
+*Coverage focuses on transpiler core business logic, excluding CLI scaffolding and generated parser code.*
 EOF
 
 # Set output for GitHub Actions

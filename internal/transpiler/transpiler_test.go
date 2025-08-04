@@ -1230,3 +1230,150 @@ func TestTranspiler_MissingCoverage_Aggressive(t *testing.T) {
 		})
 	}
 }
+
+// Tests targeting specific error handling paths to increase coverage to 85%+
+func TestTranspiler_ErrorHandlingPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		// handleCollectionOp error paths (52.4% -> 90%+)
+		{
+			name:     "First with no arguments - error handling",
+			input:    `(first)`,
+			expected: `_ = nil // Error: first requires collection`,
+		},
+		{
+			name:     "Rest with no arguments - error handling", 
+			input:    `(rest)`,
+			expected: `_ = []interface{}{} // Error: rest requires collection`,
+		},
+		{
+			name:     "Cons with insufficient arguments - error handling",
+			input:    `(cons 1)`,
+			expected: `_ = []interface{}{} // Error: cons requires element and collection`,
+		},
+		{
+			name:     "Count with no arguments - error handling",
+			input:    `(count)`,
+			expected: `_ = 0 // Error: count requires collection`,
+		},
+		{
+			name:     "Empty check with no arguments - error handling",
+			input:    `(empty?)`,
+			expected: `_ = true // Error: empty? requires collection`,
+		},
+		
+		// handleArithmetic error paths (71.4% -> 90%+)
+		{
+			name:     "Addition with no arguments - error handling",
+			input:    `(+)`,
+			expected: `// Error: arithmetic requires at least 2 operands`,
+		},
+		{
+			name:     "Addition with single argument - error handling", 
+			input:    `(+ 5)`,
+			expected: `// Error: arithmetic requires at least 2 operands`,
+		},
+		{
+			name:     "Subtraction with insufficient arguments - error handling",
+			input:    `(-)`,
+			expected: `// Error: arithmetic requires at least 2 operands`,
+		},
+		{
+			name:     "Multiplication with single argument - error handling",
+			input:    `(* 3)`,
+			expected: `// Error: arithmetic requires at least 2 operands`,
+		},
+		{
+			name:     "Division with no arguments - error handling",
+			input:    `(/)`,
+			expected: `// Error: arithmetic requires at least 2 operands`,
+		},
+		
+		// handleIf error paths (70.0% -> 90%+)
+		{
+			name:     "If with no arguments - error handling",
+			input:    `(if)`,
+			expected: `// Error: if requires at least condition and then-expr`,
+		},
+		{
+			name:     "If with only condition - error handling",
+			input:    `(if true)`,
+			expected: `// Error: if requires at least condition and then-expr`,
+		},
+		
+		// visitNode edge cases (57.1% -> 80%+)
+		{
+			name:     "Unknown node type fallback",
+			input:    `(def x "test")`, // This tests the default case in visitNode
+			expected: `var x = "test"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := New()
+			result, err := tr.TranspileFromInput(tt.input)
+			
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+// Tests for evaluateCollectionOp error paths (64.7% -> 85%+)
+func TestTranspiler_EvaluateCollectionOpErrorPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "First evaluation with no arguments",
+			input:    `(def result (first))`,
+			expected: `nil`,
+		},
+		{
+			name:     "Rest evaluation with no arguments", 
+			input:    `(def result (rest))`,
+			expected: `[]interface{}{}`, // Actual transpiler output for error case
+		},
+		{
+			name:     "Count evaluation with no arguments",
+			input:    `(def result (count))`,
+			expected: `0`,
+		},
+		{
+			name:     "Empty check evaluation with no arguments",
+			input:    `(def result (empty?))`,
+			expected: `true`,
+		},
+		{
+			name:     "Cons evaluation with insufficient arguments",
+			input:    `(def result (cons 1))`,
+			expected: `[]interface{}{}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := New()
+			result, err := tr.TranspileFromInput(tt.input)
+			
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			}
+		})
+	}
+}

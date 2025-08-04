@@ -53,16 +53,6 @@ jobs:
           .github/scripts/auto-release/bump-version.sh \
             '${{ steps.check-labels.outputs.release-type }}'
 
-      - name: Create release commit and tag
-        if: steps.check-labels.outputs.release-type != 'none'
-        run: |
-          chmod +x ./scripts/create-release-tag.sh
-          ./scripts/create-release-tag.sh \
-            "${{ steps.bump-version.outputs.new-version }}" \
-            "${{ steps.bump-version.outputs.old-version }}" \
-            "${{ github.event.pull_request.number }}" \
-            "${{ steps.check-labels.outputs.release-type }}"
-
       - name: Create release notes
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
@@ -79,10 +69,11 @@ jobs:
       - name: Create GitHub Release
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
-          chmod +x .github/scripts/release/create-github-release.sh
-          .github/scripts/release/create-github-release.sh \
-            "${{ steps.bump-version.outputs.new-version }}" \
-            "${{ steps.check-labels.outputs.release-type }}"
+          # Create release using GitHub CLI - this automatically creates the tag
+          gh release create "v${{ steps.bump-version.outputs.new-version }}" \
+            --title "Vex v${{ steps.bump-version.outputs.new-version }}" \
+            --notes-file /tmp/release-notes.md \
+            --target main
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

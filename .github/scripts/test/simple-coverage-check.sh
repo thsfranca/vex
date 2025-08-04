@@ -77,13 +77,15 @@ if [ -n "$GITHUB_OUTPUT" ]; then
     echo "coverage-status=$([ "$COVERAGE_INT" -ge "$COVERAGE_THRESHOLD" ] && echo "passed" || echo "failed")" >> $GITHUB_OUTPUT
 fi
 
-# Check threshold
+# Check threshold - but don't fail CI job here, let commenting happen first
 if [ "$COVERAGE_INT" -lt "$COVERAGE_THRESHOLD" ]; then
     echo ""
     echo "❌ Coverage $TOTAL_COV% is below threshold $COVERAGE_THRESHOLD%"
     echo "💡 Add tests to improve coverage before merging"
-    exit 1
+    echo "⚠️ Coverage check will be handled by workflow after commenting"
 else
     echo ""
     echo "✅ Coverage $TOTAL_COV% meets threshold $COVERAGE_THRESHOLD%"
 fi
+
+# Exit successfully to allow comment posting - CI failure handled by workflow

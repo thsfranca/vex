@@ -178,6 +178,15 @@ jobs:
         script: |
           const postCoverageComment = require('./.github/scripts/test/post-coverage-comment.js');
           await postCoverageComment({github, context});
+    
+    - name: Fail build if coverage below threshold
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' && steps.coverage.outputs.coverage-status == 'failed' }}
+      run: |
+        echo "❌ Build failed due to insufficient test coverage"
+        echo "Current coverage: ${{ steps.coverage.outputs.coverage }}%"
+        echo "Required threshold: 80%"
+        echo "Please add tests to improve coverage before merging"
+        exit 1
 
     - name: Upload coverage artifacts
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}

@@ -73,11 +73,11 @@ jobs:
         if: ${{ needs.detect-changes.outputs.needs-validation == 'true' && steps.antlr-cache.outputs.cache-hit != 'true' }}
         env:
           ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
-        run: .github/scripts/ci/install-antlr.sh
+        run: .github/scripts/build/install-antlr.sh
 
       - name: Setup ANTLR binary
         if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
-        run: .github/scripts/ci/setup-antlr-binary.sh
+        run: .github/scripts/build/setup-antlr-binary.sh
 
       - name: Validate grammar syntax
         if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}

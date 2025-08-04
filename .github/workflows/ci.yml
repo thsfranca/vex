@@ -45,11 +45,11 @@ jobs:
     - name: Analyze Makefile changes for Go relevance
       id: makefile-analysis
       if: ${{ steps.changes.outputs.makefile-changes == 'true' }}
-      run: .github/scripts/ci/makefile-analysis.sh
+      run: .github/scripts/utils/makefile-analysis.sh
         
     - name: Final Go files decision
       id: final-decision  
-      run: .github/scripts/ci/final-go-decision.sh "${{ steps.changes.outputs.go-files }}" "${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
+      run: .github/scripts/utils/final-go-decision.sh "${{ steps.changes.outputs.go-files }}" "${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
 
   # Parallel job: Build & Basic Tests
   build-and-test:
@@ -89,15 +89,15 @@ jobs:
       if: ${{ needs.detect-changes.outputs.go-files == 'true' && steps.antlr-cache.outputs.cache-hit != 'true' }}
       env:
         ANTLR_VERSION: ${{ env.ANTLR_VERSION }}
-      run: .github/scripts/ci/install-antlr.sh
+      run: .github/scripts/build/install-antlr.sh
         
     - name: Setup ANTLR binary
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-      run: .github/scripts/ci/setup-antlr-binary.sh
+      run: .github/scripts/build/setup-antlr-binary.sh
         
     - name: Install Go dependencies
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-      run: .github/scripts/ci/install-go-deps.sh
+      run: .github/scripts/utils/install-go-deps.sh
         
     # Cache parser generation
     - name: Cache generated parsers
@@ -110,15 +110,15 @@ jobs:
         
     - name: Generate parsers
       if: ${{ needs.detect-changes.outputs.go-files == 'true' && steps.parser-cache.outputs.cache-hit != 'true' }}
-      run: .github/scripts/ci/generate-parsers.sh
+      run: .github/scripts/build/generate-parsers.sh
         
     - name: Run Go tests
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-      run: .github/scripts/ci/run-tests.sh
+      run: .github/scripts/test/run-tests.sh
         
     - name: Build Go project
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-      run: .github/scripts/ci/build-project.sh
+      run: .github/scripts/build/build-project.sh
 
   # Parallel job: Coverage Analysis
   test-coverage:
@@ -156,27 +156,27 @@ jobs:
           
     - name: Install Go dependencies
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-      run: .github/scripts/ci/install-go-deps.sh
+      run: .github/scripts/utils/install-go-deps.sh
         
     - name: Install coverage tools
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-      run: .github/scripts/ci/install-coverage-tools.sh
+      run: .github/scripts/test/install-coverage-tools.sh
         
     - name: Run Go tests with coverage
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-      run: .github/scripts/ci/run-coverage-full.sh
+      run: .github/scripts/test/run-coverage-full.sh
         
     - name: Calculate coverage
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       id: coverage
-      run: .github/scripts/ci/calculate-coverage.sh
+      run: .github/scripts/test/calculate-coverage.sh
         
     - name: Comment coverage report on PR
       if: ${{ needs.detect-changes.outputs.go-files == 'true' && github.event_name == 'pull_request' }}
       uses: actions/github-script@v7
       with:
         script: |
-          const postCoverageComment = require('./.github/scripts/ci/post-coverage-comment.js');
+          const postCoverageComment = require('./.github/scripts/test/post-coverage-comment.js');
           await postCoverageComment({github, context});
 
     - name: Upload coverage artifacts
@@ -223,7 +223,7 @@ jobs:
           
     - name: Install Go dependencies
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-      run: .github/scripts/ci/install-go-deps.sh
+      run: .github/scripts/utils/install-go-deps.sh
         
     # Cache linting tools
     - name: Cache linting tools
@@ -235,21 +235,21 @@ jobs:
         
     - name: Install Go linting tools
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
-      run: .github/scripts/ci/install-go-linting-tools.sh
+      run: .github/scripts/lint/install-go-linting-tools.sh
         
     - name: Check formatting (changed files only)
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       env:
         GITHUB_EVENT_NAME: ${{ github.event_name }}
         GITHUB_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-      run: .github/scripts/ci/check-formatting.sh
+      run: .github/scripts/lint/check-formatting.sh
         
     - name: Run Go linting (smart failure handling)
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       env:
         GITHUB_EVENT_NAME: ${{ github.event_name }}
         GITHUB_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-      run: .github/scripts/ci/run-linting.sh
+      run: .github/scripts/lint/run-linting.sh
 
   # Summary job that depends on all parallel jobs
   ci-summary:
@@ -261,4 +261,4 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Report CI Results
-      run: .github/scripts/ci/generate-summary.sh "${{ needs.detect-changes.outputs.go-files }}" "${{ needs.build-and-test.result }}" "${{ needs.test-coverage.result }}" "${{ needs.lint-and-quality.result }}"
+      run: .github/scripts/utils/generate-summary.sh "${{ needs.detect-changes.outputs.go-files }}" "${{ needs.build-and-test.result }}" "${{ needs.test-coverage.result }}" "${{ needs.lint-and-quality.result }}"

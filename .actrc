@@ -1,5 +1,5 @@
-# act configuration for Fugo project  
-# Use golang image since Fugo is a Go project - much more efficient!
+# act configuration for Vex project
+# Use golang image since Vex is a Go project - much more efficient!
 -P ubuntu-latest=golang:1.21-alpine
 
 # Set platform for Apple Silicon compatibility  

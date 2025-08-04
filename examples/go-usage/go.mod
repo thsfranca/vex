@@ -1,4 +1,4 @@
-module fugo-example
+module vex-example
 
 go 1.22
 

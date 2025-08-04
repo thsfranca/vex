@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Fugo Progress Check Script
+# Vex Progress Check Script
 # Run this weekly to update progress and plan next steps
 
-echo "[PROGRESS] Fugo Language Progress Check"
+echo "[PROGRESS] Vex Language Progress Check"
 echo "================================"
 echo
 
@@ -19,7 +19,7 @@ echo
 
 # Check if parsers are working
 echo "🔧 Parser Status:"
-if [ -f "tools/gen/go/fugo_parser.go" ]; then
+if [ -f "tools/gen/go/vex_parser.go" ]; then
     echo "[SUCCESS] Go parser: Available"
 else
     echo "[ERROR] Go parser: Missing"
@@ -50,7 +50,7 @@ echo
 
 # Count lines of code
 echo "📈 Project Size:"
-echo "Fugo files: $(find examples -name "*.fugo" | wc -l | tr -d ' ')"
+echo "Vex files: $(find examples -name "*.vex" | wc -l | tr -d ' ')"
 echo "Go files: $(find . -name "*.go" -not -path "./tools/gen/*" | wc -l | tr -d ' ')"
 echo "Documentation: $(find docs -name "*.md" | wc -l | tr -d ' ')"
 echo

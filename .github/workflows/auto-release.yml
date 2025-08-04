@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
   pull-requests: read
+  actions: write
+  issues: write
+  repository-projects: write
 
 jobs:
   auto-release:
@@ -20,6 +23,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          persist-credentials: true
 
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -29,47 +33,30 @@ jobs:
       - name: Check for release labels
         id: check-labels
         run: |
-          echo "🔍 Checking PR labels for release triggers..."
-          cd tools/release-manager
-          go build -o release-manager .
-          
-          # Check labels and capture output
-          LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
-          OUTPUT=$(./release-manager check-labels "$LABELS")
-          echo "$OUTPUT"
-          
-          # Extract release-type from output and set GitHub output
-          RELEASE_TYPE=$(echo "$OUTPUT" | grep "^release-type=" | cut -d'=' -f2)
-          echo "release-type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          chmod +x .github/scripts/auto-release/check-release-labels.sh
+          .github/scripts/auto-release/check-release-labels.sh \
+            '${{ toJson(github.event.pull_request.labels.*.name) }}' \
+            '${{ github.event.pull_request.number }}' \
+            '${{ github.event.pull_request.title }}'
 
       - name: Configure Git
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          chmod +x .github/scripts/auto-release/configure-git.sh
+          .github/scripts/auto-release/configure-git.sh
 
       - name: Bump version
         if: steps.check-labels.outputs.release-type != 'none'
         id: bump-version
         run: |
-          echo "⬆️ Bumping version..."
-          cd tools/release-manager
-          
-          # Bump version and capture output
-          OUTPUT=$(./release-manager bump-version "${{ steps.check-labels.outputs.release-type }}")
-          echo "$OUTPUT"
-          
-          # Extract version info from output and set GitHub outputs
-          OLD_VERSION=$(echo "$OUTPUT" | grep "^old-version=" | cut -d'=' -f2)
-          NEW_VERSION=$(echo "$OUTPUT" | grep "^new-version=" | cut -d'=' -f2)
-          
-          echo "old-version=$OLD_VERSION" >> $GITHUB_OUTPUT
-          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          chmod +x .github/scripts/auto-release/bump-version.sh
+          .github/scripts/auto-release/bump-version.sh \
+            '${{ steps.check-labels.outputs.release-type }}'
 
       - name: Create release commit and tag
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
-          echo "🏷️ Creating release commit and tag..."
+          chmod +x ./scripts/create-release-tag.sh
           ./scripts/create-release-tag.sh \
             "${{ steps.bump-version.outputs.new-version }}" \
             "${{ steps.bump-version.outputs.old-version }}" \
@@ -79,34 +66,20 @@ jobs:
       - name: Create release notes
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
-          cd tools/release-manager
-          
-          # Create PR data JSON for the tool
-          PR_DATA=$(cat << 'EOF'
-          {
-            "number": ${{ github.event.pull_request.number }},
-            "title": "${{ github.event.pull_request.title }}",
-            "body": "${{ github.event.pull_request.body }}",
-            "author": "${{ github.event.pull_request.user.login }}",
-            "release_type": "${{ steps.check-labels.outputs.release-type }}"
-          }
-          EOF
-          )
-          
-          # Create release notes via tool
-          ./release-manager create-notes "$PR_DATA"
-          
-          # Create release notes for GitHub Release
-          .github/scripts/release/create-release-notes.sh \
+          chmod +x .github/scripts/auto-release/create-release-notes.sh
+          .github/scripts/auto-release/create-release-notes.sh \
             "${{ steps.bump-version.outputs.new-version }}" \
             "${{ steps.bump-version.outputs.old-version }}" \
             "${{ github.event.pull_request.number }}" \
             "${{ github.event.pull_request.title }}" \
+            "${{ github.event.pull_request.body }}" \
+            "${{ github.event.pull_request.user.login }}" \
             "${{ steps.check-labels.outputs.release-type }}"
 
       - name: Create GitHub Release
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
+          chmod +x .github/scripts/release/create-github-release.sh
           .github/scripts/release/create-github-release.sh \
             "${{ steps.bump-version.outputs.new-version }}" \
             "${{ steps.check-labels.outputs.release-type }}"
@@ -116,13 +89,9 @@ jobs:
       - name: Success notification
         if: steps.check-labels.outputs.release-type != 'none'
         run: |
-          echo "🎉 Auto-release completed successfully!"
-          echo ""
-          echo "📋 Details:"
-          echo "  • Version: ${{ steps.bump-version.outputs.old-version }} → ${{ steps.bump-version.outputs.new-version }}"
-          echo "  • Tag: v${{ steps.bump-version.outputs.new-version }}"
-          echo "  • GitHub Release: Created"
-          echo "  • Triggered by: PR #${{ github.event.pull_request.number }}"
-          echo "  • Release type: ${{ steps.check-labels.outputs.release-type }}"
-          echo ""
-          echo "🔗 Check the release: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump-version.outputs.new-version }}"
+          chmod +x .github/scripts/auto-release/success-notification.sh
+          .github/scripts/auto-release/success-notification.sh \
+            "${{ steps.bump-version.outputs.old-version }}" \
+            "${{ steps.bump-version.outputs.new-version }}" \
+            "${{ github.event.pull_request.number }}" \
+            "${{ steps.check-labels.outputs.release-type }}"

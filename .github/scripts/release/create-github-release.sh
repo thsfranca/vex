@@ -27,7 +27,7 @@ echo "# Vex Language v${VERSION}" > dist/README.md
 echo "Basic transpiler with working features:" >> dist/README.md
 echo "- Variable definitions: (def x 10) → x := 10" >> dist/README.md
 echo "- Arithmetic expressions: (+ 1 2) → 1 + 2" >> dist/README.md
-echo "- CLI tool: fugo-transpiler" >> dist/README.md
+echo "- CLI tool: vex-transpiler" >> dist/README.md
 
 # Package examples
 tar -czf "dist/vex-examples-v${VERSION}.tar.gz" examples/

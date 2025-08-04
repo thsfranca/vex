@@ -1,6 +1,6 @@
 {
   "$schema": "vscode://schemas/color-theme",
-  "name": "Fugo Dark",
+  "name": "Vex Dark",
   "type": "dark",
   "colors": {
     "editor.background": "#0f1419",
@@ -18,7 +18,7 @@
       "name": "Comments",
       "scope": [
         "comment",
-        "comment.line.semicolon.fugo"
+        "comment.line.semicolon.vex"
       ],
       "settings": {
         "foreground": "#6A9955",
@@ -29,7 +29,7 @@
       "name": "Strings",
       "scope": [
         "string",
-        "string.quoted.double.fugo"
+        "string.quoted.double.vex"
       ],
       "settings": {
         "foreground": "#CE9178"
@@ -38,7 +38,7 @@
     {
       "name": "String Escapes",
       "scope": [
-        "constant.character.escape.fugo"
+        "constant.character.escape.vex"
       ],
       "settings": {
         "foreground": "#D7BA7D"
@@ -48,8 +48,8 @@
       "name": "Numbers",
       "scope": [
         "constant.numeric",
-        "constant.numeric.integer.fugo",
-        "constant.numeric.float.fugo"
+        "constant.numeric.integer.vex",
+        "constant.numeric.float.vex"
       ],
       "settings": {
         "foreground": "#B5CEA8"
@@ -58,7 +58,7 @@
     {
       "name": "Keywords",
       "scope": [
-        "keyword.control.fugo"
+        "keyword.control.vex"
       ],
       "settings": {
         "foreground": "#C586C0",
@@ -68,7 +68,7 @@
     {
       "name": "Operators",
       "scope": [
-        "keyword.operator.fugo"
+        "keyword.operator.vex"
       ],
       "settings": {
         "foreground": "#D4D4D4"
@@ -77,7 +77,7 @@
     {
       "name": "Function Names",
       "scope": [
-        "entity.name.function.fugo"
+        "entity.name.function.vex"
       ],
       "settings": {
         "foreground": "#DCDCAA"
@@ -86,7 +86,7 @@
     {
       "name": "Variables",
       "scope": [
-        "variable.other.fugo"
+        "variable.other.vex"
       ],
       "settings": {
         "foreground": "#9CDCFE"
@@ -95,9 +95,9 @@
     {
       "name": "Parentheses and Brackets",
       "scope": [
-        "punctuation.section.parens.fugo",
-        "punctuation.section.brackets.fugo",
-        "punctuation.section.braces.fugo"
+        "punctuation.section.parens.vex",
+        "punctuation.section.brackets.vex",
+        "punctuation.section.braces.vex"
       ],
       "settings": {
         "foreground": "#D4D4D4"

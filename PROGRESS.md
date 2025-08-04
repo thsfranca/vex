@@ -77,9 +77,9 @@ Generate executable Go code from Vex programs to achieve native performance, aut
 
 ### Working CLI Tool
 ```bash
-go build -o fugo-transpiler cmd/fugo-transpiler/main.go
+go build -o vex-transpiler cmd/vex-transpiler/main.go
 echo '(def result (+ 10 5))' > test.vex
-./fugo-transpiler -input test.vex -output test.go
+./vex-transpiler -input test.vex -output test.go
 ```
 
 Generates:

@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Quick Fugo Extension Reinstall for Development
+# Quick Vex Extension Reinstall for Development
 # This script uninstalls, packages, reinstalls the extension, and restarts Cursor
 
 set -e  # Exit on any error
 
-echo "[INSTALL] Quick reinstalling Fugo VSCode Extension..."
+echo "[INSTALL] Quick reinstalling Vex VSCode Extension..."
 
 # Check if Cursor is running
 CURSOR_RUNNING=false
@@ -30,18 +30,18 @@ if [ "$CURSOR_RUNNING" = true ]; then
     echo "🛑 Creating restart script and closing Cursor..."
     
     # Create a temporary restart script that runs independently
-    cat > /tmp/fugo-restart-cursor.sh << 'EOF'
+    cat > /tmp/vex-restart-cursor.sh << 'EOF'
 #!/bin/bash
 sleep 3  # Wait for Cursor to fully close
 echo "[RESTART] Restarting Cursor..."
 open -a "Cursor" 2>/dev/null || cursor 2>/dev/null || echo "Could not auto-start Cursor"
-rm -f /tmp/fugo-restart-cursor.sh  # Clean up
+rm -f /tmp/vex-restart-cursor.sh  # Clean up
 EOF
     
-    chmod +x /tmp/fugo-restart-cursor.sh
+    chmod +x /tmp/vex-restart-cursor.sh
     
     # Run restart script in background, detached from current process
-    nohup /tmp/fugo-restart-cursor.sh > /dev/null 2>&1 &
+    nohup /tmp/vex-restart-cursor.sh > /dev/null 2>&1 &
     
     # Close Cursor
     osascript -e 'quit app "Cursor"' 2>/dev/null || pkill -f "Cursor" 2>/dev/null || true
@@ -57,10 +57,10 @@ if command -v inkscape &> /dev/null; then
 else
     magick icon.svg -density 300 -channel RGBA -alpha on -background none -resize 128x128 PNG32:icon.png
 fi
-vsce package --out "./fugo-latest.vsix"
+vsce package --out "./vex-latest.vsix"
 
 echo "[INSTALL] Installing new extension..."
-cursor --install-extension "./fugo-latest.vsix"
+cursor --install-extension "./vex-latest.vsix"
 
 echo ""
 echo "[SUCCESS] Extension reinstalled successfully!"
@@ -71,8 +71,8 @@ else
 fi
 echo ""
 echo "[TEST] Test checklist:"
-echo "   • Open examples/test-extension.fugo"
+echo "   • Open examples/test-extension.vex"
 echo "   • Verify syntax highlighting works"
-echo "   • Check Color Theme → 'Fugo Dark'"
-echo "   • Check File Icon Theme → 'Fugo File Icons'"
+echo "   • Check Color Theme → 'Vex Dark'"
+echo "   • Check File Icon Theme → 'Vex File Icons'"
 echo ""

@@ -348,11 +348,11 @@ func buildTestBinary(t *testing.T) string {
 	
 	// Create temporary binary
 	tmpDir := t.TempDir()
-	binaryPath := filepath.Join(tmpDir, "fugo-transpiler-test")
+	binaryPath := filepath.Join(tmpDir, "vex-transpiler-test")
 	
 	// Build the binary
 	cmd := exec.Command("go", "build", "-o", binaryPath, ".")
-	cmd.Dir = "." // Build in the current directory (cmd/fugo-transpiler)
+	cmd.Dir = "." // Build in the current directory (cmd/vex-transpiler)
 	
 	// Capture output for debugging
 	var stderr bytes.Buffer

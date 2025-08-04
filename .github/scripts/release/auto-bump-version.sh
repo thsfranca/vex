@@ -14,6 +14,9 @@ fi
 echo "⬆️ Bumping version..."
 cd tools/release-manager
 
+# Build the release-manager tool
+go build -o release-manager .
+
 # Bump version and capture output
 OUTPUT=$(./release-manager bump-version "$RELEASE_TYPE")
 echo "$OUTPUT"

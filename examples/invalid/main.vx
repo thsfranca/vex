@@ -12,11 +12,11 @@
   (+ x y))              ; ERROR: '+' operator not defined in current grammar
 
 ; Simple expressions
-(print "Welcome to Fugo!")
+(print "Welcome to Vex!")
 
 ; Array literals - INVALID: Vex grammar doesn't support [..] bracket syntax yet
 [1 2 3 4 5]             ; ERROR: '[' not expected, grammar expects '(' for lists
-["hello" "world" "from" "fugo"]  ; ERROR: Array literals not supported
+["hello" "world" "from" "vex"]   ; ERROR: Array literals not supported
 
 ; Nested expressions with operators
 (if (> (add 2 3) 4)     ; ERROR: '>' comparison operator not defined in grammar

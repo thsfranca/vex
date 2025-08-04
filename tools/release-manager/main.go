@@ -74,9 +74,21 @@ func checkLabels(labelsJSON string) {
 
 func bumpVersion(releaseType string) {
 	// Read current version from project root
-	versionBytes, err := os.ReadFile("../../VERSION")
+	// Try different paths since we might be in tools/release-manager or project root
+	versionPaths := []string{"../../VERSION", "VERSION"}
+	var versionBytes []byte
+	var err error
+	
+	for _, path := range versionPaths {
+		versionBytes, err = os.ReadFile(path)
+		if err == nil {
+			fmt.Printf("Found VERSION file at: %s\n", path)
+			break
+		}
+	}
+	
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading VERSION file: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error reading VERSION file from any path: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -132,8 +144,20 @@ func bumpVersion(releaseType string) {
 	fmt.Printf("New version: %s\n", newVersion)
 
 	// Write new version to project root
-	if err := os.WriteFile("../../VERSION", []byte(newVersion), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing VERSION file: %v\n", err)
+	// Use the same path logic for writing
+	writePaths := []string{"../../VERSION", "VERSION"}
+	var writeErr error
+	
+	for _, path := range writePaths {
+		writeErr = os.WriteFile(path, []byte(newVersion), 0644)
+		if writeErr == nil {
+			fmt.Printf("Updated VERSION file at: %s\n", path)
+			break
+		}
+	}
+	
+	if writeErr != nil {
+		fmt.Fprintf(os.Stderr, "Error writing VERSION file to any path: %v\n", writeErr)
 		os.Exit(1)
 	}
 

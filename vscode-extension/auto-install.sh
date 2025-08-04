@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Auto-reinstall Fugo Extension on File Changes
+# Auto-reinstall Vex Extension on File Changes
 # This script watches for changes and automatically reinstalls the extension
 
 set -e
 
-echo "👀 Starting Fugo Extension Auto-Install Watcher..."
+echo "👀 Starting Vex Extension Auto-Install Watcher..."
 echo "[WATCH] Watching for changes in extension files..."
 echo "[INFO] Press Ctrl+C to stop"
 echo ""

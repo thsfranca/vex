@@ -57,7 +57,7 @@ version-resolver:
   default: patch
 
 template: |
-  ## 📦 Fugo VSCode Extension Changes
+  ## 📦 Vex VSCode Extension Changes
 
   $CHANGES
 

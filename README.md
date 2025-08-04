@@ -39,7 +39,7 @@ Vex is designed with two primary goals:
 ```
 vex/
 ├── cmd/                            # Command-line tools
-│   └── fugo-transpiler/            # Main transpiler CLI application
+│   └── vex-transpiler/             # Main transpiler CLI application
 ├── internal/                       # Core implementation packages
 │   └── transpiler/                 # Vex to Go transpiler engine
 │       ├── parser/                 # Generated ANTLR parser files
@@ -110,7 +110,7 @@ The uniform S-expression structure + functional design means AI models can:
 The project currently includes:
 - **ANTLR4 grammar** for S-expressions, arrays, symbols, and strings
 - **Working transpiler** that converts Vex to executable Go code
-- **CLI tool** (`fugo-transpiler`) for command-line transpilation
+- **CLI tool** (`vex-transpiler`) for command-line transpilation
 - **Basic language features**:
   - Variable definitions: `(def x 10)` → `x := 10`
   - Arithmetic expressions: `(+ 1 2)` → `1 + 2`
@@ -126,9 +126,9 @@ You can transpile basic Vex programs to Go:
 
 ```bash
 # Install and use the transpiler
-go build -o fugo-transpiler cmd/fugo-transpiler/main.go
+go build -o vex-transpiler cmd/vex-transpiler/main.go
 echo '(def x (+ 5 3))' > example.vex
-./fugo-transpiler -input example.vex -output example.go
+./vex-transpiler -input example.vex -output example.go
 ```
 
 Outputs valid Go code:

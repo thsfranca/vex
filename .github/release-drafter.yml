@@ -1,5 +1,5 @@
 ---
-name-template: 'Fugo v$RESOLVED_VERSION'
+name-template: 'Vex v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 
 categories:
@@ -65,7 +65,7 @@ version-resolver:
   default: patch
 
 template: |
-  ## 🚀 Fugo Programming Language Release
+  ## 🚀 Vex Programming Language Release
 
   $CHANGES
 

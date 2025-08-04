@@ -30,45 +30,18 @@ go tool cover -html="$COVERAGE_FILE" -o coverage.html
 # Create informative PR report
 STATUS_ICON="✅"
 STATUS_TEXT="Coverage threshold met!"
-DETAILS_SECTION=""
 
 if [ "$COVERAGE_INT" -lt "$COVERAGE_THRESHOLD" ]; then
     STATUS_ICON="❌"
     STATUS_TEXT="Coverage below threshold"
-    DETAILS_SECTION="
-### 🔧 How to Improve Coverage:
-1. **Run coverage locally:** \`go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out\`
-2. **Add tests for uncovered code paths**
-3. **Focus on critical functionality first**
-4. **Consider edge cases and error conditions**
-
-This helps maintain code quality and catch potential bugs early!"
 fi
 
 cat > coverage-report.md << EOF
-## ${STATUS_ICON} Test Coverage Report
+## 📊 Test Coverage Report
 
 **Current Coverage:** \`${TOTAL_COV}%\`  
-**Required Threshold:** \`${COVERAGE_THRESHOLD}%\`  
-**Status:** ${STATUS_TEXT}
-
-### 📊 Coverage Summary:
-| Metric | Value | Status |
-|--------|-------|--------|
-| Overall Coverage | ${TOTAL_COV}% | $([ "$COVERAGE_INT" -ge "$COVERAGE_THRESHOLD" ] && echo "✅ Pass" || echo "❌ Fail") |
-| Required Threshold | ${COVERAGE_THRESHOLD}% | - |
-| Difference | $([ "$COVERAGE_INT" -ge "$COVERAGE_THRESHOLD" ] && echo "+$((COVERAGE_INT - COVERAGE_THRESHOLD))%" || echo "$((COVERAGE_INT - COVERAGE_THRESHOLD))%") | $([ "$COVERAGE_INT" -ge "$COVERAGE_THRESHOLD" ] && echo "Above target" || echo "Below target") |
-
-### 🎯 What This Means:
-$([ "$COVERAGE_INT" -ge "$COVERAGE_THRESHOLD" ] && echo "✅ **Great work!** Your changes maintain good test coverage." || echo "⚠️ **Action needed:** Please add tests to reach the ${COVERAGE_THRESHOLD}% coverage threshold.")
-
-${DETAILS_SECTION}
-
-### 🔍 Detailed Coverage Report:
-Download the \`coverage.html\` artifact from this CI run to see line-by-line coverage details.
-
----
-*Automated coverage validation • Target: ${COVERAGE_THRESHOLD}%+ for quality assurance*
+**Target Coverage:** \`${COVERAGE_THRESHOLD}%\`  
+**Status:** ${STATUS_ICON} ${STATUS_TEXT}
 EOF
 
 # Set output for GitHub Actions

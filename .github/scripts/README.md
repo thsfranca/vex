@@ -30,7 +30,7 @@ Scripts for testing and coverage analysis:
 - `run-coverage.sh` - Basic coverage collection
 - `run-coverage-full.sh` - Comprehensive coverage analysis
 - `simple-coverage-check.sh` - Simplified coverage validation and PR reporting
-- `post-coverage-comment.js` - PR coverage comment automation
+- `post-coverage-comment.sh` - PR coverage comment automation
 - `install-coverage-tools.sh` - Coverage tooling setup
 
 ### 🔍 `lint/`

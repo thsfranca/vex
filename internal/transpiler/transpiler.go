@@ -11,14 +11,16 @@ import (
 
 // Transpiler converts Vex code to Go code
 type Transpiler struct {
-	output  strings.Builder
-	imports map[string]bool
+	output     strings.Builder
+	imports    map[string]bool
+	goModules  map[string]string // Track third-party modules for go.mod
 }
 
 // New creates a new transpiler instance
 func New() *Transpiler {
 	return &Transpiler{
-		imports: make(map[string]bool),
+		imports:   make(map[string]bool),
+		goModules: make(map[string]string),
 	}
 }
 
@@ -33,9 +35,10 @@ func (t *Transpiler) TranspileFromInput(input string) (string, error) {
 	// Parse the program
 	tree := vexParser.Program()
 	
-	// Reset output and imports
+	// Reset output, imports, and modules
 	t.output.Reset()
 	t.imports = make(map[string]bool)
+	t.goModules = make(map[string]string)
 	
 	// Generate Go code
 	if programCtx, ok := tree.(*parser.ProgramContext); ok {
@@ -54,10 +57,17 @@ func (t *Transpiler) TranspileFromFile(filename string) (string, error) {
 
 // visitProgram processes the top-level program
 func (t *Transpiler) visitProgram(ctx *parser.ProgramContext) {
+	lists := ctx.AllList()
+	
 	// Visit all lists in the program
-	for _, listCtx := range ctx.AllList() {
+	for i, listCtx := range lists {
 		if concreteList, ok := listCtx.(*parser.ListContext); ok {
-			t.visitList(concreteList)
+			// For the last expression, make it the return value
+			if i == len(lists)-1 {
+				t.handleLastExpression(concreteList)
+			} else {
+				t.visitList(concreteList)
+			}
 		}
 	}
 }
@@ -97,6 +107,12 @@ func (t *Transpiler) visitList(ctx *parser.ListContext) {
 		t.handleDefinition(args)
 	case "import":
 		t.handleImport(args)
+	case "if":
+		t.handleIf(args)
+	case "do":
+		t.handleDo(args)
+	case "first", "rest", "cons", "count", "empty?":
+		t.handleCollectionOp(funcName, args)
 	case "+", "-", "*", "/":
 		t.handleArithmetic(funcName, args)
 	default:
@@ -153,6 +169,12 @@ func (t *Transpiler) evaluateExpression(ctx *parser.ListContext) string {
 
 	// Handle special expressions
 	switch funcName {
+	case "if":
+		return t.evaluateIf(args)
+	case "do":
+		return t.evaluateDo(args)
+	case "first", "rest", "cons", "count", "empty?":
+		return t.evaluateCollectionOp(funcName, args)
 	case "+", "-", "*", "/":
 		if len(args) < 2 {
 			return "0"
@@ -201,7 +223,9 @@ func (t *Transpiler) handleDefinition(args []string) {
 	varName := args[0]
 	varValue := args[1]
 
+	// Generate variable definition and use it immediately (functional style)
 	t.output.WriteString(fmt.Sprintf("var %s = %s\n", varName, varValue))
+	t.output.WriteString(fmt.Sprintf("_ = %s // Use variable to satisfy Go compiler\n", varName))
 }
 
 // handleImport processes import statements
@@ -217,6 +241,30 @@ func (t *Transpiler) handleImport(args []string) {
 	
 	// Store import for later use at package level
 	t.imports[importPath] = true
+	
+	// Track third-party modules for go.mod generation
+	if t.isThirdPartyModule(importPath) {
+		t.goModules[importPath] = "v1.0.0" // Use a reasonable default version
+	}
+}
+
+// isThirdPartyModule checks if an import is a third-party module
+func (t *Transpiler) isThirdPartyModule(importPath string) bool {
+	// Standard library packages don't need go.mod entries
+	standardPkgs := []string{
+		"fmt", "strings", "strconv", "time", "os", "io", "net", "http",
+		"database", "encoding", "crypto", "math", "sort", "regexp",
+		"context", "sync", "testing", "flag", "log", "path", "reflect",
+	}
+	
+	for _, stdPkg := range standardPkgs {
+		if strings.HasPrefix(importPath, stdPkg) {
+			return false
+		}
+	}
+	
+	// If it contains a dot, it's likely a third-party module
+	return strings.Contains(importPath, ".")
 }
 
 // handleArithmetic processes arithmetic operations
@@ -249,6 +297,147 @@ func (t *Transpiler) handleFunctionCall(funcName string, args []string) {
 		t.output.WriteString(fmt.Sprintf("%s(%s)\n", funcName, argStr))
 	} else {
 		t.output.WriteString(fmt.Sprintf("_ = %s(%s)\n", funcName, argStr))
+	}
+}
+
+// handleIf processes if conditionals: (if condition then-expr else-expr)
+func (t *Transpiler) handleIf(args []string) {
+	if len(args) < 2 {
+		t.output.WriteString("// Error: if requires at least condition and then-expr\n")
+		return
+	}
+	
+	condition := args[0]
+	thenExpr := args[1]
+	var elseExpr string
+	if len(args) > 2 {
+		elseExpr = args[2]
+	} else {
+		elseExpr = "nil"
+	}
+	
+	t.output.WriteString(fmt.Sprintf("if %s {\n\t%s\n} else {\n\t%s\n}\n", condition, thenExpr, elseExpr))
+}
+
+// evaluateIf evaluates if conditionals as expressions
+func (t *Transpiler) evaluateIf(args []string) string {
+	if len(args) < 2 {
+		return "nil"
+	}
+	
+	condition := args[0]
+	thenExpr := args[1]
+	var elseExpr string
+	if len(args) > 2 {
+		elseExpr = args[2]
+	} else {
+		elseExpr = "nil"
+	}
+	
+	return fmt.Sprintf("func() interface{} { if %s { return %s } else { return %s } }()", condition, thenExpr, elseExpr)
+}
+
+// handleDo processes do blocks: (do expr1 expr2 expr3)
+func (t *Transpiler) handleDo(args []string) {
+	for _, expr := range args {
+		t.output.WriteString(expr + "\n")
+	}
+}
+
+// evaluateDo evaluates do blocks as expressions (returns last expression)
+func (t *Transpiler) evaluateDo(args []string) string {
+	if len(args) == 0 {
+		return "nil"
+	}
+	
+	// Generate function that executes all expressions and returns the last one
+	var statements []string
+	for i, expr := range args {
+		if i == len(args)-1 {
+			statements = append(statements, "return "+expr)
+		} else {
+			statements = append(statements, expr)
+		}
+	}
+	
+	return fmt.Sprintf("func() interface{} { %s }()", strings.Join(statements, "; "))
+}
+
+// handleCollectionOp processes collection operations
+func (t *Transpiler) handleCollectionOp(op string, args []string) {
+	switch op {
+	case "first":
+		if len(args) < 1 {
+			t.output.WriteString("_ = nil // Error: first requires collection\n")
+			return
+		}
+		t.output.WriteString(fmt.Sprintf("_ = func() interface{} { if len(%s) > 0 { return %s[0] } else { return nil } }()\n", args[0], args[0]))
+	
+	case "rest":
+		if len(args) < 1 {
+			t.output.WriteString("_ = []interface{}{} // Error: rest requires collection\n")
+			return
+		}
+		t.output.WriteString(fmt.Sprintf("_ = func() []interface{} { if len(%s) > 1 { return %s[1:] } else { return []interface{}{} } }()\n", args[0], args[0]))
+	
+	case "cons":
+		if len(args) < 2 {
+			t.output.WriteString("_ = []interface{}{} // Error: cons requires element and collection\n")
+			return
+		}
+		t.output.WriteString(fmt.Sprintf("_ = append([]interface{}{%s}, %s...)\n", args[0], args[1]))
+	
+	case "count":
+		if len(args) < 1 {
+			t.output.WriteString("_ = 0 // Error: count requires collection\n")
+			return
+		}
+		t.output.WriteString(fmt.Sprintf("_ = len(%s)\n", args[0]))
+	
+	case "empty?":
+		if len(args) < 1 {
+			t.output.WriteString("_ = true // Error: empty? requires collection\n")
+			return
+		}
+		t.output.WriteString(fmt.Sprintf("_ = len(%s) == 0\n", args[0]))
+	}
+}
+
+// evaluateCollectionOp evaluates collection operations as expressions
+func (t *Transpiler) evaluateCollectionOp(op string, args []string) string {
+	switch op {
+	case "first":
+		if len(args) < 1 {
+			return "nil"
+		}
+		return fmt.Sprintf("func() interface{} { if len(%s) > 0 { return %s[0] } else { return nil } }()", args[0], args[0])
+	
+	case "rest":
+		if len(args) < 1 {
+			return "[]interface{}{}"
+		}
+		return fmt.Sprintf("func() []interface{} { if len(%s) > 1 { return %s[1:] } else { return []interface{}{} } }()", args[0], args[0])
+	
+	case "cons":
+		if len(args) < 2 {
+			return "[]interface{}{}"
+		}
+		return fmt.Sprintf("append([]interface{}{%s}, %s...)", args[0], args[1])
+	
+	case "count":
+		if len(args) < 1 {
+			return "0"
+		}
+		return fmt.Sprintf("len(%s)", args[0])
+	
+	case "empty?":
+		if len(args) < 1 {
+			return "true"
+		}
+		return fmt.Sprintf("len(%s) == 0", args[0])
+	
+	default:
+		return "nil"
 	}
 }
 
@@ -291,4 +480,71 @@ func (t *Transpiler) generateGoCode() string {
 	result.WriteString("}\n")
 	
 	return result.String()
+}
+
+// handleLastExpression processes the last expression in a program (implicit return)
+func (t *Transpiler) handleLastExpression(ctx *parser.ListContext) {
+	childCount := ctx.GetChildCount()
+	if childCount <= 2 { // Just parentheses
+		t.output.WriteString("_ = nil // Empty expression\n")
+		return
+	}
+
+	// Get the first element (function name)
+	firstChild := ctx.GetChild(1)
+	if firstChild == nil {
+		t.output.WriteString("_ = nil // Invalid expression\n")
+		return
+	}
+
+	var funcName string
+	if parseTree, ok := firstChild.(antlr.ParseTree); ok {
+		funcName = parseTree.GetText()
+	} else {
+		t.output.WriteString("_ = nil // Invalid expression\n")
+		return
+	}
+
+	// Extract arguments
+	args := make([]string, 0)
+	for i := 2; i < childCount-1; i++ { // Skip '(' and ')'
+		child := ctx.GetChild(i)
+		if child != nil {
+			args = append(args, t.visitNode(child))
+		}
+	}
+
+	// Handle the last expression - ensure it's used
+	switch funcName {
+	case "def":
+		t.handleDefinition(args)
+		// Return the defined variable
+		if len(args) >= 1 {
+			t.output.WriteString(fmt.Sprintf("_ = %s // Return last defined value\n", args[0]))
+		}
+	case "import":
+		t.handleImport(args)
+		t.output.WriteString("_ = \"import completed\" // Import statement result\n")
+	case "if":
+		t.handleIf(args)
+	case "do":
+		t.handleDo(args)
+	case "first", "rest", "cons", "count", "empty?":
+		t.handleCollectionOp(funcName, args)
+	case "+", "-", "*", "/":
+		t.handleArithmetic(funcName, args)
+	default:
+		// For function calls, capture the result
+		if strings.Contains(funcName, "Println") || strings.Contains(funcName, "Printf") {
+			t.output.WriteString(fmt.Sprintf("%s(%s) // Last expression\n", 
+				strings.ReplaceAll(funcName, "/", "."), strings.Join(args, ", ")))
+		} else {
+			t.handleFunctionCall(funcName, args)
+		}
+	}
+}
+
+// GetDetectedModules returns the Go modules detected during transpilation
+func (t *Transpiler) GetDetectedModules() map[string]string {
+	return t.goModules
 }

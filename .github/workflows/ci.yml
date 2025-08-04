@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 env:
   GO_VERSION: '1.21'
   ANTLR_VERSION: '4.13.1'
@@ -15,8 +20,8 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      go-files: ${{ steps.final-decision.outputs.go-files }}
-      has-changes: ${{ steps.changes.outputs.has-changes }}
+      go-files: ${{ steps.final-decision.outputs.go-files || 'false' }}
+      has-changes: ${{ steps.changes.outputs.has-changes || 'false' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -37,19 +42,19 @@ jobs:
             - '**'
             
     - name: Set up Go (for change detection)
-      if: ${{ steps.changes.outputs.makefile-changes == 'true' }}
+      if: steps.changes.outputs.makefile-changes == 'true'
       uses: actions/setup-go@v5
       with:
         go-version: '1.21'
 
     - name: Analyze Makefile changes for Go relevance
       id: makefile-analysis
-      if: ${{ steps.changes.outputs.makefile-changes == 'true' }}
+      if: steps.changes.outputs.makefile-changes == 'true'
       run: .github/scripts/utils/makefile-analysis.sh
         
     - name: Final Go files decision
       id: final-decision  
-      run: .github/scripts/utils/final-go-decision.sh "${{ steps.changes.outputs.go-files }}" "${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
+      run: .github/scripts/utils/final-go-decision.sh "${{ steps.changes.outputs.go-files || 'false' }}" "${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
 
   # Parallel job: Build & Basic Tests
   build-and-test:
@@ -169,15 +174,25 @@ jobs:
     - name: Calculate coverage
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}
       id: coverage
-      run: .github/scripts/test/calculate-coverage.sh
+      run: .github/scripts/test/simple-coverage-check.sh
         
     - name: Comment coverage report on PR
-      if: ${{ needs.detect-changes.outputs.go-files == 'true' && github.event_name == 'pull_request' }}
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const postCoverageComment = require('./.github/scripts/test/post-coverage-comment.js');
-          await postCoverageComment({github, context});
+      if: ${{ always() && needs.detect-changes.outputs.go-files == 'true' && github.event_name == 'pull_request' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+      run: .github/scripts/test/post-coverage-comment.sh
+    
+    - name: Fail build if coverage below threshold
+      if: ${{ needs.detect-changes.outputs.go-files == 'true' && steps.coverage.outputs.coverage-status == 'failed' }}
+      run: |
+        echo "❌ Build failed due to insufficient test coverage"
+        echo "Current coverage: ${{ steps.coverage.outputs.coverage }}%"
+        echo "Required threshold: 80%"
+        echo "Please add tests to improve coverage before merging"
+        exit 1
 
     - name: Upload coverage artifacts
       if: ${{ needs.detect-changes.outputs.go-files == 'true' }}

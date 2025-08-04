@@ -37,13 +37,13 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Skip when no extension changes
-      if: ${{ needs.detect-changes.outputs.extension-files == 'false' }}
+      if: needs.detect-changes.outputs.extension-files == 'false'
       run: |
         echo "⏭️ Skipping VSCode extension validation - no extension file changes detected"
         echo "Files that trigger this workflow: vscode-extension/**, examples/**/*.vx"
       
     - name: Set up Node.js
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
@@ -51,53 +51,53 @@ jobs:
         cache-dependency-path: 'vscode-extension/package.json'
         
     - name: Install VSCode extension dependencies
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       run: .github/scripts/extension/install-dependencies.sh
         
     - name: Install extension development tools
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       run: .github/scripts/extension/install-dev-tools.sh
         
     - name: Lint VSCode extension JavaScript
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       run: .github/scripts/extension/lint-javascript.sh
         
     - name: Check VSCode extension code formatting
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       run: .github/scripts/extension/check-formatting.sh
         
     - name: Validate VSCode extension manifest
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       run: .github/scripts/extension/validate-manifest.js
         
     - name: Validate Vex syntax highlighting grammar
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       run: .github/scripts/extension/validate-grammar.js
         
     - name: Validate Vex color themes
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       run: .github/scripts/extension/validate-themes.js
         
     - name: Set up Go (for extension testing)
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       uses: actions/setup-go@v5
       with:
         go-version: '1.21'
 
     - name: Test syntax highlighting with sample Vex code
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       run: .github/scripts/extension/test-syntax-highlighting.sh
         
     - name: Package VSCode extension (.vsix)
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       run: .github/scripts/extension/package-extension.sh
         
     - name: Verify VSCode extension package integrity
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       run: .github/scripts/extension/verify-package.sh
         
     - name: Upload VSCode extension artifact
-      if: ${{ needs.detect-changes.outputs.extension-files == 'true' }}
+      if: needs.detect-changes.outputs.extension-files == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: vex-vscode-extension-build

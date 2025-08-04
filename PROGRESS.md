@@ -119,7 +119,7 @@ Implement metaprogramming capabilities with user-defined macros.
 
 ### Working CLI Tool
 ```bash
-go build -o vex cmd/fugo-transpiler/main.go
+go build -o vex cmd/vex-transpiler/main.go
 echo '(def result (+ 10 5))' > test.vex
 ./vex transpile -input test.vex -output test.go
 ./vex run -input test.vex

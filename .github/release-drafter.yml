@@ -1,4 +1,3 @@
----
 name-template: 'Vex v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 
@@ -46,12 +45,14 @@ version-resolver:
     labels:
       - 'major'
       - 'breaking'
+      - 'release:major'
   minor:
     labels:
       - 'minor'
       - 'feature'
       - 'enhancement'
       - 'feat'
+      - 'release:minor'
   patch:
     labels:
       - 'patch'
@@ -62,6 +63,7 @@ version-resolver:
       - 'docs'
       - 'chore'
       - 'maintenance'
+      - 'release:patch'
   default: patch
 
 template: |
@@ -72,12 +74,6 @@ template: |
   **Language Version**: $RESOLVED_VERSION
   **Target**: Go transpilation
   **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
-
-# Configuration to update CHANGELOG.md
-include-pre-releases: false
-commitish: main
-
-update-release-notes: true
 
 autolabeler:
   - label: 'documentation'
@@ -92,16 +88,6 @@ autolabeler:
     files:
       - '**/*transpil*'
       - '**/*codegen*'
-  - label: 'bug'
-    branch:
-      - '/fix\/.+/'
-    title:
-      - '/fix/i'
-  - label: 'feature'
-    branch:
-      - '/feat\/.+/'
-    title:
-      - '/feat/i'
   - label: 'chore'
     branch:
       - '/chore\/.+/'

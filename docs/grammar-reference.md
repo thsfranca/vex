@@ -28,9 +28,9 @@ An array is surrounded by square brackets and contains one or more elements.
 
 #### SYMBOL
 ```antlr
-SYMBOL: (LETTER | INTEGER | '.' | '+' | '-' | '*' | '/' | '=' | '!' | '<' | '>' | '?' | '_')+ ;
+SYMBOL: (LETTER | INTEGER | '.' | '+' | '-' | '*' | '/' | '=' | '!' | '<' | '>' | '?' | '_' | ':' | '~')+ ;
 ```
-Symbols can contain letters, numbers, dots, and various operators including arithmetic operators (+, -, *, /), comparison operators (=, !, <, >), and other special characters (?, _).
+Symbols can contain letters, numbers, dots, and various operators including arithmetic operators (+, -, *, /), comparison operators (=, !, <, >), namespace separators (:), and other special characters (?, _, ~).
 
 #### STRING
 ```antlr
@@ -59,7 +59,7 @@ Whitespace (spaces, tabs, newlines) and commas are ignored.
 
 ### Valid Programs
 
-#### Working Today (Transpiler Support)
+#### Working Today (Full Transpiler Support)
 ```lisp
 ; Variable definitions
 (def x 42)
@@ -69,15 +69,27 @@ Whitespace (spaces, tabs, newlines) and commas are ignored.
 (def sum (+ 10 20))
 (def product (* 6 7))
 (def result (+ x (- 100 5)))
+
+; Import system
+(import "fmt")
+(import "strings")
+
+; Go function calls with namespace syntax
+(fmt/Println "Hello from Vex!")
+(fmt/Printf "Value: %d\n" x)
+
+; Macro definitions (advanced feature)
+(macro debug-print [value] 
+  (fmt/Println "DEBUG:" value))
+
+; Complex expressions
+(def calculation (+ (* 10 5) (- 20 (/ 100 5))))
 ```
 
 #### Planned Features (Grammar Ready)
 ```lisp
-; Function definitions (planned)
+; Function definitions (in development)
 (defn add [x y] (+ x y))
-
-; Function calls (planned)  
-(print "Hello, World!")
 
 ; Conditional expressions (planned)
 (if (> x 0) (print "positive") (print "negative"))
@@ -86,18 +98,24 @@ Whitespace (spaces, tabs, newlines) and commas are ignored.
 [1 2 3 4]
 ["hello" "world"]
 
-; Mixed structures (grammar ready)
-(function [arg1 arg2] (body goes here))
+; HTTP server patterns (planned)
+(http-server
+  :port 8080
+  :routes [(GET "/api/users" get-users)])
 ```
 
 ### Language Features Supported by Grammar
 
 - **S-expressions**: `(operator operand1 operand2 ...)`
-- **Array literals**: `[element1 element2 ...]`
+- **Array literals**: `[element1 element2 ...]` 
 - **String literals**: `"text with spaces"`
-- **Symbols/Identifiers**: `variable-name`, `+`, `function123`
+- **Symbols/Identifiers**: `variable-name`, `+`, `function123`, `fmt/Println`
 - **Comments**: `; comment text`
 - **Nested structures**: Lists and arrays can contain other lists and arrays
+- **Namespace syntax**: `namespace/function` for Go interop
+- **Macro definitions**: `(macro name [params] body)`
+- **Import statements**: `(import "package-name")`
+- **Complex arithmetic**: Nested mathematical expressions
 
 ## Usage with ANTLR
 

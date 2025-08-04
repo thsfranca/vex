@@ -9,17 +9,32 @@ echo "[COVERAGE] Running simplified coverage analysis..."
 
 # Run tests with coverage, excluding generated parser files
 echo "[DEBUG] Running coverage test command..."
+echo "[DEBUG] Current directory: $(pwd)"
+echo "[DEBUG] Available test files: $(find . -name "*_test.go" | head -5)"
+
+# Run the test command and capture all output
 go test -v -coverprofile="$COVERAGE_FILE" -covermode=atomic -coverpkg=./internal/transpiler ./... > coverage_test_output.log 2>&1
 TEST_EXIT_CODE=$?
 echo "[DEBUG] Test command completed with exit code: $TEST_EXIT_CODE"
 
+# Always show the test output for debugging
+echo "[DEBUG] Test output:"
+cat coverage_test_output.log
+
+# Check if coverage file was created
+if [ -f "$COVERAGE_FILE" ]; then
+    echo "[DEBUG] Coverage file created successfully"
+else
+    echo "[DEBUG] Coverage file NOT created"
+fi
+
 # Check if tests actually passed by looking for "PASS" in output and coverage file exists
 if grep -q "PASS" coverage_test_output.log && [ -f "$COVERAGE_FILE" ]; then
     echo "[COVERAGE] Tests passed successfully"
-    cat coverage_test_output.log
 else
     echo "❌ Tests failed during coverage analysis (exit code: $TEST_EXIT_CODE)"
-    cat coverage_test_output.log
+    echo "[DEBUG] PASS found in output: $(grep -q "PASS" coverage_test_output.log && echo "YES" || echo "NO")"
+    echo "[DEBUG] Coverage file exists: $([ -f "$COVERAGE_FILE" ] && echo "YES" || echo "NO")"
     exit 1
 fi
 

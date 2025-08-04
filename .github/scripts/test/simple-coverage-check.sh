@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 # Configuration
 COVERAGE_THRESHOLD=85
@@ -10,7 +9,8 @@ echo "[COVERAGE] Running simplified coverage analysis..."
 # Run tests with coverage, excluding generated parser files
 echo "[DEBUG] Running coverage test command..."
 echo "[DEBUG] Current directory: $(pwd)"
-echo "[DEBUG] Available test files: $(find . -name "*_test.go" | head -5)"
+echo "[DEBUG] Available test files:"
+find . -name "*_test.go" | head -5 || echo "  No test files found"
 
 # Run the test command and capture all output
 go test -v -coverprofile="$COVERAGE_FILE" -covermode=atomic -coverpkg=./internal/transpiler ./... > coverage_test_output.log 2>&1

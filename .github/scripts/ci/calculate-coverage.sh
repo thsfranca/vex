@@ -135,6 +135,107 @@ fi
 echo -e "\n📊 Coverage Report:"
 echo -e "$COVERAGE_REPORT"
 
+# Create markdown report for PR comment
+create_pr_coverage_report() {
+    local status_icon="✅"
+    local status_text="All coverage thresholds met!"
+    local details_section=""
+    
+    if [ "$VALIDATION_FAILED" = true ]; then
+        status_icon="❌"
+        status_text="Coverage thresholds not met"
+        details_section="
+### 🔧 How to Fix Coverage Issues:
+1. **Add tests for uncovered code paths**
+2. **Review existing tests for completeness**  
+3. **Consider edge cases and error conditions**
+4. **Test error handling and boundary conditions**
+
+This is a learning project - maintaining good test coverage teaches best practices!"
+    fi
+    
+    # Create coverage table
+    local coverage_table="| Component | Current | Threshold | Status |\n|-----------|---------|-----------|--------|\n"
+    
+    # Build coverage table from our component data
+    for component in "${!COMPONENT_THRESHOLDS[@]}"; do
+        threshold="${COMPONENT_THRESHOLDS[$component]}%"
+        
+        # Extract current coverage from our reports
+        current_coverage=""
+        status=""
+        
+        if echo -e "$COVERAGE_REPORT" | grep -q "$component:"; then
+            current_line=$(echo -e "$COVERAGE_REPORT" | grep "$component:" | head -1)
+            if [[ $current_line =~ ([0-9]+\.?[0-9]*)% ]]; then
+                current_coverage="${BASH_REMATCH[1]}%"
+                current_num=${BASH_REMATCH[1]%.*}
+                threshold_num=${COMPONENT_THRESHOLDS[$component]}
+                
+                if [[ $current_num -ge $threshold_num ]]; then
+                    status="✅ Pass"
+                else
+                    status="❌ Fail"
+                fi
+            elif [[ $current_line == *"No data"* ]]; then
+                current_coverage="-"
+                status="⚠️ No data"
+            elif [[ $current_line == *"Tests failed"* ]]; then
+                current_coverage="-"
+                status="⚠️ Tests failed"
+            elif [[ $current_line == *"Not implemented"* ]]; then
+                current_coverage="-"
+                status="⚠️ Not implemented"
+            fi
+        else
+            current_coverage="-"
+            status="⚠️ Unknown"
+        fi
+        
+        coverage_table="${coverage_table}| $component | $current_coverage | $threshold | $status |\n"
+    done
+    
+    # Add total coverage if available
+    local total_section=""
+    if echo -e "$COVERAGE_REPORT" | grep -q "Total:"; then
+        total_line=$(echo -e "$COVERAGE_REPORT" | grep "Total:" | head -1)
+        if [[ $total_line =~ ([0-9]+\.?[0-9]*)% ]]; then
+            total_coverage="${BASH_REMATCH[1]}%"
+            total_section="
+**Overall Coverage:** ${total_coverage}"
+        fi
+    fi
+
+    cat > coverage-report.md << EOF
+## ${status_icon} Test Coverage Report
+
+**Status:** ${status_text}${total_section}
+
+### 📊 Component Coverage:
+$(echo -e "${coverage_table}")
+
+### 🎯 Required Thresholds:
+| Component | Threshold | Purpose |
+|-----------|-----------|---------|
+| Parser | 95%+ | Critical language component |
+| Transpiler | 90%+ | Core functionality |
+| Types | 85%+ | Type system implementation |
+| Standard Library | 80%+ | User-facing features |
+
+${details_section}
+
+---
+*Coverage validation enforced to maintain code quality in this learning project.*
+EOF
+}
+
+# Create the PR coverage report
+create_pr_coverage_report
+
+# Output location for GitHub Actions
+echo "COVERAGE_REPORT_FILE=coverage-report.md" >> $GITHUB_OUTPUT
+echo "COVERAGE_STATUS=$([ "$VALIDATION_FAILED" = true ] && echo "failed" || echo "passed")" >> $GITHUB_OUTPUT
+
 # Fail if any component is below threshold
 if [ "$VALIDATION_FAILED" = true ]; then
     echo ""

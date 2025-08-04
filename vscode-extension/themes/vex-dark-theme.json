@@ -11,7 +11,7 @@
     "editor.lineHighlightBackground": "#191f26",
     "editorCursor.foreground": "#73d0ff",
     "editor.findMatchBackground": "#204a87",
-    "editor.findMatchHighlightBackground": "#153f5c"
+    "editor.findMatchHighlightBackground": "#153f5c80"
   },
   "tokenColors": [
     {

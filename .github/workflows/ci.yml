@@ -15,8 +15,8 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      go-files: ${{ steps.final-decision.outputs.go-files }}
-      has-changes: ${{ steps.changes.outputs.has-changes }}
+      go-files: ${{ steps.final-decision.outputs.go-files || 'false' }}
+      has-changes: ${{ steps.changes.outputs.has-changes || 'false' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -37,19 +37,19 @@ jobs:
             - '**'
             
     - name: Set up Go (for change detection)
-      if: ${{ steps.changes.outputs.makefile-changes == 'true' }}
+      if: steps.changes.outputs.makefile-changes == 'true'
       uses: actions/setup-go@v5
       with:
         go-version: '1.21'
 
     - name: Analyze Makefile changes for Go relevance
       id: makefile-analysis
-      if: ${{ steps.changes.outputs.makefile-changes == 'true' }}
+      if: steps.changes.outputs.makefile-changes == 'true'
       run: .github/scripts/utils/makefile-analysis.sh
         
     - name: Final Go files decision
       id: final-decision  
-      run: .github/scripts/utils/final-go-decision.sh "${{ steps.changes.outputs.go-files }}" "${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
+      run: .github/scripts/utils/final-go-decision.sh "${{ steps.changes.outputs.go-files || 'false' }}" "${{ steps.makefile-analysis.outputs.go-related || 'false' }}"
 
   # Parallel job: Build & Basic Tests
   build-and-test:

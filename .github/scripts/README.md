@@ -29,7 +29,7 @@ Scripts for testing and coverage analysis:
 - `run-tests.sh` - Execute test suites
 - `run-coverage.sh` - Basic coverage collection
 - `run-coverage-full.sh` - Comprehensive coverage analysis
-- `calculate-coverage.sh` - Coverage validation and reporting
+- `simple-coverage-check.sh` - Simplified coverage validation and PR reporting
 - `post-coverage-comment.js` - PR coverage comment automation
 - `install-coverage-tools.sh` - Coverage tooling setup
 

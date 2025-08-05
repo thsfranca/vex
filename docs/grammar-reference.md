@@ -83,12 +83,18 @@ Whitespace (spaces, tabs, newlines) and commas are ignored.
 
 ; Complex expressions
 (def calculation (+ (* 10 5) (- 20 (/ 100 5))))
+
+; Macro definitions
+(macro greet [name] (fmt/Println "Hello" name))
+
+; Function definitions using defn macro
+(defn add [x y] (+ x y))
 ```
 
 #### Planned Features (Grammar Ready)
 ```lisp
-; Function definitions (in development)
-(defn add [x y] (+ x y))
+; Enhanced function definitions with types (in development)
+(defn add [x: int y: int] -> int (+ x y))
 
 ; Conditional expressions (planned)
 (if (> x 0) (print "positive") (print "negative"))
@@ -115,6 +121,8 @@ Whitespace (spaces, tabs, newlines) and commas are ignored.
 - **Import statements**: `(import "package-name")`
 - **Conditional expressions**: `(if condition then else)`
 - **Complex arithmetic**: Nested mathematical expressions
+- **Macro definitions**: `(macro name [params] body)` for metaprogramming
+- **Function definitions**: `(defn name [params] body)` via built-in macros
 
 ## Usage with ANTLR
 

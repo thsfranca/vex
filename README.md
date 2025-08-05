@@ -118,6 +118,8 @@ The project currently includes:
   - Basic arrays: `[1 2 3]` → `[]interface{}{1, 2, 3}`
   - Conditional expressions: `(if condition then else)` → Go if statements
   - Sequential execution: `(do expr1 expr2)` → Multiple Go statements
+  - Basic macro system: `(macro name [params] body)` → Macro registration and expansion
+  - Function definitions: `(defn name [params] body)` → Via built-in defn macro
 - **Comprehensive CI/CD pipeline** with automated quality checks
 - **Automated release process** with PR label-based version management  
 - **Grammar validation system** testing both valid and invalid syntax
@@ -178,13 +180,18 @@ Current features working:
 (do
   (def x 10)
   (fmt/Println x))
+
+;; Macro definitions
+(macro greet [name] (fmt/Println "Hello" name))
+
+;; Function definitions using defn macro
+(defn add [x y] (+ x y))
 ```
 
 ### Next Phase 🚧
 
-- **Function definitions** (`defn`) for user-defined functions
+- **Enhanced function definitions** with proper type checking and semantics
 - **Type system** with inference and checking for safety and performance
-- **Macro system** for metaprogramming capabilities
 - **Enhanced semantic analysis** for better error reporting and optimization
 - **AI-friendly HTTP patterns** with semantic annotations for endpoints
 - **HTTP server framework** that AI can generate from simple descriptions
@@ -301,8 +308,8 @@ See [docs/vex-implementation-requirements.md](docs/vex-implementation-requiremen
 
 ## Project Status
 
-**Current Phase**: Basic Transpiler Foundation Complete (✅ Phase 1-2 Complete)  
-**Next Phase**: Advanced Language Features (Phase 3: Type System & Semantic Analysis)  
+**Current Phase**: Basic Transpiler Foundation + Macro System Complete (✅ Phase 1-2, 4 Complete)  
+**Next Phase**: Advanced Language Features (Phase 3: Type System & Semantic Analysis, Phase 5: Enhanced Functions)  
 **Timeline**: Personal study project for learning compiler concepts, developed for fun in spare time
 
 ### Infrastructure Achievements
@@ -316,6 +323,11 @@ See [docs/vex-implementation-requirements.md](docs/vex-implementation-requiremen
 - Core Vex to Go transpilation working
 - Variable definitions, arithmetic, imports, function calls
 - CLI tool with transpile, run, and build commands
+
+✅ **Macro System**
+- Basic macro definition and expansion
+- User-defined macros with parameter substitution
+- Built-in defn macro for function definitions
 
 ✅ **Development Tooling** 
 - Modular Go tools for CI/CD operations
@@ -344,8 +356,8 @@ This project maintains high code quality through automated testing:
 | **VSCode Extension** | 85%+ | ✅ *Active* | IDE integration quality |
 | **Parser** | 95%+ | ✅ *Complete* | Critical language component |
 | **Basic Transpiler** | 90%+ | ✅ *Active* | Core transpilation functionality |
+| **Macro System** | 80%+ | ✅ *Active* | Metaprogramming capabilities |
 | **Type System** | 85%+ | ⏳ *Planned* | Type inference and checking |
-| **Macro System** | 80%+ | ⏳ *Planned* | Metaprogramming capabilities |
 | **Standard Library** | 80%+ | ⏳ *Planned* | User-facing features |
 
 > **Quality Philosophy**: Higher coverage requirements for more critical components. The current infrastructure ensures robust development practices for future language implementation.

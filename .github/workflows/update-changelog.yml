@@ -1,9 +1,15 @@
 ---
 name: Update CHANGELOG
 
-'on':
+on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to add to changelog (e.g., v0.2.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,7 +17,7 @@ permissions:
 jobs:
   update-changelog:
     # Only run for main Vex releases (not extension releases)
-    if: ${{ !startsWith(github.event.release.tag_name, 'extension-') }}
+    if: ${{ (github.event_name == 'release' && !startsWith(github.event.release.tag_name, 'extension-')) || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -19,13 +25,40 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Get release information
+        id: release-info
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual trigger - get release info from API
+            RELEASE_TAG="${{ github.event.inputs.release_tag }}"
+            RELEASE_INFO=$(gh release view "$RELEASE_TAG" --json name,body,publishedAt)
+            RELEASE_NAME=$(echo "$RELEASE_INFO" | jq -r '.name')
+            RELEASE_BODY=$(echo "$RELEASE_INFO" | jq -r '.body')
+            RELEASE_DATE=$(echo "$RELEASE_INFO" | jq -r '.publishedAt' | cut -d'T' -f1)
+          else
+            # Automatic trigger from release event
+            RELEASE_TAG="${{ github.event.release.tag_name }}"
+            RELEASE_NAME="${{ github.event.release.name }}"
+            RELEASE_BODY="${{ github.event.release.body }}"
+            RELEASE_DATE=$(date +%Y-%m-%d)
+          fi
+          
+          echo "tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+          echo "date=$RELEASE_DATE" >> $GITHUB_OUTPUT
+          
+          # Save body to file for multiline content
+          echo "$RELEASE_BODY" > /tmp/release_body.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Update CHANGELOG
         run: |
-          # Get the latest release info
-          RELEASE_TAG="${{ github.event.release.tag_name }}"
-          RELEASE_NAME="${{ github.event.release.name }}"
-          RELEASE_BODY="${{ github.event.release.body }}"
-          RELEASE_DATE=$(date +%Y-%m-%d)
+          # Get the release info
+          RELEASE_TAG="${{ steps.release-info.outputs.tag }}"
+          RELEASE_NAME="${{ steps.release-info.outputs.name }}"
+          RELEASE_DATE="${{ steps.release-info.outputs.date }}"
+          RELEASE_BODY=$(cat /tmp/release_body.txt)
 
           # Prepare the new entry and insert it
           {
@@ -44,5 +77,5 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add CHANGELOG.md
-          git commit -m "docs: update CHANGELOG for ${{ github.event.release.tag_name }}" || exit 0
+          git commit -m "docs: update CHANGELOG for ${{ steps.release-info.outputs.tag }}" || exit 0
           git push

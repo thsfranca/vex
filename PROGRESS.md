@@ -129,7 +129,7 @@ echo '(def result (+ 10 5))' > test.vex
 
 ### Current Architecture ✅ **BASIC IMPLEMENTATION**
 - **Single-phase transpiler** with basic AST to Go code generation
-- **Core transpiler** with basic language construct support (`internal/transpiler/transpiler.go`)
+- **Core transpiler** with modular language construct support (`internal/transpiler/`)
 - **ANTLR parser integration** for parsing Vex syntax into AST
 - **Basic code generator** for core Go output patterns
 - **CLI tool** with `transpile`, `run`, and `build` commands

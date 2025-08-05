@@ -44,7 +44,13 @@ vex/
 ├── internal/                       # Core implementation packages
 │   └── transpiler/                 # Vex to Go transpiler engine
 │       ├── parser/                 # Generated ANTLR parser files
-│       └── transpiler.go           # Main transpiler logic
+│       ├── core.go                 # Core transpiler functionality
+│       ├── expressions.go          # Expression handling
+│       ├── macros.go               # Macro system implementation
+│       ├── special_forms.go        # Special form handling
+│       └── collections.go          # Collection type support
+├── core/                           # Core Vex standard library
+│   └── core.vx                     # Standard library definitions
 ├── docs/                           # Documentation
 │   ├── grammar-reference.md        # Language grammar documentation
 │   ├── vex-implementation-requirements.md # Development roadmap
@@ -52,17 +58,24 @@ vex/
 ├── examples/                       # Example Vex programs
 │   ├── valid/                      # Valid syntax examples for testing
 │   ├── invalid/                    # Invalid syntax for parser validation
+│   ├── stdlib/                     # Standard library examples
 │   └── go-usage/                   # Go integration examples
 ├── tools/                          # Development and build tools
 │   ├── grammar/                    # ANTLR4 grammar definition (Vex.g4)
 │   ├── grammar-validator/          # Grammar validation with Go parser
-│   └── (various other tools)/      # CI, debugging, and release utilities
+│   ├── coverage-updater/           # Test coverage automation
+│   ├── release-manager/            # Automated release management
+│   ├── change-detector/            # CI change detection
+│   ├── debug-helper/               # Development debugging utilities
+│   ├── extension-tester/           # VSCode extension testing
+│   └── gen/                        # Generated parser files
 ├── .github/                        # CI/CD infrastructure
 │   ├── workflows/                  # GitHub Actions workflows
 │   └── scripts/                    # Extracted workflow scripts
 ├── assets/                         # Project assets (logo, etc.)
 ├── scripts/                        # Build and utility scripts
-└── vscode-extension/               # VSCode language support (optional)
+├── coverage/                       # Test coverage reports
+└── vscode-extension/               # VSCode language support
 ```
 
 ## Language Vision

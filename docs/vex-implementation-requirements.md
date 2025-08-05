@@ -141,7 +141,7 @@ Basic module system supports:
 
 **Single-Stage Compilation Pipeline** ✅
 1. ✅ Parse Vex source into AST using ANTLR parser
-2. ⏳ Macro registration and expansion phase (planned)
+2. ✅ Macro registration and expansion phase
 3. ⏳ Perform semantic analysis and type checking (planned)
 4. ⏳ Type inference with comprehensive type system (planned)
 5. ✅ Generate basic Go code from AST

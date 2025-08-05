@@ -7,7 +7,7 @@ list
     ;
 
 array
-    : '[' (array | list| SYMBOL | STRING)+ ']'
+    : '[' (array | list| SYMBOL | STRING)* ']'
     ;
 
 SYMBOL

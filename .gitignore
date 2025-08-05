@@ -68,3 +68,7 @@ vex
 coverage.out
 cli_coverage.out
 
+coverage-report.md
+coverage_core.html
+coverage.html
+*.coverage.out

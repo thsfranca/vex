@@ -734,7 +734,7 @@ func TestTranspilerMissingCoverage(t *testing.T) {
 		{
 			name:     "Test visitList with complex nesting",
 			input:    `((+ 1 2) (- 3 4) (* 5 6))`,
-			expected: `_ = (+12)((3 - 4), (5 * 6))`, // Actual transpiler output
+			expected: `_ = (1 + 2)((3 - 4), (5 * 6))`, // Function call with arithmetic expressions
 		},
 		{
 			name:     "Test visitNode with all node types",

@@ -1,0 +1,12 @@
+;; Macro System Examples
+;; Demonstrates basic macro functionality
+
+;; Simple identity macro
+(macro identity [x] x)
+
+;; Simple greeting macro
+(macro greet [name] (fmt/Println "Hello" name))
+
+;; Using the macros (commented until we import fmt)
+;; (identity "world")
+;; (greet "Vex")

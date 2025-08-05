@@ -1,0 +1,11 @@
+;; Lambda Functions Example
+;; Demonstrates basic lambda (anonymous function) functionality
+
+;; Simple lambda that returns its parameter
+(def identity (fn [x] x))
+
+;; Lambda with multiple parameters (returns first parameter)
+(def getFirst (fn [a b] a))
+
+;; Lambda assigned to variable
+(def getMessage (fn [name] name))

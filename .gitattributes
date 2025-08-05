@@ -1,0 +1,26 @@
+# Language detection configuration for GitHub
+
+# Exclude generated parser files from language statistics
+tools/gen/** linguist-generated=true
+tools/grammar-validator/grammar/** linguist-generated=true  
+tools/grammar-validator/parser/** linguist-generated=true
+internal/transpiler/parser/** linguist-generated=true
+
+# Mark Vex files as a custom language (not Go)
+*.vx linguist-language=Vex
+*.vex linguist-language=Vex
+
+# Ensure Go files are properly detected
+*.go linguist-language=Go
+
+# Exclude coverage and build artifacts
+*.out linguist-generated=true
+coverage/** linguist-generated=true
+bin/** linguist-generated=true
+
+# Exclude documentation from language stats (optional)
+docs/** linguist-documentation=true
+*.md linguist-documentation=true
+
+# Exclude VSCode extension files from main language detection
+vscode-extension/** linguist-vendored=true

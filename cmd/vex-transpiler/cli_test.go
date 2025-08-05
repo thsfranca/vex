@@ -568,10 +568,10 @@ func TestRunCommandDirect(t *testing.T) {
 	}
 }
 
-func TestExecCommandDirect(t *testing.T) {
+func TestBuildCommandDirect(t *testing.T) {
 	tempDir := t.TempDir()
 	
-	// Create core.vx file for exec command
+	// Create core.vx file for build command
 	coreFile := filepath.Join(tempDir, "core.vx")
 	coreContent := `(import "fmt")`
 	err := os.WriteFile(coreFile, []byte(coreContent), 0644)
@@ -580,16 +580,16 @@ func TestExecCommandDirect(t *testing.T) {
 	}
 
 	// Create test Vex file
-	inputFile := filepath.Join(tempDir, "exec-test.vx")
+	inputFile := filepath.Join(tempDir, "build-test.vx")
 	vexContent := `(import "fmt")
-(fmt/Println "Hello from exec test")`
+(fmt/Println "Hello from build test")`
 	
 	err = os.WriteFile(inputFile, []byte(vexContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create input file: %v", err)
 	}
 
-	// Test execCommand logic
+	// Test buildCommand logic
 	tests := []struct {
 		name      string
 		inputFile string
@@ -597,13 +597,13 @@ func TestExecCommandDirect(t *testing.T) {
 		shouldErr bool
 	}{
 		{
-			name:      "Valid exec command",
+			name:      "Valid build command",
 			inputFile: inputFile,
 			verbose:   false,
 			shouldErr: false,
 		},
 		{
-			name:      "Valid exec command with verbose",
+			name:      "Valid build command with verbose",
 			inputFile: inputFile,
 			verbose:   true,
 			shouldErr: false,
@@ -623,9 +623,9 @@ func TestExecCommandDirect(t *testing.T) {
 			defer os.Chdir(oldWd)
 			os.Chdir(tempDir)
 
-			// Test execCommand logic (simplified version that won't actually run)
+			// Test buildCommand logic (simplified version that won't actually build)
 			err := func() error {
-				// Test the transpilation part of execCommand
+				// Test the transpilation part of buildCommand
 				tr := transpiler.New()
 				
 				// Load core (this tests loadCoreVex)
@@ -681,9 +681,9 @@ func TestMainFunctionDirect(t *testing.T) {
 			expected: "should handle run",
 		},
 		{
-			name:     "Exec command structure",
-			args:     []string{"vex", "exec"},
-			expected: "should handle exec",
+			name:     "Build command structure",
+			args:     []string{"vex", "build"},
+			expected: "should handle build",
 		},
 	}
 
@@ -712,7 +712,7 @@ func TestMainFunctionDirect(t *testing.T) {
 			} else {
 				command := os.Args[1]
 				switch command {
-				case "transpile", "run", "exec":
+				case "transpile", "run", "build":
 					t.Logf("Would handle %s command", command)
 				case "-h", "--help":
 					t.Logf("Would show help")

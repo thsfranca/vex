@@ -123,6 +123,7 @@ go build -o vex cmd/vex-transpiler/main.go
 echo '(def result (+ 10 5))' > test.vex
 ./vex transpile -input test.vex -output test.go
 ./vex run -input test.vex
+./vex build -input test.vex -output test-binary
 ```
 
 ### Current Architecture ✅ **BASIC IMPLEMENTATION**
@@ -130,7 +131,7 @@ echo '(def result (+ 10 5))' > test.vex
 - **Core transpiler** with basic language construct support (`internal/transpiler/transpiler.go`)
 - **ANTLR parser integration** for parsing Vex syntax into AST
 - **Basic code generator** for core Go output patterns
-- **CLI tool** with `transpile`, `run`, and `exec` commands
+- **CLI tool** with `transpile`, `run`, and `build` commands
 
 ---
 

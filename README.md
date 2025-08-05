@@ -109,7 +109,7 @@ The uniform S-expression structure + functional design means AI models can:
 The project currently includes:
 - **ANTLR4 grammar** for S-expressions, arrays, symbols, and strings
 - **Basic transpiler** that converts core Vex constructs to Go
-- **CLI tool** (`vex`) with `transpile`, `run`, and `exec` commands
+- **CLI tool** (`vex`) with `transpile`, `run`, and `build` commands
 - **Core language features**:
   - Variable definitions: `(def x 10)` → `x := 10`
   - Arithmetic expressions: `(+ 1 2)` → `1 + 2`
@@ -126,7 +126,7 @@ The project currently includes:
 
 ### Working Today 🚀
 
-You can transpile and run Vex programs:
+You can transpile, run, and build Vex programs:
 
 ```bash
 # Build the transpiler
@@ -136,8 +136,11 @@ go build -o vex cmd/vex-transpiler/main.go
 echo '(def x (+ 5 3))' > example.vex
 ./vex transpile -input example.vex -output example.go
 
-# Or transpile and run directly
+# Compile and execute everything
 ./vex run -input example.vex
+
+# Build a binary executable
+./vex build -input example.vex -output hello-world
 ```
 
 Outputs valid Go code:
@@ -148,6 +151,11 @@ func main() {
     x := 5 + 3
 }
 ```
+
+**Command Overview:**
+- **`transpile`** - Convert Vex source code to Go (for inspection or integration)
+- **`run`** - Compile and execute Vex programs directly (includes core.vx if available)
+- **`build`** - Create standalone binary executables from Vex programs
 
 Current features working:
 ```vex
@@ -307,7 +315,7 @@ See [docs/vex-implementation-requirements.md](docs/vex-implementation-requiremen
 ✅ **Basic Transpilation**
 - Core Vex to Go transpilation working
 - Variable definitions, arithmetic, imports, function calls
-- CLI tool with transpile, run, and exec commands
+- CLI tool with transpile, run, and build commands
 
 ✅ **Development Tooling** 
 - Modular Go tools for CI/CD operations

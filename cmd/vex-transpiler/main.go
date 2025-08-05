@@ -26,8 +26,8 @@ func main() {
 		transpileCommand(os.Args[2:])
 	case "run":
 		runCommand(os.Args[2:])
-	case "exec":
-		execCommand(os.Args[2:])
+	case "build":
+		buildCommand(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", command)
 		printUsage()
@@ -40,15 +40,15 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage:\n")
 	fmt.Fprintf(os.Stderr, "  vex transpile -input <file.vex> [-output <file.go>] [-verbose]\n")
 	fmt.Fprintf(os.Stderr, "  vex run -input <file.vex> [-verbose]\n")
-	fmt.Fprintf(os.Stderr, "  vex exec <file.vex> [-verbose]\n\n")
+	fmt.Fprintf(os.Stderr, "  vex build -input <file.vex> [-output <binary>] [-verbose]\n\n")
 	fmt.Fprintf(os.Stderr, "Commands:\n")
 	fmt.Fprintf(os.Stderr, "  transpile  Transpile Vex source code to Go\n")
-	fmt.Fprintf(os.Stderr, "  run        Transpile and run Vex source code\n")
-	fmt.Fprintf(os.Stderr, "  exec       Execute Vex file directly (includes core.vx)\n\n")
+	fmt.Fprintf(os.Stderr, "  run        Compile and execute Vex source code\n")
+	fmt.Fprintf(os.Stderr, "  build      Build Vex source code to binary executable\n\n")
 	fmt.Fprintf(os.Stderr, "Examples:\n")
 	fmt.Fprintf(os.Stderr, "  vex transpile -input example.vex -output example.go\n")
 	fmt.Fprintf(os.Stderr, "  vex run -input example.vex\n")
-	fmt.Fprintf(os.Stderr, "  vex exec example.vex\n")
+	fmt.Fprintf(os.Stderr, "  vex build -input example.vex -output example\n")
 }
 
 func transpileCommand(args []string) {
@@ -121,18 +121,24 @@ func runCommand(args []string) {
 		fmt.Fprintf(os.Stderr, "🚀 Running Vex file: %s\n", *inputFile)
 	}
 
-	// Read input file
-	content, err := ioutil.ReadFile(*inputFile)
+	// Load core.vx if it exists
+	coreContent := loadCoreVex(*verbose)
+
+	// Read user input file
+	userContent, err := ioutil.ReadFile(*inputFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
 		os.Exit(1)
 	}
 
+	// Combine core + user code
+	fullProgram := coreContent + "\n" + string(userContent)
+
 	// Create transpiler
 	t := transpiler.New()
 
-	// Transpile
-	goCode, err := t.TranspileFromInput(string(content))
+	// Transpile combined program
+	goCode, err := t.TranspileFromInput(fullProgram)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Transpilation error: %v\n", err)
 		os.Exit(1)
@@ -161,10 +167,9 @@ func runCommand(args []string) {
 		}
 	}()
 
-	// Run the Go code
-	// Note: Go will complain about unused variables, but the code will compile if syntax is correct
-	cmd := exec.Command("go", "build", "-o", strings.TrimSuffix(tmpGoFile, ".go"), tmpGoFile)
-	var buildErr error
+	// Build the Go code
+	executable := strings.TrimSuffix(tmpGoFile, ".go")
+	cmd := exec.Command("go", "build", "-o", executable, tmpGoFile)
 	buildOutput, buildErr := cmd.CombinedOutput()
 
 	if buildErr != nil {
@@ -172,10 +177,10 @@ func runCommand(args []string) {
 		os.Exit(1)
 	}
 
-	// If build succeeded, run the executable
-	executable := strings.TrimSuffix(tmpGoFile, ".go")
-	defer os.Remove(executable) // Clean up executable
+	// Clean up executable when done
+	defer os.Remove(executable)
 
+	// Run the executable
 	runCmd := exec.Command(executable)
 	runCmd.Stdout = os.Stdout
 	runCmd.Stderr = os.Stderr
@@ -191,34 +196,42 @@ func runCommand(args []string) {
 	}
 }
 
-func execCommand(args []string) {
-	execFlags := flag.NewFlagSet("exec", flag.ExitOnError)
+func buildCommand(args []string) {
+	buildFlags := flag.NewFlagSet("build", flag.ExitOnError)
 	var (
-		verbose = execFlags.Bool("verbose", false, "Enable verbose output")
+		inputFile  = buildFlags.String("input", "", "Input .vex file to build")
+		outputFile = buildFlags.String("output", "", "Output binary file (optional, defaults to input filename)")
+		verbose    = buildFlags.Bool("verbose", false, "Enable verbose output")
 	)
-	execFlags.Parse(args)
+	buildFlags.Parse(args)
 
-	// Get input file from remaining args
-	remainingArgs := execFlags.Args()
-	if len(remainingArgs) == 0 {
-		fmt.Fprintf(os.Stderr, "Error: input file is required\n\n")
+	if *inputFile == "" {
+		fmt.Fprintf(os.Stderr, "Error: -input flag is required\n\n")
 		printUsage()
 		os.Exit(1)
 	}
 
-	inputFile := remainingArgs[0]
+	// Determine output filename
+	var outputBinary string
+	if *outputFile == "" {
+		// Default to input filename without extension
+		baseName := strings.TrimSuffix(filepath.Base(*inputFile), filepath.Ext(*inputFile))
+		outputBinary = baseName
+	} else {
+		outputBinary = *outputFile
+	}
 
 	if *verbose {
-		fmt.Fprintf(os.Stderr, "🚀 Executing Vex file: %s\n", inputFile)
+		fmt.Fprintf(os.Stderr, "🔨 Building Vex file: %s -> %s\n", *inputFile, outputBinary)
 	}
 
 	// Load core.vx if it exists
 	coreContent := loadCoreVex(*verbose)
 
 	// Read user input file
-	userContent, err := ioutil.ReadFile(inputFile)
+	userContent, err := ioutil.ReadFile(*inputFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", inputFile, err)
+		fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
 		os.Exit(1)
 	}
 
@@ -236,81 +249,69 @@ func execCommand(args []string) {
 	}
 
 	if *verbose {
-		fmt.Fprintf(os.Stderr, "🔄 Transpilation complete, executing...\n")
-		fmt.Fprintf(os.Stderr, "Generated Go code:\n%s\n", goCode)
+		fmt.Fprintf(os.Stderr, "🔄 Transpilation complete, building binary...\n")
 	}
 
-	// Create .vex directory structure
-	vexDir := ".vex"
-	genDir := filepath.Join(vexDir, "gen")
-	binDir := filepath.Join(vexDir, "bin")
-	
-	if err := os.MkdirAll(genDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error creating .vex directory: %v\n", err)
+	// Create temporary directory for build
+	tmpDir := os.TempDir()
+	buildDir := filepath.Join(tmpDir, "vex-build-"+strings.ReplaceAll(time.Now().Format("20060102-150405"), ":", ""))
+	if err := os.MkdirAll(buildDir, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Error creating build directory: %v\n", err)
 		os.Exit(1)
 	}
-	if err := os.MkdirAll(binDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error creating .vex/bin directory: %v\n", err)
-		os.Exit(1)
-	}
+
+	// Clean up temporary directory when done
+	defer func() {
+		if err := os.RemoveAll(buildDir); err != nil && *verbose {
+			fmt.Fprintf(os.Stderr, "⚠️  Warning: could not remove temporary build directory %s: %v\n", buildDir, err)
+		}
+	}()
 
 	// Generate go.mod with detected dependencies
 	detectedModules := t.GetDetectedModules()
-	if err := generateGoMod(vexDir, detectedModules, *verbose); err != nil {
+	if err := generateGoMod(buildDir, detectedModules, *verbose); err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Error generating go.mod: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Write Go code to .vex/gen/main.go
-	mainGoFile := filepath.Join(genDir, "main.go")
+	// Write Go code to build directory
+	mainGoFile := filepath.Join(buildDir, "main.go")
 	if err := ioutil.WriteFile(mainGoFile, []byte(goCode), 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Error writing Go file: %v\n", err)
 		os.Exit(1)
 	}
 
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "📁 Generated Go module in %s/\n", vexDir)
-	}
-
-	// Download dependencies
+	// Download dependencies if needed
 	if len(detectedModules) > 0 {
 		if *verbose {
 			fmt.Fprintf(os.Stderr, "📦 Downloading dependencies...\n")
 		}
-		if err := downloadDependencies(vexDir, *verbose); err != nil {
+		if err := downloadDependencies(buildDir, *verbose); err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error downloading dependencies: %v\n", err)
 			os.Exit(1)
 		}
 	}
 
-	// Build binary
-	binaryPath := filepath.Join(binDir, "app")
-	if err := buildBinary(vexDir, genDir, binaryPath, *verbose); err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Build error: %v\n", err)
+	// Build binary to final location
+	absOutputPath, err := filepath.Abs(outputBinary)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Error getting absolute output path: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Execute binary (use absolute path)
-	absBinaryPath, err := filepath.Abs(binaryPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error getting absolute path: %v\n", err)
-		os.Exit(1)
-	}
+	cmd := exec.Command("go", "build", "-o", absOutputPath, "main.go")
+	cmd.Dir = buildDir
 	
-	cmd := exec.Command(absBinaryPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err = cmd.Run()
-	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "❌ Execution error: %v\n", err)
-		}
+	buildOutput, buildErr := cmd.CombinedOutput()
+	if buildErr != nil {
+		fmt.Fprintf(os.Stderr, "❌ Build error: %v\n%s", buildErr, string(buildOutput))
 		os.Exit(1)
 	}
 
 	if *verbose {
-		fmt.Fprintf(os.Stderr, "✅ Execution complete\n")
+		fmt.Fprintf(os.Stderr, "✅ Binary built successfully: %s\n", absOutputPath)
+	} else {
+		fmt.Printf("Binary built: %s\n", outputBinary)
 	}
 }
 

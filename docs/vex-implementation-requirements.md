@@ -88,7 +88,7 @@ Basic ANTLR grammar supports:
 - ✅ S-expression syntax for core language constructs
 - ✅ Module import declarations
 - ✅ Go interop syntax for calling Go functions
-- ⏳ Macro definition and expansion syntax (planned)
+- ✅ Macro definition and expansion syntax
 - ⏳ Pattern matching expressions for destructuring (planned)
 - ⏳ Lambda expressions with capture semantics (planned)
 
@@ -112,6 +112,12 @@ Basic ANTLR grammar supports:
 
 ; Conditional expressions
 (if (> x 0) (fmt/Println "positive") (fmt/Println "negative"))
+
+; Macro definitions
+(macro greet [name] (fmt/Println "Hello" name))
+
+; Function definitions using defn macro
+(defn add [x y] (+ x y))
 ```
 
 **Planned Function Definition Syntax**
@@ -176,23 +182,24 @@ Basic integration with Go standard library:
 - ⏳ JSON processing with encoding/json (planned)
 - ⏳ Database operations via database/sql (planned)
 
-## Advanced Feature: Macro System ⏳ **PLANNED**
+## Advanced Feature: Macro System ✅ **BASIC IMPLEMENTATION**
 
-**Macro Definition and Expansion** ⏳ **PLANNED**
-A comprehensive macro system to be implemented that will support:
-- ⏳ User-defined macro registration using `(macro name [params] body)` syntax
-- ⏳ Dynamic macro expansion during compilation
-- ⏳ Macro template system with parameter substitution
-- ⏳ Integration with semantic analysis and type checking
-- ⏳ Multi-pass compilation with macro preprocessing
+**Macro Definition and Expansion** ✅ **BASIC IMPLEMENTATION**
+A comprehensive macro system has been implemented with:
+- ✅ User-defined macro registration using `(macro name [params] body)` syntax
+- ✅ Dynamic macro expansion during compilation
+- ✅ Macro template system with parameter substitution
+- ✅ Built-in defn macro for function definitions
+- ⏳ Integration with semantic analysis and type checking (planned)
+- ✅ Basic compilation with macro preprocessing
 
-**Macro Architecture** ⏳ **PLANNED**
-- **Macro Registry**: Dynamic registration and lookup system
-- **Macro Collector**: Pre-processing phase to find macro definitions
-- **Macro Expander**: Template expansion with parameter substitution
-- **Integration**: Seamless integration with transpiler pipeline
+**Macro Architecture** ✅ **BASIC IMPLEMENTATION**
+- **Macro Registry**: ✅ Dynamic registration and lookup system implemented
+- **Macro Collector**: ✅ Registration phase to collect macro definitions
+- **Macro Expander**: ✅ Template expansion with parameter substitution
+- **Integration**: ✅ Integration with transpiler pipeline
 
-This metaprogramming capability will enable AI code generation patterns and is planned to explore AI-friendly language design concepts.
+This metaprogramming capability enables AI code generation patterns and explores AI-friendly language design concepts through uniform macro syntax.
 
 ## Phase 4: Immutable Data Structures
 

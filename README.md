@@ -44,9 +44,7 @@ vex/
 ├── internal/                       # Core implementation packages
 │   └── transpiler/                 # Vex to Go transpiler engine
 │       ├── parser/                 # Generated ANTLR parser files
-│       ├── transpiler.go           # Main transpiler logic
-│       ├── ast_visitor.go          # AST traversal and code generation
-│       └── codegen.go              # Go code generation utilities
+│       └── transpiler.go           # Main transpiler logic
 ├── docs/                           # Documentation
 │   ├── grammar-reference.md        # Language grammar documentation
 │   ├── vex-implementation-requirements.md # Development roadmap
@@ -106,20 +104,20 @@ The uniform S-expression structure + functional design means AI models can:
 - **Scale automatically**: Every program handles thousands of concurrent requests
 - **Focus on logic**: No syntax complexity, no concurrency complexity
 
-### Current Status: Advanced Transpiler with Type System ✅
+### Current Status: Basic Transpiler Foundation ✅
 
 The project currently includes:
-- **ANTLR4 grammar** for S-expressions, arrays, symbols, strings, and advanced language constructs
-- **Advanced transpiler** with multi-phase compilation pipeline
-- **CLI tool** (`vex`) with `transpile` and `run` commands
-- **Advanced language features**:
+- **ANTLR4 grammar** for S-expressions, arrays, symbols, and strings
+- **Basic transpiler** that converts core Vex constructs to Go
+- **CLI tool** (`vex`) with `transpile`, `run`, and `exec` commands
+- **Core language features**:
   - Variable definitions: `(def x 10)` → `x := 10`
   - Arithmetic expressions: `(+ 1 2)` → `1 + 2`
   - Import system: `(import "fmt")` → `import "fmt"`
-  - Macro system with user-defined macros
-  - Semantic analysis with type checking and inference
-  - Symbol resolution and namespace management
-  - Type-aware code generation
+  - Go function calls: `(fmt/Println "Hello")` → `fmt.Println("Hello")`
+  - Basic arrays: `[1 2 3]` → `[]interface{}{1, 2, 3}`
+  - Conditional expressions: `(if condition then else)` → Go if statements
+  - Sequential execution: `(do expr1 expr2)` → Multiple Go statements
 - **Comprehensive CI/CD pipeline** with automated quality checks
 - **Automated release process** with PR label-based version management  
 - **Grammar validation system** testing both valid and invalid syntax
@@ -151,7 +149,7 @@ func main() {
 }
 ```
 
-Advanced features working:
+Current features working:
 ```vex
 ;; Import Go packages
 (import "fmt")
@@ -159,23 +157,32 @@ Advanced features working:
 ;; Define variables with complex expressions
 (def result (+ (* 10 5) (- 20 5)))
 
-;; Macro definitions
-(macro debug-print [value] (fmt/Println "DEBUG:" value))
-
 ;; Call Go functions
 (fmt/Println "Hello from Vex!")
+
+;; Basic arrays
+(def numbers [1 2 3 4])
+
+;; Conditional expressions
+(if true (fmt/Println "condition works") (fmt/Println "else"))
+
+;; Sequential execution
+(do
+  (def x 10)
+  (fmt/Println x))
 ```
 
 ### Next Phase 🚧
 
 - **Function definitions** (`defn`) for user-defined functions
+- **Type system** with inference and checking for safety and performance
+- **Macro system** for metaprogramming capabilities
+- **Enhanced semantic analysis** for better error reporting and optimization
 - **AI-friendly HTTP patterns** with semantic annotations for endpoints
 - **HTTP server framework** that AI can generate from simple descriptions
 - **JWT authentication patterns** as the most market-valuable auth method
 - **Immutable data structures** with structural sharing
 - **Standard library** for common operations
-
-Note: Type system with inference and checking is already implemented.
 
 ## Usage
 
@@ -286,21 +293,26 @@ See [docs/vex-implementation-requirements.md](docs/vex-implementation-requiremen
 
 ## Project Status
 
-**Current Phase**: Core Language Infrastructure Complete (✅ Phases 1-4 Complete)  
-**Next Phase**: Function Definitions & Control Flow (Phase 5)  
+**Current Phase**: Basic Transpiler Foundation Complete (✅ Phase 1-2 Complete)  
+**Next Phase**: Advanced Language Features (Phase 3: Type System & Semantic Analysis)  
 **Timeline**: Personal study project for learning compiler concepts, developed for fun in spare time
 
 ### Infrastructure Achievements
 
 ✅ **Grammar Foundation**
-- ANTLR4 grammar with comprehensive S-expression support
+- ANTLR4 grammar with S-expression, array, and symbol support
 - Automated parser generation and validation
 - Test-driven grammar development with valid/invalid examples
+
+✅ **Basic Transpilation**
+- Core Vex to Go transpilation working
+- Variable definitions, arithmetic, imports, function calls
+- CLI tool with transpile, run, and exec commands
 
 ✅ **Development Tooling** 
 - Modular Go tools for CI/CD operations
 - Grammar validator with detailed error reporting
-- VSCode extension with full language support
+- VSCode extension with syntax highlighting
 
 ✅ **CI/CD Pipeline**
 - Automated testing on all pull requests
@@ -323,9 +335,9 @@ This project maintains high code quality through automated testing:
 | **Development Tools** | 90%+ | ✅ *Active* | CI/CD infrastructure reliability |
 | **VSCode Extension** | 85%+ | ✅ *Active* | IDE integration quality |
 | **Parser** | 95%+ | ✅ *Complete* | Critical language component |
-| **Transpiler** | 90%+ | ✅ *Complete* | Core functionality with advanced features |
-| **Type System** | 85%+ | ✅ *Complete* | Type inference and checking |
-| **Macro System** | 80%+ | ✅ *Complete* | Metaprogramming capabilities |
+| **Basic Transpiler** | 90%+ | ✅ *Active* | Core transpilation functionality |
+| **Type System** | 85%+ | ⏳ *Planned* | Type inference and checking |
+| **Macro System** | 80%+ | ⏳ *Planned* | Metaprogramming capabilities |
 | **Standard Library** | 80%+ | ⏳ *Planned* | User-facing features |
 
 > **Quality Philosophy**: Higher coverage requirements for more critical components. The current infrastructure ensures robust development practices for future language implementation.

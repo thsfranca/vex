@@ -78,9 +78,8 @@ Whitespace (spaces, tabs, newlines) and commas are ignored.
 (fmt/Println "Hello from Vex!")
 (fmt/Printf "Value: %d\n" x)
 
-; Macro definitions (advanced feature)
-(macro debug-print [value] 
-  (fmt/Println "DEBUG:" value))
+; Conditional expressions
+(if (> x 0) (fmt/Println "positive") (fmt/Println "negative"))
 
 ; Complex expressions
 (def calculation (+ (* 10 5) (- 20 (/ 100 5))))
@@ -113,8 +112,8 @@ Whitespace (spaces, tabs, newlines) and commas are ignored.
 - **Comments**: `; comment text`
 - **Nested structures**: Lists and arrays can contain other lists and arrays
 - **Namespace syntax**: `namespace/function` for Go interop
-- **Macro definitions**: `(macro name [params] body)`
 - **Import statements**: `(import "package-name")`
+- **Conditional expressions**: `(if condition then else)`
 - **Complex arithmetic**: Nested mathematical expressions
 
 ## Usage with ANTLR

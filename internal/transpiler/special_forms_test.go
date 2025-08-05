@@ -454,3 +454,142 @@ func TestTranspiler_PrintlnSpecialHandling(t *testing.T) {
 		})
 	}
 }
+// TestTranspiler_HandleMacroFunction tests the handleMacro function to increase coverage
+func TestTranspiler_HandleMacroFunction(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Simple macro definition",
+			input:    `(macro greet [name] (fmt/Printf "Hello %s!" name))`,
+			expected: "// Registered macro: greet with parameters [name]",
+		},
+		{
+			name:     "Macro with multiple parameters",
+			input:    `(macro add [x y] (+ x y))`,
+			expected: "// Registered macro: add with parameters [x y]",
+		},
+		{
+			name:     "Macro with no parameters",
+			input:    `(macro zero [] 0)`,
+			expected: "// Registered macro: zero with parameters []",
+		},
+		{
+			name:     "Macro with insufficient args - error case",
+			input:    `(macro incomplete)`,
+			expected: "// Error: macro requires name, parameter list, and body",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := New()
+			result, err := tr.TranspileFromInput(tt.input)
+			
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestTranspiler_HandleLambdaSuccess tests successful lambda function creation
+func TestTranspiler_HandleLambdaSuccess(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Lambda with single parameter",
+			input:    "(fn [x] x)",
+			expected: "func(x interface{}) interface{} { return x }",
+		},
+		{
+			name:     "Lambda with multiple parameters",
+			input:    "(fn [x y] (+ x y))",
+			expected: "func(x interface{}, y interface{}) interface{} { return (x + y) }",
+		},
+		{
+			name:     "Lambda with no parameters",
+			input:    "(fn [] 42)",
+			expected: "func() interface{} { return 42 }",
+		},
+		{
+			name:     "Lambda with complex body",
+			input:    `(fn [n] (fmt/Printf "Number: %d" n))`,
+			expected: "func(n interface{}) interface{} { return fmt.Printf(\"Number: %d\", n) }",
+		},
+		{
+			name:     "Lambda error case - insufficient args",
+			input:    "(fn [x])",
+			expected: "// Error: fn requires parameter list and body",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := New()
+			result, err := tr.TranspileFromInput(tt.input)
+			
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestTranspiler_CollectionOpEdgeCases tests missing edge cases for collection operations
+func TestTranspiler_CollectionOpEdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Rest operation with empty array",
+			input:    `(def result (rest []))`,
+			expected: "func() []interface{} { if len([]interface{}{}) > 1 { return []interface{}{}[1:] } else { return []interface{}{} } }()",
+		},
+		{
+			name:     "Cons with multiple elements",
+			input:    `(def result (cons 1 [2 3]))`,
+			expected: "append([]interface{}{1}, []interface{}{2, 3}...)",
+		},
+		{
+			name:     "Count with variable argument",
+			input:    `(def arr [1 2 3]) (def result (count arr))`,
+			expected: "len(arr)",
+		},
+		{
+			name:     "First with variable argument",
+			input:    `(def arr [1 2 3]) (def result (first arr))`,
+			expected: "func() interface{} { if len(arr) > 0 { return arr[0] } else { return nil } }()",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := New()
+			result, err := tr.TranspileFromInput(tt.input)
+			
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			}
+		})
+	}
+}

@@ -2,7 +2,7 @@
 
 ## Quick Start Guide
 
-Vex is a functional programming language that transpiles to Go, designed specifically for AI code generation and concurrent HTTP services. This guide will get you up and running in minutes.
+Vex is a functional programming language that transpiles to Go, designed specifically for AI code generation and concurrent HTTP services. With a sophisticated macro system and comprehensive Go interoperability, Vex provides a clean, predictable syntax that both humans and AI can understand. This guide will get you up and running in minutes.
 
 ## Prerequisites
 
@@ -20,10 +20,7 @@ cd vex
 
 ### 2. Build the Transpiler
 ```bash
-# Option 1: Using Make (recommended)
-make build-transpiler
-
-# Option 2: Direct Go build
+# Build the Vex transpiler
 go build -o vex cmd/vex-transpiler/main.go
 ```
 
@@ -33,6 +30,12 @@ go build -o vex cmd/vex-transpiler/main.go
 ```
 
 You should see the available commands: `transpile`, `run`, and `build`.
+
+The Vex transpiler includes:
+- **Advanced macro system** with defn macro for function definitions
+- **Comprehensive Go interoperability** for accessing any Go package
+- **Sophisticated code generation** that produces clean, idiomatic Go
+- **Symbol table management** for proper variable scoping
 
 ## Your First Vex Program
 
@@ -118,12 +121,22 @@ Everything in Vex follows the pattern: `(operation arguments...)`
 
 ### Function Definitions
 ```vex
-;; Define a function using defn macro
+;; Define a function using the defn macro
 (defn greet [name]
   (fmt/Printf "Hello, %s!\n" name))
 
-;; Call the function
+;; Define a function with multiple parameters
+(defn add [x y]
+  (+ x y))
+
+;; Define a function with complex logic
+(defn absolute [x]
+  (if (< x 0) (- x) x))
+
+;; Call the functions
 (greet "World")
+(def result (add 5 3))
+(def positive (absolute -42))
 ```
 
 ### Conditional Logic
@@ -177,7 +190,26 @@ Run with: `./vex run -input calculator.vx`
 (fmt/Println "Numbers:" numbers)
 ```
 
-### 3. Macro Usage
+### 3. Advanced Function Definitions
+```vex
+;; advanced.vx
+(import "fmt")
+
+;; Define a function that uses other functions
+(defn square [x] (* x x))
+(defn sum-of-squares [a b] (+ (square a) (square b)))
+
+;; Define a function with conditional logic
+(defn max [a b]
+  (if (> a b) a b))
+
+;; Use the functions
+(def result (sum-of-squares 3 4))  ; 25
+(def larger (max 10 5))            ; 10
+(fmt/Printf "Result: %d, Larger: %d\n" result larger)
+```
+
+### 4. Custom Macros
 ```vex
 ;; macros.vx
 (import "fmt")
@@ -186,9 +218,14 @@ Run with: `./vex run -input calculator.vx`
 (macro log [message]
   (fmt/Printf "[LOG] %s\n" message))
 
-;; Use the macro
+;; Define a debugging macro
+(macro debug [var]
+  (fmt/Printf "[DEBUG] %s = %v\n" var var))
+
+;; Use the macros
 (log "Application started")
-(log "Processing data")
+(def x 42)
+(debug x)
 ```
 
 ## Available Commands
@@ -285,22 +322,34 @@ vim my-program.vx
 
 ## What's Working Now
 
-✅ **Variables and basic types**  
-✅ **Arithmetic operations**  
-✅ **Go function calls**  
-✅ **Import system**  
-✅ **Basic macros**  
-✅ **Function definitions (via defn macro)**  
-✅ **Conditional expressions**  
-✅ **Arrays**  
+✅ **Variables and basic types** - Complete support for integers, strings, booleans, symbols  
+✅ **Arithmetic operations** - Full arithmetic with nested expressions  
+✅ **Go function calls** - Comprehensive Go interoperability with namespace syntax  
+✅ **Import system** - Advanced import management with module detection  
+✅ **Sophisticated macro system** - User-defined macros with parameter validation  
+✅ **Function definitions** - Complete defn macro with parameter lists and complex bodies  
+✅ **Conditional expressions** - if/then/else with proper code generation  
+✅ **Arrays** - Array literals and basic operations  
+✅ **Symbol table management** - Proper scoping and variable resolution  
+✅ **Error handling** - Comprehensive error reporting for parsing and transpilation  
+✅ **Advanced code generation** - Clean, idiomatic Go output  
+
+## Current Architecture
+
+The Vex transpiler now includes:
+
+- **Multi-stage compilation pipeline** with parsing, macro expansion, semantic analysis, and code generation
+- **Advanced macro system** with template expansion and validation
+- **Symbol table management** for proper variable scoping
+- **Comprehensive Go interoperability** for seamless library access
+- **Clean code generation** producing idiomatic Go output
 
 ## Coming Soon
 
-⏳ **Type system with inference**  
-⏳ **Enhanced function definitions**  
-⏳ **HTTP server framework**  
-⏳ **Standard library**  
-⏳ **Error handling constructs**  
-⏳ **Performance optimizations**
+⏳ **Enhanced type system** - Type inference and checking  
+⏳ **Package discovery system** - Advanced module management  
+⏳ **HTTP server framework** - Built-in web service capabilities  
+⏳ **Standard library** - Core functions and utilities  
+⏳ **Performance optimizations** - Advanced compiler optimizations  
 
 Happy coding with Vex! 🚀

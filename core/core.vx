@@ -1,44 +1,45 @@
-;; Vex Standard Library - Core Macros and Functions
-;; This file contains essential macros that should be available in all Vex programs
+;; Core Vex Language Macros
+;; This file defines the essential macros for the Vex language
 
-;; Define the 'defn' macro for function definitions
-;; (defn name [params] body) expands to (def name (fn [params] body))
+;; defn - Function definition macro  
+;; Transforms (defn name [params] body) into (def name (fn [params] body))
 (macro defn [name params body]
-  (def ~name (fn ~params ~body)))
+  (def name (fn params body)))
 
-;; Define the 'when' macro for conditional execution without else
-;; (when condition body) expands to (if condition body nil)
-(macro when [condition body]
-  (if ~condition ~body nil))
+;; when - Conditional execution when condition is true
+;; Transforms (when test body) into (if test body)
+(macro when [test body]
+  (if test body))
 
-;; Define the 'unless' macro for negated conditional execution
-;; (unless condition body) expands to (if (not condition) body nil)
-(macro unless [condition body]
-  (if (not ~condition) ~body nil))
+;; unless - Conditional execution when condition is false  
+;; Transforms (unless test body) into (if (not test) body)
+(macro unless [test body]
+  (if (not test) body))
 
-;; Define the 'let' macro for local bindings
-;; (let [var1 val1 var2 val2] body) creates local scope with bindings
-(macro let [bindings body]
-  ((fn [] ~body))) ;; Simplified version - full implementation would handle bindings
+;; Collection operation macros
+;; These provide safe, high-level collection operations using primitive functions
 
-;; Define the 'cond' macro for multi-way conditionals
-;; (cond test1 result1 test2 result2 ... :else default) 
-(macro cond [& clauses]
-  ;; Simplified version - full implementation would handle multiple clauses
-  (if ~(first clauses) ~(second clauses) nil))
+;; first - Get the first element of a collection
+;; Gracefully handles missing arguments with safe fallbacks
+(macro first [coll]
+  (get coll 0))
 
-;; Define the '->' macro for threading expressions (pipe forward)
-;; (-> x (f a) (g b)) expands to (g (f x a) b)
-(macro -> [expr & forms]
-  ;; Simplified version - full implementation would chain the forms
-  ~expr)
+;; rest - Get all elements except the first
+;; Transforms (rest coll) into (slice coll 1)
+(macro rest [coll]
+  (slice coll 1))
 
-;; Define the '->>' macro for threading last (pipe last)
-;; (->> x (f a) (g b)) expands to (g b (f a x))
-(macro ->> [expr & forms]
-  ;; Simplified version - full implementation would chain the forms with expr last
-  ~expr)
+;; count - Get the number of elements in a collection
+;; Transforms (count coll) into (len coll)
+(macro count [coll]
+  (len coll))
 
-;; These macros provide the foundation for more complex Vex programs
-;; and demonstrate how language features can be built in pure Vex code
-;; rather than being hardcoded in the transpiler.
+;; cons - Prepend an element to a collection
+;; Transforms (cons elem coll) into (append [elem] coll)
+(macro cons [elem coll]
+  (append [elem] coll))
+
+;; empty? - Check if a collection is empty
+;; Transforms (empty? coll) into (= (len coll) 0)
+(macro empty? [coll]
+  (= (len coll) 0))

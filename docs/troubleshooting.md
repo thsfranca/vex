@@ -163,11 +163,27 @@ Error: macro greet expects 1 arguments, got 0
 (macro greet [name] (fmt/Printf "Hello %s" name))
 (greet "World")
 
-;; ✅ Or make arguments optional in macro design
-(macro greet [name] 
-  (if name 
-    (fmt/Printf "Hello %s" name)
-    (fmt/Println "Hello!")))
+;; ✅ Use defn macro for functions instead of macro
+(defn greet [name] (fmt/Printf "Hello %s" name))
+(greet "World")
+```
+
+#### Problem: Defn macro issues
+```vex
+(defn add [x] (+ x y))  ; Undefined variable y
+```
+```
+Error: undefined symbol: y
+```
+
+**Solution:**
+```vex
+;; ✅ Ensure all variables are defined or passed as parameters
+(defn add [x y] (+ x y))
+
+;; ✅ Or define the variable separately
+(def y 10)
+(defn add [x] (+ x y))
 ```
 
 ## Performance Issues
@@ -239,6 +255,37 @@ go run debug.go
 dlv debug debug.go
 ```
 
+#### Problem: Symbol resolution errors
+```vex
+(defn helper [x] (* x 2))
+(defn main [] (helper 5))  ; May fail if helper not properly resolved
+```
+
+**Solution:**
+```bash
+# Check symbol table in transpiled Go
+./vex transpile -input problem.vx -output debug.go
+grep -n "helper" debug.go  # Check function generation
+
+# Ensure proper function ordering in Vex
+(defn helper [x] (* x 2))
+(defn main [] (helper 5))
+```
+
+#### Problem: Macro expansion debugging
+```vex
+(macro debug-print [var] 
+  (fmt/Printf "DEBUG: %s = %v\n" var var))
+(debug-print x)  ; May expand incorrectly
+```
+
+**Solution:**
+```bash
+# Check macro expansion in generated Go
+./vex transpile -input macro-test.vx -output debug.go
+# Look for macro expansion comments in output
+```
+
 ### Testing Strategies
 
 #### Problem: Hard to test Vex programs
@@ -249,13 +296,22 @@ dlv debug debug.go
 echo '(+ 1 2)' > test.vx
 ./vex run -input test.vx
 
-# 2. Use transpilation for unit testing
+# 2. Test function definitions
+echo '(import "fmt") (defn add [x y] (+ x y)) (fmt/Println (add 3 4))' > func-test.vx
+./vex run -input func-test.vx
+
+# 3. Use transpilation for unit testing
 ./vex transpile -input logic.vx -output logic.go
 # Then test logic.go with Go testing tools
 
-# 3. Test macros separately
-echo '(macro test [] "works")' > macro-test.vx
+# 4. Test macros separately
+echo '(import "fmt") (macro log [msg] (fmt/Printf "[LOG] %s\n" msg)) (log "test")' > macro-test.vx
 ./vex run -input macro-test.vx
+
+# 5. Test complex programs step by step
+./vex transpile -input complex.vx -output debug.go
+go fmt debug.go  # Check syntax
+go build debug.go  # Check compilation
 ```
 
 ## Integration Issues
@@ -378,6 +434,7 @@ cat debug.go
 - **Documentation**: Check [docs/](.) for complete guides
 - **Examples**: See [examples/valid/](../examples/valid/) for working code
 - **Grammar**: Reference [grammar-reference.md](grammar-reference.md)
+- **Known Bugs**: Check [known-bugs.md](known-bugs.md) for tracked issues and workarounds
 - **GitHub Issues**: [Report bugs](https://github.com/thsfranca/vex/issues)
 - **AI Reference**: [ai-quick-reference.md](ai-quick-reference.md) for structured help
 

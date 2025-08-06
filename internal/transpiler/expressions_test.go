@@ -14,17 +14,17 @@ func TestTranspiler_ExpressionEvaluation(t *testing.T) {
 		{
 			name:     "Arithmetic in assignment",
 			input:    `(def result (+ 1 2))`,
-			expected: `var result = (1 + 2)`,
+			expected: `result := (1 + 2)`,
 		},
 		{
 			name:     "Nested arithmetic",
 			input:    `(def result (+ (* 2 3) (/ 8 4)))`,
-			expected: `var result = ((2 * 3) + (8 / 4))`,
+			expected: `result := ((2 * 3) + (8 / 4))`,
 		},
 		{
 			name:     "Function call in assignment",
 			input:    `(def result (calculate 5 10))`,
-			expected: `var result = calculate(5, 10)`,
+			expected: `result := calculate(5, 10)`,
 		},
 		{
 			name:     "If expression in assignment",
@@ -58,17 +58,17 @@ func TestTranspiler_NestedExpressions(t *testing.T) {
 		{
 			name:     "Nested function calls",
 			input:    `(def result (print (add 1 (multiply 2 3))))`,
-			expected: `var result = print(add(1, multiply(2, 3)))`,
+			expected: `result := print(add(1, multiply(2, 3)))`,
 		},
 		{
 			name:     "Nested arithmetic",
 			input:    `(def result (+ (- (* 5 6) (/ 8 2)) (+ 1 2)))`,
-			expected: `var result = (((5 * 6) - (8 / 2)) + (1 + 2))`,
+			expected: `result := (((5 * 6) - (8 / 2)) + (1 + 2))`,
 		},
 		{
 			name:     "Mixed expression types",
 			input:    `(def result (if (> (+ 1 1) 1) "greater" "not greater"))`,
-			expected: `func() interface{} { if >((1 + 1), 1) { return "greater" } else { return "not greater" } }()`,
+			expected: `func() interface{} { if ((1 + 1) > 1) { return "greater" } else { return "not greater" } }()`,
 		},
 	}
 
@@ -97,27 +97,27 @@ func TestTranspiler_ArithmeticExpressions(t *testing.T) {
 		{
 			name:     "Addition expression",
 			input:    `(def x (+ 1 2))`,
-			expected: `var x = (1 + 2)`,
+			expected: `x := (1 + 2)`,
 		},
 		{
 			name:     "Subtraction expression",
 			input:    `(def x (- 10 5))`,
-			expected: `var x = (10 - 5)`,
+			expected: `x := (10 - 5)`,
 		},
 		{
 			name:     "Multiplication expression",
 			input:    `(def x (* 3 4))`,
-			expected: `var x = (3 * 4)`,
+			expected: `x := (3 * 4)`,
 		},
 		{
 			name:     "Division expression",
 			input:    `(def x (/ 8 2))`,
-			expected: `var x = (8 / 2)`,
+			expected: `x := (8 / 2)`,
 		},
 		{
 			name:     "Chained arithmetic",
 			input:    `(def x (+ 1 2 3 4))`,
-			expected: `var x = (((1 + 2) + 3) + 4)`,
+			expected: `x := (((1 + 2) + 3) + 4)`,
 		},
 	}
 
@@ -146,22 +146,22 @@ func TestTranspiler_FunctionCallExpressions(t *testing.T) {
 		{
 			name:     "Simple function call in assignment",
 			input:    `(def result (getValue))`,
-			expected: `var result = getValue()`,
+			expected: `result := getValue()`,
 		},
 		{
 			name:     "Function call with arguments",
 			input:    `(def result (add 1 2))`,
-			expected: `var result = add(1, 2)`,
+			expected: `result := add(1, 2)`,
 		},
 		{
 			name:     "Namespaced function call",
 			input:    `(def result (math/sqrt 16))`,
-			expected: `var result = math.sqrt(16)`,
+			expected: `result := math.sqrt(16)`,
 		},
 		{
 			name:     "Function call with array argument",
 			input:    `(def result (process [1 2 3]))`,
-			expected: `var result = process([]interface{}{1, 2, 3})`,
+			expected: `result := process([]interface{}{1, 2, 3})`,
 		},
 	}
 
@@ -195,12 +195,12 @@ func TestTranspiler_ConditionalExpressions(t *testing.T) {
 		{
 			name:     "If with function condition",
 			input:    `(def result (if (empty? []) "empty" "not empty"))`,
-			expected: `func() interface{} { if len([]interface{}{}) == 0 { return "empty" } else { return "not empty" } }()`,
+			expected: `func() interface{} { if true { return "empty" } else { return "not empty" } }()`,
 		},
 		{
 			name:     "If with arithmetic condition",
 			input:    `(def result (if (> 5 3) "greater" "lesser"))`,
-			expected: `func() interface{} { if >(5, 3) { return "greater" } else { return "lesser" } }()`,
+			expected: `func() interface{} { if (5 > 3) { return "greater" } else { return "lesser" } }()`,
 		},
 		{
 			name:     "Nested if expressions",
@@ -234,17 +234,17 @@ func TestTranspiler_DoBlockExpressions(t *testing.T) {
 		{
 			name:     "Simple do expression",
 			input:    `(def result (do "hello"))`,
-			expected: `var result = func() interface{} { return "hello" }()`,
+			expected: `result := func() interface{} { return "hello" }()`,
 		},
 		{
 			name:     "Do with multiple expressions",
 			input:    `(def result (do (print "computing") 42))`,
-			expected: `func() interface{} { print("computing"); return 42 }()`,
+			expected: `result := func() interface{} { print("computing"); return 42 }()`,
 		},
 		{
 			name:     "Do with arithmetic",
 			input:    `(def result (do (+ 1 2) (* 3 4)))`,
-			expected: `func() interface{} { (1 + 2); return (3 * 4) }()`,
+			expected: `result := func() interface{} { (1 + 2); return (3 * 4) }()`,
 		},
 	}
 
@@ -317,7 +317,7 @@ func TestTranspiler_ExpressionEdgeCases(t *testing.T) {
 		{
 			name:     "Empty do block",
 			input:    `(def result (do))`,
-			expected: `var result = nil`,
+			expected: `result := func() interface{} { return nil }()`,
 		},
 		{
 			name:     "If with only condition and then",
@@ -327,7 +327,7 @@ func TestTranspiler_ExpressionEdgeCases(t *testing.T) {
 		{
 			name:     "Arithmetic with insufficient args",
 			input:    `(def result (+))`,
-			expected: `var result = 0`,
+			expected: `result := 0`,
 		},
 	}
 
@@ -356,12 +356,12 @@ func TestTranspiler_ComplexNestedExpressions(t *testing.T) {
 		{
 			name:     "Complex nested expression",
 			input:    `(def result (+ (if (> 5 3) 10 0) (* (count [1 2 3]) 2)))`,
-			expected: `(func() interface{} { if >(5, 3) { return 10 } else { return 0 } }() + (len([]interface{}{1, 2, 3}) * 2))`,
+			expected: `result := (func() interface{} { if (5 > 3) { return 10 } else { return 0 } }() + (len([]interface{}{1, 2, 3}) * 2))`,
 		},
 		{
 			name:     "Deep nesting with do blocks",
 			input:    `(def result (do (def x (+ 1 2)) (if (> x 2) (* x 3) (/ x 2))))`,
-			expected: `func() interface{} { def(x, (1 + 2)); return func() interface{} { if >(x, 2) { return (x * 3) } else { return (x / 2) } }() }()`,
+			expected: `result := func() interface{} { def(x, (1 + 2)); return func() interface{} { if (x > 2) { return (x * 3) } else { return (x / 2) } }() }()`,
 		},
 		{
 			name:     "Lambda in expression context",

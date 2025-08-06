@@ -1,6 +1,6 @@
 ---
 title: "Vex Language - AI Quick Reference"
-version: "0.2.0"
+version: "0.3.0"
 compatibility: "Go 1.21+"
 last-updated: "2025-01-09"
 ai-model-compatibility: "GPT-4, Claude-3+, and similar models"
@@ -11,12 +11,13 @@ purpose: "Machine-readable reference for AI code generation"
 
 ## Core Language Model
 
-**Execution Pipeline**: Parse S-expressions → AST → Macro expansion → Go transpilation → Compile & execute  
+**Execution Pipeline**: Parse S-expressions → AST → Macro expansion → Semantic analysis → Go transpilation → Compile & execute  
 **Syntax Pattern**: `(operation arg1 arg2 ...)`  
 **Output Target**: Go source code  
-**Type System**: Static typing with Go interop (planned)  
+**Type System**: Basic types with Go interop | Advanced typing planned  
 **Concurrency**: Automatic via Go goroutines  
-**Project Status**: Phase 1-2,4 complete | Phase 3,5+ planned  
+**Macro System**: Comprehensive user-defined macros with defn support  
+**Project Status**: Phase 1-4 complete | Phase 5+ planned  
 
 ## Language Specification
 
@@ -226,8 +227,10 @@ Constants: ALL-CAPS (MAX-RETRIES, DEFAULT-PORT)
 | **Conditionals** | ✅ | `(if c t e)` | `(if (> x 0) x 0)` | Logic branching |
 | **Sequences** | ✅ | `(do e1 e2)` | `(do (def x 1) x)` | Multiple exprs |
 | **Macros** | ✅ | `(macro n [p] b)` | `(macro log [m] ...)` | Code generation |
-| **Functions** | ✅ | `(defn n [p] b)` | `(defn add [x y] (+))` | Reusable logic |
+| **Functions** | ✅ | `(defn n [p] b)` | `(defn add [x y] (+ x y))` | Reusable logic |
 | **Arrays** | ✅ | `[a b c]` | `[1 2 3]` | Collections |
+| **Symbol tables** | ✅ | Variable scoping | Automatic | Proper scoping |
+| **Error handling** | ✅ | Parse/compile errors | Comprehensive | Error reporting |
 | **Types** | ⏳ | `[x: int]` | Future | Type annotations |
 | **HTTP** | ⏳ | `(http-server)` | Future | Web services |
 | **Loops** | ⏳ | `(for x in xs)` | Future | Iteration |
@@ -291,17 +294,27 @@ echo '(def x (+ 5 3))' > test.vx
 4. Test generated code with `vex run` command
 5. Use macros for repetitive code patterns
 
+**Current Capabilities**:
+- ✅ Comprehensive function definitions with defn macro
+- ✅ Advanced macro system for code generation
+- ✅ Complete Go interoperability for library access
+- ✅ Symbol table management for proper scoping
+- ✅ Sophisticated error reporting and validation
+- ✅ Clean code generation producing idiomatic Go
+
 **Current Limitations**:
-- No type checking (use Go types via interop)
-- No error handling (use Go patterns)  
+- No advanced type checking (basic types supported, use Go types via interop)
+- No structured error handling (use Go patterns)  
 - No loops (use recursion or Go interop)
-- No complex data structures (use Go types)
+- No immutable data structures (use Go types)
 
 **Future AI Enhancements** (Planned):
+- Advanced type inference and checking
+- Package discovery and dependency management
 - Semantic annotations for intent-based generation
 - Type-aware code completion
 - Automatic HTTP endpoint generation
-- Error handling patterns
+- Structured error handling patterns
 - Performance optimization hints
 
 ---

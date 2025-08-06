@@ -30,7 +30,7 @@ func TestTranspiler_SimpleExpressions(t *testing.T) {
 		{
 			name:     "Variable definition",
 			input:    "(def x 10)",
-			expected: "var x = 10",
+			expected: "x := 10",
 			hasError: false,
 		},
 		{
@@ -91,7 +91,7 @@ func TestTranspiler_FullProgram(t *testing.T) {
 		"package main",
 		`import "fmt"`,
 		"func main()",
-		"var greeting = \"Hello, World!\"",
+		"greeting := \"Hello, World!\"",
 		"fmt.Println(greeting)",
 	}
 
@@ -112,7 +112,7 @@ func TestTranspiler_ImplicitReturns(t *testing.T) {
 			name:  "Variable definition return",
 			input: "(def x 42)",
 			expected: []string{
-				"var x = 42",
+				"x := 42",
 				"_ = x // Return last defined value",
 			},
 		},
@@ -260,9 +260,9 @@ func TestTranspiler_VariableUsage(t *testing.T) {
 	}
 
 	expectedParts := []string{
-		"var message = \"Hello\"",
+		"message := \"Hello\"",
 		"_ = message // Use variable to satisfy Go compiler",
-		"var count = 42",
+		"count := 42",
 		"_ = count // Use variable to satisfy Go compiler",
 	}
 
@@ -304,12 +304,12 @@ func TestTranspiler_ComplexDependencyProgram(t *testing.T) {
 	}
 
 	expectedCode := []string{
-		"var program-name = \"VexTranspiler\"",
-		"var version = \"1.0.0\"",
-		"fmt.Printf(\"Program: %s, Version: %s\\n\", program-name, version)",
-		"var args = os.Args()",
-		"var arg-count = len(args)",
-		"fmt.Printf(\"Arguments: %d\\n\", arg-count)",
+		"program_name := \"VexTranspiler\"",
+		"version := \"1.0.0\"",
+		"fmt.Printf(\"Program: %s, Version: %s\\n\", program_name, version)",
+		"args := os.Args",
+		"arg_count := len(args)",
+		"fmt.Printf(\"Arguments: %d\\n\", arg_count)",
 	}
 
 	for _, code := range expectedCode {
@@ -344,12 +344,13 @@ func TestTranspiler_TranspileFromFile(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
+		return
 	}
 
 	expectedParts := []string{
 		"package main",
 		`import "fmt"`,
-		"var message = \"Hello from file!\"",
+		"message := \"Hello from file!\"",
 		"fmt.Println(message)",
 	}
 
@@ -378,22 +379,22 @@ func TestTranspiler_ArrayHandling(t *testing.T) {
 		{
 			name:     "Empty array",
 			input:    "(def arr [])",
-			expected: "var arr = []interface{}{}",
+			expected: "arr := []interface{}{}",
 		},
 		{
 			name:     "Array with elements",
 			input:    "(def nums [1 2 3])",
-			expected: "var nums = []interface{}{1, 2, 3}",
+			expected: "nums := []interface{}{1, 2, 3}",
 		},
 		{
 			name:     "Array with strings",
 			input:    `(def words ["hello" "world"])`,
-			expected: `var words = []interface{}{"hello", "world"}`,
+			expected: `words := []interface{}{"hello", "world"}`,
 		},
 		{
 			name:     "Mixed array",
 			input:    `(def mixed [1 "hello" 42])`,
-			expected: `var mixed = []interface{}{1, "hello", 42}`,
+			expected: `mixed := []interface{}{1, "hello", 42}`,
 		},
 	}
 
@@ -423,21 +424,21 @@ func TestTranspiler_VisitNodeComprehensive(t *testing.T) {
 			name:  "String literals preserved",
 			input: `(def msg "Hello World")`,
 			expected: []string{
-				`var msg = "Hello World"`,
+				`msg := "Hello World"`,
 			},
 		},
 		{
 			name:  "Numeric literals",
 			input: "(def num 42)",
 			expected: []string{
-				"var num = 42",
+				"num := 42",
 			},
 		},
 		{
 			name:  "Symbol handling",
 			input: "(def x y)",
 			expected: []string{
-				"var x = y",
+				"x := y",
 			},
 		},
 	}

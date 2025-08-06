@@ -87,6 +87,30 @@ VERSION                                # Current version file
 
 ## 🎯 Best Practices
 
+### Branch Naming Convention
+
+Follow these patterns for consistent branch organization:
+
+| Prefix | Purpose | Example | Description |
+|--------|---------|---------|-------------|
+| `feat/` | New features | `feat/http-server-framework` | Adding new language features or functionality |
+| `fix/` | Bug fixes | `fix/transpiler-test-failures` | Fixing bugs or issues |
+| `docs/` | Documentation | `docs/comprehensive-documentation-update` | Documentation updates and improvements |
+| `chore/` | Maintenance | `chore/remove-dates-from-docs` | Project maintenance, cleanup, refactoring |
+| `test/` | Testing | `test/comprehensive-unit-tests` | Adding or improving tests |
+| `patch/` | Small fixes | `patch/comprehensive-auto-release-fixes` | Minor fixes and patches |
+
+#### Branch Naming Rules
+- Use **kebab-case** (lowercase with hyphens)
+- Be **descriptive** but **concise**
+- Include **context** about what the branch does
+- Examples:
+  - ✅ `feat/package-discovery-system`
+  - ✅ `docs/update-implementation-status`
+  - ✅ `fix/macro-parameter-validation`
+  - ❌ `my-branch` (not descriptive)
+  - ❌ `Fix_Bug` (wrong case style)
+
 ### PR Titles
 - Use clear, descriptive titles
 - They become release notes

@@ -51,12 +51,13 @@ vex/
 │       └── collections.go          # Collection type support
 ├── core/                           # Core Vex standard library
 │   └── core.vx                     # Standard library definitions
-├── docs/                           # Documentation
+├── docs/                           # Comprehensive documentation
 │   ├── getting-started.md          # Quick start tutorial
 │   ├── ai-quick-reference.md       # AI-optimized language reference
 │   ├── cli-reference.md            # Complete CLI tool documentation
 │   ├── grammar-reference.md        # Language grammar documentation
 │   ├── troubleshooting.md          # Common issues and solutions
+│   ├── known-bugs.md               # Bug tracking and workarounds
 │   ├── vex-implementation-requirements.md # Development roadmap
 │   └── release-process.md          # Release automation documentation
 ├── examples/                       # Example Vex programs

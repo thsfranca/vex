@@ -626,7 +626,17 @@ func TestBuildCommandDirect(t *testing.T) {
 			// Test buildCommand logic (simplified version that won't actually build)
 			err := func() error {
 				// Test the transpilation part of buildCommand
-				tr := transpiler.New()
+				// Create a transpiler without macros for testing
+				config := transpiler.TranspilerConfig{
+					EnableMacros:     false,
+					CoreMacroPath:    "",
+					PackageName:      "main",
+					GenerateComments: true,
+				}
+				tr, err := transpiler.NewTranspilerWithConfig(config)
+				if err != nil {
+					return err
+				}
 				
 				// Load core (this tests loadCoreVex)
 				coreCode := loadCoreVex(tt.verbose)
@@ -635,8 +645,8 @@ func TestBuildCommandDirect(t *testing.T) {
 				}
 				
 				// Test transpilation
-				_, err := tr.TranspileFromFile(tt.inputFile)
-				return err
+				_, transpileErr := tr.TranspileFromFile(tt.inputFile)
+				return transpileErr
 			}()
 
 			if tt.shouldErr && err == nil {

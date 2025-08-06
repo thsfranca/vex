@@ -139,6 +139,36 @@ func (g *GoCodeGenerator) VisitList(ctx *parser.ListContext) (Value, error) {
 
 	// Get function name (first child after '(')
 	funcNameNode := ctx.GetChild(1)
+	
+	// Check if the function name is actually a nested expression
+	if listCtx, ok := funcNameNode.(*parser.ListContext); ok {
+		// This is a nested expression like ((+ 1 2) args...)
+		// We need to evaluate the nested expression first
+		funcResult, err := g.VisitList(listCtx)
+		if err != nil {
+			return nil, err
+		}
+		funcName := funcResult.String()
+		
+		// Extract arguments for the function call
+		args := make([]string, 0, childCount-3)
+		for i := 2; i < childCount-1; i++ { // Skip '(' and ')'
+			child := ctx.GetChild(i)
+			if child != nil {
+				argValue, err := g.visitNode(child)
+				if err != nil {
+					return nil, err
+				}
+				args = append(args, argValue.String())
+			}
+		}
+		
+		// Generate function call with the evaluated function name
+		argsStr := strings.Join(args, ", ")
+		code := fmt.Sprintf("%s(%s)", funcName, argsStr)
+		return analysis.NewBasicValue(code, "interface{}"), nil
+	}
+	
 	funcName := g.nodeToString(funcNameNode)
 
 	// Extract arguments - pre-allocate with estimated capacity

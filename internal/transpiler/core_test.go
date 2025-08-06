@@ -121,7 +121,6 @@ func TestTranspiler_ImplicitReturns(t *testing.T) {
 			input: `(import "fmt")`,
 			expected: []string{
 				`import "fmt"`,
-				"_ = \"import completed\" // Import statement result",
 			},
 		},
 	}

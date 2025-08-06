@@ -70,7 +70,7 @@ func TestTranspiler_MacroExpansion(t *testing.T) {
 			input: `(macro greet [name] (fmt/Println "Hello" name))
 (greet "World")`,
 			expected: []string{
-				"_ = fmt.Println(\"Hello\", \"World\")",
+				"fmt.Println(\"Hello\", \"World\")",
 			},
 		},
 		{

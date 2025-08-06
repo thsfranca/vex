@@ -70,7 +70,6 @@ func (b *TranspilerBuilder) Build() (*VexTranspiler, error) {
 	if b.config.EnableMacros {
 		macroConfig := macro.Config{
 			CoreMacroPath:    b.config.CoreMacroPath,
-			EnableFallback:   false,
 			EnableValidation: true,
 		}
 		registry := macro.NewRegistry(macroConfig)

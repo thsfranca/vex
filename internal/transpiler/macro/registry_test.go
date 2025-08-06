@@ -8,7 +8,6 @@ import (
 func TestNewRegistry(t *testing.T) {
 	config := Config{
 		CoreMacroPath:    "test.vx",
-		EnableFallback:   true,
 		EnableValidation: true,
 	}
 	
@@ -207,17 +206,11 @@ func TestRegistry_GetMacro(t *testing.T) {
 	}
 }
 
-// TestRegistry_LoadFallbackMacros removed - fallback macros are obsolete
-// All macros should be defined in core/core.vx, not hardcoded
-
-// TestRegistry_LoadCoreMacros_Fallback and TestRegistry_LoadCoreMacros_NoFallback removed
-// These tests were testing obsolete scenarios that don't apply to the current architecture:
-// 1. Fallback macros are removed - all macros are in core/core.vx  
-// 2. LoadCoreMacros will always succeed when core/core.vx exists
+// Obsolete tests removed - all macros are in core/core.vx
+// LoadCoreMacros will always succeed when core/core.vx exists
 
 func TestRegistry_LoadCoreMacros_PreventDuplicate(t *testing.T) {
 	registry := NewRegistry(Config{
-		EnableFallback:   true,
 		EnableValidation: false,
 	})
 	

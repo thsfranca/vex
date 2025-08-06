@@ -26,7 +26,6 @@ type Registry struct {
 // Config holds macro system configuration
 type Config struct {
 	CoreMacroPath    string
-	EnableFallback   bool
 	EnableValidation bool
 }
 
@@ -62,7 +61,7 @@ func (r *Registry) GetMacro(name string) (*Macro, bool) {
 	return macro, exists
 }
 
-// LoadCoreMacros loads core macros from file or fallback
+// LoadCoreMacros loads core macros from file
 func (r *Registry) LoadCoreMacros() error {
 	if r.coreLoaded {
 		return nil
@@ -83,11 +82,6 @@ func (r *Registry) LoadCoreMacros() error {
 				return r.loadMacrosFromContent(string(content))
 			}
 		}
-	}
-
-	// Fallback to built-in macros
-	if r.config.EnableFallback {
-		return r.loadFallbackMacros()
 	}
 
 	return fmt.Errorf("no core macros available - tried paths: %v", corePaths)
@@ -178,12 +172,7 @@ func (r *Registry) parseMacroDefinition(listCtx *parser.ListContext) error {
 	return r.RegisterMacro(name, macro)
 }
 
-// loadFallbackMacros loads essential built-in macros as a last resort
-func (r *Registry) loadFallbackMacros() error {
-	// Only provide absolutely essential macros that are needed for the core to work
-	// Most macros should be defined in core/core.vx using (macro ...) syntax
-	return fmt.Errorf("no core macros file found - please ensure core/core.vx exists with macro definitions")
-}
+
 
 // validateMacro validates a macro definition
 func (r *Registry) validateMacro(name string, macro *Macro) error {

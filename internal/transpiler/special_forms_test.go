@@ -397,7 +397,7 @@ func TestTranspiler_ErrorHandlingPaths(t *testing.T) {
 			name:        "Arithmetic with insufficient args",
 			input:       `(+)`,
 			expectError: false,
-			expected:    `_ = 0`, // Arithmetic has fallback behavior
+			expected:    `_ = 0`, // Arithmetic returns 0 when no args provided
 		},
 		{
 			name:          "Lambda with insufficient args",

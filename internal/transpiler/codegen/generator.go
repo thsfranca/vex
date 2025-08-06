@@ -101,7 +101,19 @@ func (g *GoCodeGenerator) VisitProgram(ctx *parser.ProgramContext) error {
 						}
 					}
 				} else {
-					g.output.WriteString(fmt.Sprintf("_ = %s\n", value.String()))
+					// Special handling for certain statements that don't need assignments
+					valueStr := value.String()
+					if strings.HasPrefix(valueStr, "fmt.Println(") || 
+					   strings.HasPrefix(valueStr, "fmt.Printf(") || 
+					   strings.HasPrefix(valueStr, "\"import completed\"") {
+						// Don't assign these to _
+						if !strings.HasPrefix(valueStr, "\"import completed\"") {
+							g.output.WriteString(valueStr + "\n")
+						}
+						// Skip import completed messages entirely
+					} else {
+						g.output.WriteString(fmt.Sprintf("_ = %s\n", valueStr))
+					}
 				}
 			}
 		}

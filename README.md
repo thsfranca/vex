@@ -52,7 +52,11 @@ vex/
 ├── core/                           # Core Vex standard library
 │   └── core.vx                     # Standard library definitions
 ├── docs/                           # Documentation
+│   ├── getting-started.md          # Quick start tutorial
+│   ├── ai-quick-reference.md       # AI-optimized language reference
+│   ├── cli-reference.md            # Complete CLI tool documentation
 │   ├── grammar-reference.md        # Language grammar documentation
+│   ├── troubleshooting.md          # Common issues and solutions
 │   ├── vex-implementation-requirements.md # Development roadmap
 │   └── release-process.md          # Release automation documentation
 ├── examples/                       # Example Vex programs
@@ -318,6 +322,10 @@ This project explores key language implementation concepts with a focus on AI-fr
 ## Implementation Roadmap
 
 See [docs/vex-implementation-requirements.md](docs/vex-implementation-requirements.md) for the complete development plan, covering type systems, Go transpilation, immutable data structures, and production features.
+
+## AI Code Generation
+
+For AI models and automated code generation, see [docs/ai-quick-reference.md](docs/ai-quick-reference.md) for a machine-readable language specification with structured examples, decision trees, and error prevention patterns.
 
 ## Project Status
 

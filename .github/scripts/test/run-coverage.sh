@@ -4,7 +4,11 @@ echo "[TEST] Running tests with coverage analysis..."
 
 if find . -name "*_test.go" | grep -q .; then
     echo "[TEST] Running test command..."
-    go test -v -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/transpiler ./... > test_output.log 2>&1
+    # Build coverpkg list excluding generated parser package
+    COVERPKG_LIST=$(go list ./internal/transpiler/... | grep -v "/internal/transpiler/parser" | tr '\n' ',' | sed 's/,$//')
+
+    # Execute tests with coverage excluding parser from package list
+    go test -v -coverprofile=coverage.out -covermode=atomic -coverpkg="$COVERPKG_LIST" ./... > test_output.log 2>&1
     TEST_EXIT_CODE=$?
     
     # Check if tests actually passed by looking for "PASS" in output

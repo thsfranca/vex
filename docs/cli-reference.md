@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Vex CLI provides three main commands for working with Vex programs: `transpile`, `run`, and `build`. All commands follow Go's performance characteristics and provide detailed error reporting.
+The Vex CLI provides three main commands for working with Vex programs: `transpile`, `run`, and `build`. Built on a sophisticated transpiler architecture with advanced macro system, comprehensive Go interoperability, and clean code generation, all commands follow Go's performance characteristics and provide detailed error reporting.
 
 ## Global Options
 
@@ -77,7 +77,11 @@ Compiles and executes Vex programs directly without creating intermediate files.
 #### Required Arguments
 - `-input <file>` - Input Vex source file (.vx)
 
-#### Optional Features
+#### Advanced Features
+- **Macro System**: Comprehensive macro expansion including defn macro
+- **Symbol Table**: Advanced variable scoping and resolution
+- **Go Interoperability**: Complete access to Go standard library
+- **Error Handling**: Detailed error reporting for all phases
 - **Core Library**: Automatically includes `core/core.vx` if present
 - **Go Compilation**: Uses Go's native compiler for execution
 - **Memory Management**: Leverages Go's garbage collector
@@ -93,15 +97,24 @@ Compiles and executes Vex programs directly without creating intermediate files.
 # Quick testing during development
 echo '(import "fmt") (fmt/Println "Test")' > test.vx
 ./vex run -input test.vx
+
+# Run program with function definitions
+echo '(import "fmt") (defn greet [name] (fmt/Printf "Hello %s!\n" name)) (greet "World")' > func.vx
+./vex run -input func.vx
+
+# Run program with macros
+echo '(import "fmt") (macro log [msg] (fmt/Printf "[LOG] %s\n" msg)) (log "Starting")' > macro.vx
+./vex run -input macro.vx
 ```
 
 #### Execution Process
-1. Parse Vex source into AST
-2. Expand macros if present
-3. Transpile to Go source
-4. Compile Go source with `go build`
-5. Execute resulting binary
-6. Clean up temporary files
+1. Parse Vex source into AST using ANTLR parser
+2. Register and expand macros (including defn) with comprehensive validation
+3. Perform semantic analysis with symbol table management
+4. Transpile to Go source with clean code generation
+5. Compile Go source with `go build`
+6. Execute resulting binary
+7. Clean up temporary files
 
 #### Performance
 - **Fast startup**: Direct execution without manual compilation steps

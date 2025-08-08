@@ -62,6 +62,10 @@ vscode-extension/yarn.lock
 vex
 /vex-transpiler
 /fugo-transpiler
+test_*
+!test_*.go
+!test_*.vx
+!test_*.md
 
 # Coverage files
 *.out

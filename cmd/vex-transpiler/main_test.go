@@ -49,7 +49,7 @@ func TestMainFunction(t *testing.T) {
 			inputFile:      "test.vex",
 			inputContent:   "(def x 42)",
 			expectError:    false,
-			expectedStdout: "var x = 42",
+			expectedStdout: "x := 42",
 		},
 		{
 			name:           "Verbose transpilation",
@@ -57,7 +57,7 @@ func TestMainFunction(t *testing.T) {
 			inputFile:      "test.vex",
 			inputContent:   "(def x 42)",
 			expectError:    false,
-			expectedStdout: "var x = 42",
+			expectedStdout: "x := 42",
 			expectedStderr: "Transpiling:",
 		},
 		{
@@ -165,7 +165,7 @@ func TestMainFunction_OutputFile(t *testing.T) {
 
 	expectedParts := []string{
 		"package main",
-		`var greeting = "Hello World"`,
+		`greeting := "Hello World"`,
 		"fmt.Println(greeting)",
 	}
 
@@ -331,7 +331,7 @@ func TestMainFunction_StdoutOutput(t *testing.T) {
 	// Check that Go code was written to stdout
 	expectedParts := []string{
 		"package main",
-		`var message = "Hello stdout"`,
+		`message := "Hello stdout"`,
 		"func main() {",
 	}
 

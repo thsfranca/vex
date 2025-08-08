@@ -238,34 +238,40 @@ func TestTranspiler_EvaluateCollectionOpComprehensive(t *testing.T) {
 
 func TestTranspiler_EvaluateCollectionOpErrorPaths(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name          string
+		input         string
+		expectError   bool
+		errorContains string
 	}{
 		{
-			name:     "First with no arguments",
-			input:    `(first)`,
-			expected: `_ = nil // Error: first requires collection`,
+			name:          "First with no arguments",
+			input:         `(first)`,
+			expectError:   true,
+			errorContains: "macro 'first' expects 1 arguments, got 0",
 		},
 		{
-			name:     "Rest with no arguments",
-			input:    `(rest)`,
-			expected: `_ = []interface{}{} // Error: rest requires collection`,
+			name:          "Rest with no arguments",
+			input:         `(rest)`,
+			expectError:   true,
+			errorContains: "macro 'rest' expects 1 arguments, got 0",
 		},
 		{
-			name:     "Count with no arguments",
-			input:    `(count)`,
-			expected: `_ = 0 // Error: count requires collection`,
+			name:          "Count with no arguments",
+			input:         `(count)`,
+			expectError:   true,
+			errorContains: "macro 'count' expects 1 arguments, got 0",
 		},
 		{
-			name:     "Empty with no arguments",
-			input:    `(empty?)`,
-			expected: `_ = true // Error: empty? requires collection`,
+			name:          "Empty with no arguments",
+			input:         `(empty?)`,
+			expectError:   true,
+			errorContains: "macro 'empty?' expects 1 arguments, got 0",
 		},
 		{
-			name:     "Cons with insufficient arguments",
-			input:    `(cons 1)`,
-			expected: `_ = []interface{}{} // Error: cons requires element and collection`,
+			name:          "Cons with insufficient arguments",
+			input:         `(cons 1)`,
+			expectError:   true,
+			errorContains: "macro 'cons' expects 2 arguments, got 1",
 		},
 	}
 
@@ -274,12 +280,17 @@ func TestTranspiler_EvaluateCollectionOpErrorPaths(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
 			
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-			
-			if !strings.Contains(result, tt.expected) {
-				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("Expected error but got none. Result: %s", result)
+				}
+				if !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("Expected error to contain '%s', but got: %v", tt.errorContains, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
 			}
 		})
 	}

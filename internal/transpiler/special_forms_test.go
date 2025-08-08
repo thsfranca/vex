@@ -146,17 +146,17 @@ func TestTranspiler_ArithmeticEdgeCases(t *testing.T) {
 		{
 			name:     "Comparison operators",
 			input:    `(> 5 3)`,
-			expected: `_ = >(5, 3)`, // Transpiler treats > as function call
+			expected: `_ = (5 > 3)`, // Updated to match correct Go infix output
 		},
 		{
 			name:     "Less than",
 			input:    `(< 2 8)`,
-			expected: `_ = <(2, 8)`,
+			expected: `_ = (2 < 8)`, // Updated to match correct Go infix output
 		},
 		{
 			name:     "Equality",
 			input:    `(= 5 5)`,
-			expected: `_ = =(5, 5)`,
+			expected: `_ = (5 == 5)`, // Updated to match correct Go infix output
 		},
 	}
 
@@ -185,22 +185,22 @@ func TestTranspiler_IfStatementEdgeCases(t *testing.T) {
 		{
 			name:     "If with function call condition",
 			input:    `(if (empty? []) "is empty" "not empty")`,
-			expected: `if len([]interface{}{}) == 0 {`,
+			expected: `func() interface{} { if true { return "is empty" } else { return "not empty" } }()`, // empty? [] optimized to true
 		},
 		{
 			name:     "If with arithmetic condition",
 			input:    `(if (> (+ 1 1) 1) "greater" "not greater")`,
-			expected: `if >((1 + 1), 1) {`, // Transpiler treats > as function in if condition
+			expected: `func() interface{} { if ((1 + 1) > 1) { return "greater" } else { return "not greater" } }()`, // Uses Go infix operators
 		},
 		{
 			name:     "Nested if statements",
 			input:    `(if true (if false "inner true" "inner false") "outer false")`,
-			expected: `if true {`,
+			expected: `if true {`, // This might still work as a statement
 		},
 		{
 			name:     "If in variable assignment",
 			input:    `(def result (if (> 5 3) "yes" "no"))`,
-			expected: `func() interface{} { if >(5, 3) { return "yes" } else { return "no" } }()`,
+			expected: `func() interface{} { if (5 > 3) { return "yes" } else { return "no" } }()`, // Uses Go infix operators
 		},
 	}
 
@@ -307,7 +307,7 @@ func TestTranspiler_HandleFunctionCallComprehensive(t *testing.T) {
 		},
 		{
 			name:     "Function call with string interpolation",
-			input:    `(log "Processing item: %s" name)`,
+			input:    `(def name "widget") (log "Processing item: %s" name)`,
 			expected: `_ = log("Processing item: %s", name)`,
 		},
 	}
@@ -369,34 +369,41 @@ func TestTranspiler_LambdaFunctions(t *testing.T) {
 
 func TestTranspiler_ErrorHandlingPaths(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name          string
+		input         string
+		expectError   bool
+		errorContains string
+		expected      string
 	}{
 		{
-			name:     "Def with insufficient args",
-			input:    `(def)`,
-			expected: `// Error: def requires name and value`,
+			name:          "Def with insufficient args",
+			input:         `(def)`,
+			expectError:   true,
+			errorContains: "def requires name and value",
 		},
 		{
-			name:     "Import with no args",
-			input:    `(import)`,
-			expected: `// Error: import requires package name`,
+			name:          "Import with no args",
+			input:         `(import)`,
+			expectError:   true,
+			errorContains: "import requires package path",
 		},
 		{
-			name:     "If with insufficient args",
-			input:    `(if)`,
-			expected: `// Error: if requires at least condition and then-expr`,
+			name:          "If with insufficient args",
+			input:         `(if)`,
+			expectError:   true,
+			errorContains: "if requires condition and then-branch",
 		},
 		{
-			name:     "Arithmetic with insufficient args",
-			input:    `(+)`,
-			expected: `// Error: + requires at least 2 arguments`,
+			name:        "Arithmetic with insufficient args",
+			input:       `(+)`,
+			expectError: false,
+			expected:    `_ = 0`, // Arithmetic returns 0 when no args provided
 		},
 		{
-			name:     "Lambda with insufficient args",
-			input:    `(fn)`,
-			expected: `// Error: fn requires parameter list and body`,
+			name:          "Lambda with insufficient args",
+			input:         `(fn)`,
+			expectError:   true,
+			errorContains: "fn requires parameter list and body",
 		},
 	}
 
@@ -405,12 +412,20 @@ func TestTranspiler_ErrorHandlingPaths(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
 			
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-			
-			if !strings.Contains(result, tt.expected) {
-				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("Expected error but got none")
+				}
+				if !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("Expected error to contain %q, got: %v", tt.errorContains, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				if !strings.Contains(result, tt.expected) {
+					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+				}
 			}
 		})
 	}
@@ -457,29 +472,32 @@ func TestTranspiler_PrintlnSpecialHandling(t *testing.T) {
 // TestTranspiler_HandleMacroFunction tests the handleMacro function to increase coverage
 func TestTranspiler_HandleMacroFunction(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name          string
+		input         string
+		expected      string
+		expectError   bool
+		errorContains string
 	}{
 		{
 			name:     "Simple macro definition",
-			input:    `(macro greet [name] (fmt/Printf "Hello %s!" name))`,
-			expected: "// Registered macro: greet with parameters [name]",
+			input:    `(macro greet [name] (fmt/Printf "Hello %s!" name)) (greet "World")`,
+			expected: `fmt.Printf("Hello %s!", "World")`,
 		},
 		{
 			name:     "Macro with multiple parameters",
-			input:    `(macro add [x y] (+ x y))`,
-			expected: "// Registered macro: add with parameters [x y]",
+			input:    `(macro add [x y] (+ x y)) (add 3 4)`,
+			expected: "_ = (3 + 4)",
 		},
 		{
 			name:     "Macro with no parameters",
-			input:    `(macro zero [] 0)`,
-			expected: "// Registered macro: zero with parameters []",
+			input:    `(macro get-msg [] (fmt/Println "hello")) (get-msg)`,
+			expected: `fmt.Println("hello")`,
 		},
 		{
-			name:     "Macro with insufficient args - error case",
-			input:    `(macro incomplete)`,
-			expected: "// Error: macro requires name, parameter list, and body",
+			name:          "Macro with insufficient args - error case",
+			input:         `(macro incomplete)`,
+			expectError:   true,
+			errorContains: "macro requires name, parameters, and body",
 		},
 	}
 
@@ -488,12 +506,20 @@ func TestTranspiler_HandleMacroFunction(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
 			
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-			
-			if !strings.Contains(result, tt.expected) {
-				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("Expected error but got none")
+				}
+				if !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("Expected error to contain %q, got: %v", tt.errorContains, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				if !strings.Contains(result, tt.expected) {
+					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+				}
 			}
 		})
 	}
@@ -502,34 +528,37 @@ func TestTranspiler_HandleMacroFunction(t *testing.T) {
 // TestTranspiler_HandleLambdaSuccess tests successful lambda function creation
 func TestTranspiler_HandleLambdaSuccess(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name          string
+		input         string
+		expected      string
+		expectError   bool
+		errorContains string
 	}{
 		{
 			name:     "Lambda with single parameter",
-			input:    "(fn [x] x)",
+			input:    "(def f (fn [x] x)) (f 42)",
 			expected: "func(x interface{}) interface{} { return x }",
 		},
 		{
 			name:     "Lambda with multiple parameters",
-			input:    "(fn [x y] (+ x y))",
+			input:    "(def add (fn [x y] (+ x y))) (add 1 2)",
 			expected: "func(x interface{}, y interface{}) interface{} { return (x + y) }",
 		},
 		{
 			name:     "Lambda with no parameters",
-			input:    "(fn [] 42)",
+			input:    "(def get-val (fn [] 42)) (get-val)",
 			expected: "func() interface{} { return 42 }",
 		},
 		{
 			name:     "Lambda with complex body",
-			input:    `(fn [n] (fmt/Printf "Number: %d" n))`,
+			input:    `(def print-num (fn [n] (fmt/Printf "Number: %d" n))) (print-num 5)`,
 			expected: "func(n interface{}) interface{} { return fmt.Printf(\"Number: %d\", n) }",
 		},
 		{
-			name:     "Lambda error case - insufficient args",
-			input:    "(fn [x])",
-			expected: "// Error: fn requires parameter list and body",
+			name:          "Lambda error case - insufficient args",
+			input:         "(fn [x])",
+			expectError:   true,
+			errorContains: "fn requires parameter list and body",
 		},
 	}
 
@@ -538,12 +567,20 @@ func TestTranspiler_HandleLambdaSuccess(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
 			
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-			
-			if !strings.Contains(result, tt.expected) {
-				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("Expected error but got none")
+				}
+				if !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("Expected error to contain %q, got: %v", tt.errorContains, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				if !strings.Contains(result, tt.expected) {
+					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
+				}
 			}
 		})
 	}

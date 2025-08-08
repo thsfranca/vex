@@ -14,6 +14,13 @@ func TestTranspiler_New(t *testing.T) {
 	}
 }
 
+func TestTranspiler_NewWithDebug(t *testing.T) {
+    tr := NewWithDebug()
+    if tr == nil {
+        t.Error("Expected NewWithDebug() to return a non-nil transpiler")
+    }
+}
+
 func TestTranspiler_SimpleExpressions(t *testing.T) {
 	tests := []struct {
 		name     string

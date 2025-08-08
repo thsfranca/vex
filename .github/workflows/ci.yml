@@ -190,7 +190,7 @@ jobs:
       run: |
         echo "❌ Build failed due to insufficient test coverage"
         echo "Current coverage: ${{ steps.coverage.outputs.coverage }}%"
-        echo "Required threshold: 80%"
+        echo "Required threshold: 85%"
         echo "Please add tests to improve coverage before merging"
         exit 1
 

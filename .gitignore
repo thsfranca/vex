@@ -6,6 +6,10 @@ tools/grammar/Vex.tokens
 tools/grammar/VexLexer.interp
 tools/grammar/VexLexer.tokens
 
+# Generated parser files (grammar-validator)
+tools/grammar-validator/grammar/vex_*.go
+tools/grammar-validator/parser/vex_*.go
+
 # Compiled binaries  
 bin/
 tools/*/[!.]*

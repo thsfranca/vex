@@ -59,7 +59,7 @@ Whitespace (spaces, tabs, newlines) and commas are ignored.
 
 ### Valid Programs
 
-#### Working Today (Full Transpiler Support)
+#### Working Today (Transpiler Support)
 ```lisp
 ; Variable definitions
 (def x 42)
@@ -96,12 +96,13 @@ Whitespace (spaces, tabs, newlines) and commas are ignored.
 ; Enhanced function definitions with types (in development)
 (defn add [x: int y: int] -> int (+ x y))
 
-; Conditional expressions (planned)
-(if (> x 0) (print "positive") (print "negative"))
+; Enhanced typed function syntax (planned)
+(defn add [x: int y: int] -> int (+ x y))
 
-; Arrays (grammar ready)
-[1 2 3 4]
-["hello" "world"]
+; HTTP server patterns (planned)
+(http-server
+  :port 8080
+  :routes [(GET "/api/users" get-users)])
 
 ; HTTP server patterns (planned)
 (http-server

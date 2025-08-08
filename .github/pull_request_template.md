@@ -6,12 +6,7 @@
 ### ✅ Requirements (Automatically Checked)
 
 - [ ] **All tests pass** - CI workflow must be green
-- [ ] **Test coverage maintained** - Enforced thresholds for code quality:
-  - **Parser**: 95%+ (critical language component)
-  - **Transpiler**: 90%+ (core functionality)  
-  - **Types**: 85%+ (type system implementation)
-  - **Standard Library**: 80%+ (user-facing features)
-  - **Build fails** if any implemented component is below its threshold
+- [ ] **Coverage ≥ 85%** for `internal/transpiler` (parser package excluded). Build fails if below threshold
 - [ ] **Code builds successfully** - All Go code compiles
 - [ ] **Examples still work** - Existing Vex programs parse correctly
 
@@ -39,7 +34,7 @@ If this PR modifies CI/CD, workflows, or tools:
 
 ---
 
-**Note**: PRs are automatically blocked if test coverage drops below thresholds for implemented components. This ensures good testing practices in this learning project.
+**Note**: PRs are automatically blocked if overall transpiler coverage drops below 85% (generated parser excluded).
 
 <!-- 
 Quality Philosophy: We maintain high standards because:

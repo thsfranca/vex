@@ -2,7 +2,7 @@
 title: "Vex Language - AI Quick Reference"
 version: "0.3.0"
 compatibility: "Go 1.21+"
-last-updated: "2025-01-09"
+last-updated: "2025-08-08"
 ai-model-compatibility: "GPT-4, Claude-3+, and similar models"
 purpose: "Machine-readable reference for AI code generation"
 ---
@@ -52,14 +52,14 @@ Status: ✅ IMPLEMENTED
 Purpose: Create variables with values
 ```
 
-### Arithmetic Operations
+### Arithmetic & Comparison Operations
 ```
 Syntax: (operator arg1 arg2 ...)
 Examples: 
   (+ 1 2) → 1 + 2
   (* (+ 1 2) 3) → (1 + 2) * 3
 Status: ✅ IMPLEMENTED
-Operators: + - * / > < = >= <=
+Operators: + - * / > < =
 ```
 
 ### Import System
@@ -228,7 +228,7 @@ Constants: ALL-CAPS (MAX-RETRIES, DEFAULT-PORT)
 | **Sequences** | ✅ | `(do e1 e2)` | `(do (def x 1) x)` | Multiple exprs |
 | **Macros** | ✅ | `(macro n [p] b)` | `(macro log [m] ...)` | Code generation |
 | **Functions** | ✅ | `(defn n [p] b)` | `(defn add [x y] (+ x y))` | Reusable logic |
-| **Arrays** | ✅ | `[a b c]` | `[1 2 3]` | Collections |
+| **Arrays** | ✅ | `[a b c]` | `[]interface{}{1, 2, 3}` | Collections |
 | **Symbol tables** | ✅ | Variable scoping | Automatic | Proper scoping |
 | **Error handling** | ✅ | Parse/compile errors | Comprehensive | Error reporting |
 | **Types** | ⏳ | `[x: int]` | Future | Type annotations |

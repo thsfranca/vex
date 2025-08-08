@@ -28,9 +28,10 @@ Transpiles Vex source code to Go source code for inspection or integration.
 ./vex transpile -input <input-file> -output <output-file> [options]
 ```
 
-#### Required Arguments
-- `-input <file>` - Input Vex source file (.vx)
-- `-output <file>` - Output Go source file (.go)
+#### Arguments
+- `-input <file>` (required) - Input Vex source file (.vx)
+- `-output <file>` (optional) - Output Go source file (.go). If omitted, prints to stdout
+- `-verbose` (optional) - Prints progress information to stderr
 
 #### Examples
 ```bash
@@ -74,8 +75,9 @@ Compiles and executes Vex programs directly without creating intermediate files.
 ./vex run -input <input-file> [options]
 ```
 
-#### Required Arguments
-- `-input <file>` - Input Vex source file (.vx)
+#### Arguments
+- `-input <file>` (required) - Input Vex source file (.vx)
+- `-verbose` (optional) - Prints progress information to stderr
 
 #### Advanced Features
 - **Macro System**: Comprehensive macro expansion including defn macro
@@ -132,9 +134,10 @@ Creates standalone binary executables from Vex programs.
 ./vex build -input <input-file> -output <output-binary> [options]
 ```
 
-#### Required Arguments
-- `-input <file>` - Input Vex source file (.vx)
-- `-output <file>` - Output binary executable (no extension needed)
+#### Arguments
+- `-input <file>` (required) - Input Vex source file (.vx)
+- `-output <file>` (optional) - Output binary executable. Defaults to input filename without extension
+- `-verbose` (optional) - Prints progress information to stderr
 
 #### Examples
 ```bash

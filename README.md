@@ -43,12 +43,15 @@ vex/
 │   └── vex-transpiler/             # Main transpiler CLI application
 ├── internal/                       # Core implementation packages
 │   └── transpiler/                 # Vex to Go transpiler engine
+│       ├── analysis/               # Semantic analysis (symbol table, errors)
+│       ├── ast/                    # AST wrapper for parser tree
+│       ├── codegen/                # Go code generation
+│       ├── macro/                  # Macro registry and expander
 │       ├── parser/                 # Generated ANTLR parser files
-│       ├── core.go                 # Core transpiler functionality
-│       ├── expressions.go          # Expression handling
-│       ├── macros.go               # Macro system implementation
-│       ├── special_forms.go        # Special form handling
-│       └── collections.go          # Collection type support
+│       ├── adapters.go             # Adapters bridging subsystems
+│       ├── interfaces.go           # Core interfaces (Parser, Analyzer, etc.)
+│       ├── orchestrator.go         # Builder and multi-stage pipeline
+│       └── core.go                 # Public transpiler entrypoints
 ├── core/                           # Core Vex standard library
 │   └── core.vx                     # Standard library definitions
 ├── docs/                           # Comprehensive documentation
@@ -367,22 +370,15 @@ For AI models and automated code generation, see [docs/ai-quick-reference.md](do
 - Comprehensive test coverage tracking
 - Automated code quality enforcement
 
-### Test Coverage Standards
+### Test Coverage Standard
 
-This project maintains high code quality through automated testing:
+This project enforces a single, simple coverage rule in CI:
 
-| Component | Target | Status | Purpose |
-|-----------|--------|--------|---------|
-| **Grammar Validation** | 100% | ✅ *Active* | Parser correctness with valid/invalid test cases |
-| **Development Tools** | 90%+ | ✅ *Active* | CI/CD infrastructure reliability |
-| **VSCode Extension** | 85%+ | ✅ *Active* | IDE integration quality |
-| **Parser** | 95%+ | ✅ *Complete* | Critical language component |
-| **Basic Transpiler** | 90%+ | ✅ *Active* | Core transpilation functionality |
-| **Macro System** | 80%+ | ✅ *Active* | Metaprogramming capabilities |
-| **Type System** | 85%+ | ⏳ *Planned* | Type inference and checking |
-| **Standard Library** | 80%+ | ⏳ *Planned* | User-facing features |
+- Overall coverage for `internal/transpiler` must be at least **85%**
+- Generated parser code at `internal/transpiler/parser` is **excluded** from coverage
+- PRs fail if coverage drops below the threshold
 
-> **Quality Philosophy**: Higher coverage requirements for more critical components. The current infrastructure ensures robust development practices for future language implementation.
+The PR report shows only the current coverage and the target threshold, in line with the project’s preference for simple coverage comments.
 
 ## Release Process
 

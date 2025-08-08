@@ -64,7 +64,6 @@ Vex is a statically-typed functional programming language designed specifically 
 
 **Primitive Types** ✅ *Basic Support*
 - `int`: Integers mapping to Go's `int`
-- `float`: Floating point mapping to Go's `float64`
 - `string`: UTF-8 strings mapping to Go's `string`
 - `symbol`: Identifiers and function names
 - `bool`: Boolean values mapping to Go's `bool`
@@ -100,7 +99,7 @@ Advanced type system planned for future phases:
 - Variable definitions and expressions
 - Go package structure with main function
 - Import management for Go packages
-- Arithmetic and string operations
+- Arithmetic operations
 
 **Language Constructs** ✅ *Basic Implementation*
 - ✅ Variable declarations: `(def x 42)` → `x := 42`
@@ -177,7 +176,7 @@ The transpiler generates Go code that:
 - ✅ Maps core Vex expressions to clean Go syntax
 - ✅ Generates proper package structure with main function
 - ✅ Implements sophisticated import management for Go packages
-- ✅ Handles arithmetic, string, and array operations
+- ✅ Handles arithmetic and array operations
 - ✅ Supports conditional expressions and control flow
 - ✅ Generates function definitions from defn macro
 - ⏳ Implements immutable collections (planned)
@@ -194,19 +193,19 @@ The transpiler generates code that:
 ### Go Interoperability Layer ✅ **COMPREHENSIVE IMPLEMENTATION**
 
 **Function Binding System** ✅ **COMPREHENSIVE SUPPORT**
-Robust mechanism to expose Go functions to Vex code through:
+Mechanism to expose Go functions to Vex code through:
 - ✅ Namespace-qualified function calls (`fmt/Println`)
-- ✅ Sophisticated import management with module detection
+- ✅ Import management with basic module detection
 - ✅ Clean function call generation with proper argument handling
-- ✅ Comprehensive Go standard library access
+- ✅ Access to Go standard library via imports
 - ⏳ Error handling integration (planned)
 - ⏳ Goroutine management for concurrent operations (planned)
 
-**Standard Library Integration** ✅ **COMPREHENSIVE SUPPORT**
-Comprehensive integration with Go standard library:
-- ✅ Import system for any Go package
+**Standard Library Integration** ✅ **SUPPORTED VIA IMPORTS**
+Integration with Go standard library:
+- ✅ Import system for Go packages
 - ✅ Function call generation with clean syntax
-- ✅ Module detection for dependencies
+- ✅ Basic module detection for third-party packages
 - ✅ Proper package structure generation
 - ⏳ HTTP handling through net/http (planned)
 - ⏳ JSON processing with encoding/json (planned)

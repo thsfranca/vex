@@ -32,10 +32,10 @@ go build -o vex cmd/vex-transpiler/main.go
 You should see the available commands: `transpile`, `run`, and `build`.
 
 The Vex transpiler includes:
-- **Advanced macro system** with defn macro for function definitions
-- **Comprehensive Go interoperability** for accessing any Go package
-- **Sophisticated code generation** that produces clean, idiomatic Go
-- **Symbol table management** for proper variable scoping
+- **Macro system** with core macros (including `defn`) loaded from `core/core.vx`
+- **Go interoperability** for calling standard library functions via `package/Function` syntax
+- **Code generation** that produces executable Go code with a `main` function
+- **Semantic analysis** with symbol table management and basic validations
 
 ## Your First Vex Program
 

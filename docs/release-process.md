@@ -79,8 +79,8 @@ If you prefer manual control, you can still:
 
 ```
 .github/workflows/auto-release.yml     # Main auto-release workflow
-tools/release-manager/                 # Go tool for version management
-scripts/create-release-tag.sh          # Git tagging script
+tools/release-manager/                 # Go tool for version and release management
+  - check-labels, bump-version, create-notes, create-tag, publish-release
 ```
 
 ## 🎯 Best Practices

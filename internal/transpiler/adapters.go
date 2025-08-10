@@ -12,13 +12,11 @@ import (
 // ParserAdapter adapts ast.VexParser to the Parser interface
 type ParserAdapter struct {
 	parser *ast.VexParser
-    exports map[string]map[string]bool
 }
 
 func NewParserAdapter() *ParserAdapter {
 	return &ParserAdapter{
         parser:  ast.NewParser(),
-        exports: make(map[string]map[string]bool),
 	}
 }
 

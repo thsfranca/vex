@@ -13,7 +13,6 @@ import (
 type GoCodeGenerator struct {
 	output      strings.Builder
     imports     map[string]string
-	goModules   map[string]string
 	packageName string
 	config      Config
     exports     map[string]map[string]bool // package -> exported symbols
@@ -32,7 +31,6 @@ type Config struct {
 func NewGoCodeGenerator(config Config) *GoCodeGenerator {
 	return &GoCodeGenerator{
         imports:     make(map[string]string),
-		goModules:   make(map[string]string),
 		packageName: config.PackageName,
         config:      config,
         exports:     config.Exports,

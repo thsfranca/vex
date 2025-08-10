@@ -211,32 +211,7 @@ func NewTranspilerWithConfig(config TranspilerConfig) (*VexTranspiler, error) {
 //
 // fmt.Println(result)
 
-// Adapter for legacy tests - this allows existing tests to work with minimal changes
-type TranspilerAdapter struct {
-	vexTranspiler *VexTranspiler
-}
-
-// NewTranspilerAdapter creates an adapter for legacy compatibility
-func NewTranspilerAdapter() (*TranspilerAdapter, error) {
-	vt, err := NewVexTranspiler()
-	if err != nil {
-		return nil, err
-	}
-	
-	return &TranspilerAdapter{
-		vexTranspiler: vt,
-	}, nil
-}
-
-// TranspileFromInput adapts to the old interface
-func (ta *TranspilerAdapter) TranspileFromInput(input string) (string, error) {
-	return ta.vexTranspiler.TranspileFromInput(input)
-}
-
-// TranspileFromFile adapts to the old interface
-func (ta *TranspilerAdapter) TranspileFromFile(filename string) (string, error) {
-	return ta.vexTranspiler.TranspileFromFile(filename)
-}
+// Note: Legacy adapter removed; tests migrated to use current APIs.
 
 // detectThirdPartyModules scans input for import statements and identifies third-party modules
 func (vt *VexTranspiler) detectThirdPartyModules(input string) {

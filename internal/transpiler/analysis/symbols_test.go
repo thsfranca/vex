@@ -286,6 +286,41 @@ func TestSymbolTable_GetAllSymbols_MultipleScopes(t *testing.T) {
 	}
 }
 
+func TestSymbolTable_RedefinitionInSameScope(t *testing.T) {
+    st := NewSymbolTable()
+    if err := st.Define("x", NewBasicValue("1", "number")); err != nil {
+        t.Fatalf("first define should succeed: %v", err)
+    }
+    if err := st.Define("x", NewBasicValue("2", "number")); err == nil {
+        t.Fatalf("expected error on redefining symbol in same scope")
+    }
+}
+
+func TestSymbolTable_EnterExitScopeRemovesLocalSymbols(t *testing.T) {
+    st := NewSymbolTable()
+    // define in global
+    if err := st.Define("g", NewBasicValue("0", "number")); err != nil {
+        t.Fatalf("define g failed: %v", err)
+    }
+    // enter scope and define local symbol
+    st.EnterScope()
+    if err := st.Define("x", NewBasicValue("1", "number")); err != nil {
+        t.Fatalf("define x failed: %v", err)
+    }
+    if _, ok := st.Lookup("x"); !ok {
+        t.Fatalf("expected to lookup x in inner scope")
+    }
+    // exit scope; x should be removed from global map
+    st.ExitScope()
+    if _, ok := st.Lookup("x"); ok {
+        t.Fatalf("x should not be found after exiting scope")
+    }
+    // g remains
+    if _, ok := st.Lookup("g"); !ok {
+        t.Fatalf("global symbol g should remain")
+    }
+}
+
 func TestSymbolTable_ScopeCleanup(t *testing.T) {
 	st := NewSymbolTable()
 	

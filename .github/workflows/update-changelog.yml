@@ -76,15 +76,28 @@ jobs:
           git push -u origin "$BRANCH"
 
       - name: Open pull request
+        id: create-pr
         env:
           GH_TOKEN: ${{ secrets.GH_BOT_TOKEN }}
           TAG: ${{ steps.release-info.outputs.tag }}
           DATE: ${{ steps.release-info.outputs.date }}
         run: |
           BRANCH="docs/update-changelog-${TAG}"
-          gh pr create \
+          PR_JSON=$(gh pr create \
             --title "docs: update CHANGELOG for ${TAG}" \
             --body "Add changelog entry for ${TAG} released on ${DATE}." \
             --base main \
             --head "$BRANCH" \
-            --draft
+            --json number,url)
+          echo "$PR_JSON"
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number')
+          PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+          echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "url=$PR_URL" >> $GITHUB_OUTPUT
+
+      - name: Enable auto-merge and merge PR
+        if: steps.create-pr.outputs.url != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_BOT_TOKEN }}
+        run: |
+          gh pr merge "${{ steps.create-pr.outputs.url }}" --squash --auto --delete-branch

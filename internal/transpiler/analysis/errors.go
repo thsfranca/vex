@@ -32,6 +32,7 @@ func (et ErrorType) String() string {
 
 // CompilerError represents a compilation error
 type CompilerError struct {
+    File    string
 	Line    int
 	Column  int
 	Message string
@@ -39,7 +40,11 @@ type CompilerError struct {
 }
 
 func (e *CompilerError) String() string {
-	return fmt.Sprintf("%s at line %d:%d: %s", e.Type, e.Line, e.Column, e.Message)
+    // Go-style: file:line:col: error: message (file optional)
+    if e.File != "" {
+        return fmt.Sprintf("%s:%d:%d: error: %s", e.File, e.Line, e.Column, e.Message)
+    }
+    return fmt.Sprintf("%d:%d: error: %s", e.Line, e.Column, e.Message)
 }
 
 // ErrorReporterImpl implements the ErrorReporter interface
@@ -64,6 +69,7 @@ func (er *ErrorReporterImpl) ReportError(line, column int, message string) {
 // ReportWarning reports a compilation warning
 func (er *ErrorReporterImpl) ReportWarning(line, column int, message string) {
 	warning := CompilerError{
+        File:    "",
 		Line:    line,
 		Column:  column,
 		Message: message,
@@ -75,6 +81,7 @@ func (er *ErrorReporterImpl) ReportWarning(line, column int, message string) {
 // ReportTypedError reports an error with a specific type
 func (er *ErrorReporterImpl) ReportTypedError(line, column int, message string, errorType ErrorType) {
 	error := CompilerError{
+        File:    "",
 		Line:    line,
 		Column:  column,
 		Message: message,
@@ -158,7 +165,12 @@ func (er *ErrorReporterImpl) FormatWarnings() string {
 	
 	result := ""
 	for _, warning := range er.GetWarnings() {
-		result += "Warning: " + warning.String() + "\n"
+        // lowercase 'warning:' after position for consistency with Go style
+        if warning.File != "" {
+            result += fmt.Sprintf("%s:%d:%d: warning: %s\n", warning.File, warning.Line, warning.Column, warning.Message)
+        } else {
+            result += fmt.Sprintf("%d:%d: warning: %s\n", warning.Line, warning.Column, warning.Message)
+        }
 	}
 	
 	return result

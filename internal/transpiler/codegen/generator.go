@@ -12,10 +12,11 @@ import (
 // GoCodeGenerator generates Go code from AST
 type GoCodeGenerator struct {
 	output      strings.Builder
-	imports     map[string]bool
+    imports     map[string]string
 	goModules   map[string]string
 	packageName string
 	config      Config
+    exports     map[string]map[string]bool // package -> exported symbols
 }
 
 // Config holds code generation configuration
@@ -23,15 +24,18 @@ type Config struct {
 	PackageName      string
 	GenerateComments bool
 	IndentSize       int
+    IgnoreImports    map[string]bool
+    Exports          map[string]map[string]bool
 }
 
 // NewGoCodeGenerator creates a new Go code generator
 func NewGoCodeGenerator(config Config) *GoCodeGenerator {
 	return &GoCodeGenerator{
-		imports:     make(map[string]bool),
+        imports:     make(map[string]string),
 		goModules:   make(map[string]string),
 		packageName: config.PackageName,
-		config:      config,
+        config:      config,
+        exports:     config.Exports,
 	}
 }
 
@@ -39,7 +43,7 @@ func NewGoCodeGenerator(config Config) *GoCodeGenerator {
 func (g *GoCodeGenerator) Generate(ast AST, symbols SymbolTable) (string, error) {
 	// Reset for new generation
 	g.output.Reset()
-	g.imports = make(map[string]bool)
+    g.imports = make(map[string]string)
 	
 	// Visit the AST
 	if err := ast.Accept(g); err != nil {
@@ -51,7 +55,9 @@ func (g *GoCodeGenerator) Generate(ast AST, symbols SymbolTable) (string, error)
 
 // AddImport adds an import to the generated code
 func (g *GoCodeGenerator) AddImport(importPath string) {
-	g.imports[importPath] = true
+    if _, exists := g.imports[importPath]; !exists {
+        g.imports[importPath] = ""
+    }
 }
 
 // SetPackageName sets the package name for generated code
@@ -191,7 +197,7 @@ func (g *GoCodeGenerator) VisitList(ctx *parser.ListContext) (Value, error) {
 	}
 
 	// Generate code based on function type
-	switch funcName {
+    switch funcName {
 	case "def":
 		return g.generateDef(args)
 	case "if":
@@ -202,8 +208,11 @@ func (g *GoCodeGenerator) VisitList(ctx *parser.ListContext) (Value, error) {
 		return g.generateFn(args)
 	case "macro":
 		return g.generateMacro(args)
+	case "export":
+		// Export is a compile-time declaration, no runtime code
+		return analysis.NewBasicValue("", "void"), nil
 	case "import":
-		return g.generateImport(args)
+        return g.generateImportFromCtx(ctx)
 	case "+", "-", "*", "/":
 		return g.generateArithmetic(funcName, args)
 	case ">", "<", "=":
@@ -329,15 +338,97 @@ func (g *GoCodeGenerator) generateFn(args []string) (Value, error) {
 }
 
 func (g *GoCodeGenerator) generateImport(args []string) (Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("import requires package path")
-	}
-	
-	importPath := strings.Trim(args[0], "\"")
-	g.AddImport(importPath)
-	
-	// Return a meaningful value for implicit returns
-	return analysis.NewBasicValue("\"import completed\" // Import statement result", "string"), nil
+    if len(args) < 1 {
+        return nil, fmt.Errorf("import requires package path")
+    }
+    importPath := strings.Trim(args[0], "\"")
+    g.AddImport(importPath)
+    return analysis.NewBasicValue("\"import completed\" // Import statement result", "string"), nil
+}
+
+func (g *GoCodeGenerator) generateImportFromCtx(ctx *parser.ListContext) (Value, error) {
+    if ctx.GetChildCount() < 3 {
+        return nil, fmt.Errorf("import requires package path")
+    }
+    firstArg := ctx.GetChild(2)
+    if arrayCtx, ok := firstArg.(*parser.ArrayContext); ok {
+        for i := 1; i < arrayCtx.GetChildCount()-1; i++ {
+            elem := arrayCtx.GetChild(i)
+            if elem == nil {
+                continue
+            }
+            if term, ok := elem.(antlr.TerminalNode); ok {
+                t := term.GetText()
+                if t == "," || t == "[" || t == "]" {
+                    continue
+                }
+                if strings.HasPrefix(t, "\"") && strings.HasSuffix(t, "\"") {
+                    p := strings.Trim(t, "\"")
+                    g.AddImport(p)
+                    continue
+                }
+            }
+            switch n := elem.(type) {
+            case *parser.ArrayContext, *parser.ListContext:
+                path, alias := g.extractImportPair(n)
+                if path != "" {
+                    if alias != "" {
+                        g.imports[path] = alias
+                    } else {
+                        g.AddImport(path)
+                    }
+                }
+            }
+        }
+        return analysis.NewBasicValue("\"import completed\" // Import statement result", "string"), nil
+    }
+    if term, ok := firstArg.(antlr.TerminalNode); ok {
+        t := term.GetText()
+        if strings.HasPrefix(t, "\"") && strings.HasSuffix(t, "\"") {
+            p := strings.Trim(t, "\"")
+            g.AddImport(p)
+            return analysis.NewBasicValue("\"import completed\" // Import statement result", "string"), nil
+        }
+    }
+    return nil, fmt.Errorf("import requires package path")
+}
+
+func (g *GoCodeGenerator) extractImportPair(node antlr.Tree) (string, string) {
+    var parts []string
+    switch n := node.(type) {
+    case *parser.ListContext:
+        for i := 1; i < n.GetChildCount()-1; i++ {
+            if t, ok := n.GetChild(i).(antlr.TerminalNode); ok {
+                s := t.GetText()
+                if s == "," {
+                    continue
+                }
+                parts = append(parts, s)
+            }
+        }
+    case *parser.ArrayContext:
+        for i := 1; i < n.GetChildCount()-1; i++ {
+            if t, ok := n.GetChild(i).(antlr.TerminalNode); ok {
+                s := t.GetText()
+                if s == "," {
+                    continue
+                }
+                parts = append(parts, s)
+            }
+        }
+    }
+    if len(parts) == 0 {
+        return "", ""
+    }
+    path := parts[0]
+    if strings.HasPrefix(path, "\"") && strings.HasSuffix(path, "\"") {
+        path = strings.Trim(path, "\"")
+    }
+    alias := ""
+    if len(parts) >= 2 {
+        alias = strings.Trim(parts[1], "\"")
+    }
+    return path, alias
 }
 
 func (g *GoCodeGenerator) generateArithmetic(op string, args []string) (Value, error) {
@@ -437,10 +528,45 @@ func (g *GoCodeGenerator) generatePrimitiveOp(op string, args []string) (Value, 
 }
 
 func (g *GoCodeGenerator) generateFunctionCall(funcName string, args []string) (Value, error) {
-	// Handle package/function notation
-	if strings.Contains(funcName, "/") {
-		funcName = strings.ReplaceAll(funcName, "/", ".")
-	}
+    // Handle package/function notation with proper package identifier
+    if strings.Contains(funcName, "/") {
+        parts := strings.Split(funcName, "/")
+        if len(parts) >= 2 {
+            importPath := strings.Join(parts[:len(parts)-1], "/")
+            function := parts[len(parts)-1]
+            // If this is a local Vex package (marked to ignore in Go imports), call the function directly
+            if g.config.IgnoreImports != nil && g.config.IgnoreImports[importPath] {
+                // Enforce exports for local packages
+                if ex, ok := g.exports[importPath]; ok {
+                    if !ex[function] {
+                        return nil, fmt.Errorf("symbol '%s' is not exported from package '%s'. Export it with (export [%s]) in that package.", function, importPath, function)
+                    }
+                }
+                // Direct call by identifier (convert to Go-compatible)
+                funcName = convertVexToGoIdentifier(function)
+            } else if alias, ok := g.imports[importPath]; ok {
+                pkgIdent := alias
+                if pkgIdent == "" {
+                    segs := strings.Split(importPath, "/")
+                    pkgIdent = segs[len(segs)-1]
+                }
+                funcName = pkgIdent + "." + function
+
+                // Enforce exports: if importPath is a local package (present in exports map)
+                // then function must be exported
+                if ex, ok := g.exports[importPath]; ok {
+                    if !ex[function] {
+                        return nil, fmt.Errorf("symbol '%s' is not exported from package '%s'. Export it with (export [%s]) in that package.", function, importPath, function)
+                    }
+                }
+            } else {
+                // Fallback: replace slashes with dots
+                funcName = strings.ReplaceAll(funcName, "/", ".")
+            }
+        } else {
+            funcName = strings.ReplaceAll(funcName, "/", ".")
+        }
+    }
 	
 	// Special case: handle variable access in packages (like os.Args)
 	if len(args) == 0 && isPackageVariable(funcName) {
@@ -518,13 +644,20 @@ func (g *GoCodeGenerator) buildFinalCode() string {
 	// Package declaration
 	result.WriteString(fmt.Sprintf("package %s\n\n", g.packageName))
 	
-	// Imports
-	if len(g.imports) > 0 {
-		for importPath := range g.imports {
-			result.WriteString(fmt.Sprintf("import \"%s\"\n", importPath))
-		}
-		result.WriteString("\n")
-	}
+    // Imports
+    if len(g.imports) > 0 {
+        for importPath, alias := range g.imports {
+            if g.config.IgnoreImports != nil && g.config.IgnoreImports[importPath] {
+                continue
+            }
+            if alias != "" {
+                result.WriteString(fmt.Sprintf("import %s \"%s\"\n", alias, importPath))
+            } else {
+                result.WriteString(fmt.Sprintf("import \"%s\"\n", importPath))
+            }
+        }
+        result.WriteString("\n")
+    }
 	
 	// Main function
 	result.WriteString("func main() {\n")

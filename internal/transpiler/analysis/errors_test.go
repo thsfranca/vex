@@ -35,7 +35,7 @@ func TestCompilerError_String(t *testing.T) {
 		Type:    SyntaxError,
 	}
 	
-	expected := "Syntax Error at line 10:5: test error"
+    expected := "10:5: error: test error"
 	got := err.String()
 	
 	if got != expected {
@@ -322,11 +322,11 @@ func TestErrorReporter_FormatErrors(t *testing.T) {
 		t.Error("Formatted errors should contain second error")
 	}
 	
-	if !strings.Contains(formatted, "Semantic Error at line 10:5") {
+    if !strings.Contains(formatted, "10:5: error:") {
 		t.Error("Formatted errors should contain line info for first error")
 	}
 	
-	if !strings.Contains(formatted, "Type Error at line 20:3") {
+    if !strings.Contains(formatted, "20:3: error:") {
 		t.Error("Formatted errors should contain line info for second error")
 	}
 }
@@ -355,11 +355,11 @@ func TestErrorReporter_FormatWarnings(t *testing.T) {
 		t.Error("Formatted warnings should contain second warning")
 	}
 	
-	if !strings.Contains(formatted, "Warning:") {
-		t.Error("Formatted warnings should contain 'Warning:' prefix")
-	}
+    if !strings.Contains(strings.ToLower(formatted), "warning:") {
+        t.Error("Formatted warnings should contain 'warning:' prefix")
+    }
 	
-	if !strings.Contains(formatted, "line 15:8") {
+    if !strings.Contains(formatted, "15:8:") {
 		t.Error("Formatted warnings should contain line info")
 	}
 }

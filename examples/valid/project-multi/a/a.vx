@@ -1,0 +1,6 @@
+(import ["b"]) ; local package import
+
+(defn sum-three [x y z]
+  (+ (b/add x y) z))
+
+

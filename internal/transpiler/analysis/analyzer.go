@@ -73,7 +73,7 @@ func (a *AnalyzerImpl) VisitList(ctx *parser.ListContext) (Value, error) {
 	if childCount < 3 { // Need at least: '(', function, ')'
 		line := ctx.GetStart().GetLine()
 		column := ctx.GetStart().GetColumn()
-		a.errorReporter.ReportError(line, column, "empty expression")
+        a.errorReporter.ReportError(line, column, "empty expression")
 		return nil, fmt.Errorf("empty expression")
 	}
 
@@ -83,11 +83,11 @@ func (a *AnalyzerImpl) VisitList(ctx *parser.ListContext) (Value, error) {
 
 	// Extract arguments
 	var args []Value
-	for i := 2; i < childCount-1; i++ { // Skip '(' and ')'
+    for i := 2; i < childCount-1; i++ { // Skip '(' and ')'
 		child := ctx.GetChild(i)
 		if child != nil {
 			// For special forms that need raw arguments, handle specially
-			if funcName == "macro" || funcName == "def" {
+            if funcName == "macro" || funcName == "def" || funcName == "export" {
 				// For these special forms, just get the text representation
 				argText := a.nodeToString(child)
 				args = append(args, NewBasicValue(argText, "raw"))
@@ -102,7 +102,7 @@ func (a *AnalyzerImpl) VisitList(ctx *parser.ListContext) (Value, error) {
 	}
 
 	// Analyze special forms
-	switch funcName {
+    switch funcName {
 	case "def":
 		return a.analyzeDef(ctx, args)
 	case "if":
@@ -111,9 +111,22 @@ func (a *AnalyzerImpl) VisitList(ctx *parser.ListContext) (Value, error) {
 		return a.analyzeFn(ctx, args)
 	case "macro":
 		return a.analyzeMacro(ctx, args)
+    case "export":
+        return a.analyzeExport(ctx, args)
 	default:
 		return a.analyzeFunctionCall(ctx, funcName, args)
 	}
+}
+// analyzeExport records exported symbols for current package scope
+func (a *AnalyzerImpl) analyzeExport(ctx *parser.ListContext, args []Value) (Value, error) {
+    if len(args) < 1 {
+        line := ctx.GetStart().GetLine()
+        column := ctx.GetStart().GetColumn()
+        a.errorReporter.ReportError(line, column, "export requires a list of symbols")
+        return nil, fmt.Errorf("invalid export")
+    }
+    // Minimal placeholder: accept and no-op. Enforcement will be performed cross-package in future step.
+    return NewBasicValue("export", "void"), nil
 }
 
 // VisitArray analyzes an array literal
@@ -177,7 +190,7 @@ func (a *AnalyzerImpl) analyzeDef(ctx *parser.ListContext, args []Value) (Value,
 	if len(args) < 2 {
 		line := ctx.GetStart().GetLine()
 		column := ctx.GetStart().GetColumn()
-		a.errorReporter.ReportError(line, column, "def requires name and value")
+        a.errorReporter.ReportError(line, column, "def requires name and value\nSuggestion: use (def name value)")
 		return nil, fmt.Errorf("invalid def")
 	}
 	
@@ -200,7 +213,7 @@ func (a *AnalyzerImpl) analyzeIf(ctx *parser.ListContext, args []Value) (Value, 
 	if len(args) < 2 {
 		line := ctx.GetStart().GetLine()
 		column := ctx.GetStart().GetColumn()
-		a.errorReporter.ReportError(line, column, "if requires condition and then-branch")
+        a.errorReporter.ReportError(line, column, "if requires condition and then-branch\nSuggestion: use (if condition then-expr [else-expr])")
 		return nil, fmt.Errorf("invalid if")
 	}
 	
@@ -237,7 +250,7 @@ func (a *AnalyzerImpl) analyzeFn(ctx *parser.ListContext, args []Value) (Value, 
 	if len(args) < 2 {
 		line := ctx.GetStart().GetLine()
 		column := ctx.GetStart().GetColumn()
-		a.errorReporter.ReportError(line, column, "fn requires parameter list and body")
+        a.errorReporter.ReportError(line, column, "fn requires parameter list and body\nSuggestion: use (fn [params] body)")
 		return nil, fmt.Errorf("invalid fn")
 	}
 	
@@ -281,8 +294,8 @@ func (a *AnalyzerImpl) analyzeMacro(ctx *parser.ListContext, args []Value) (Valu
 	if isReservedWord(name) {
 		line := ctx.GetStart().GetLine()
 		column := ctx.GetStart().GetColumn()
-		a.errorReporter.ReportError(line, column, 
-			fmt.Sprintf("'%s' is a reserved word and cannot be used as macro name", name))
+        a.errorReporter.ReportError(line, column, 
+            fmt.Sprintf("'%s' is a reserved word and cannot be used as macro name\nSuggestion: choose a different macro name", name))
 		return nil, fmt.Errorf("invalid macro name")
 	}
 	
@@ -301,8 +314,8 @@ func (a *AnalyzerImpl) analyzeFunctionCall(ctx *parser.ListContext, funcName str
 		if !isBuiltinFunction(funcName) {
 			line := ctx.GetStart().GetLine()
 			column := ctx.GetStart().GetColumn()
-			a.errorReporter.ReportWarning(line, column, 
-				fmt.Sprintf("function '%s' may not be defined", funcName))
+        a.errorReporter.ReportWarning(line, column, 
+            fmt.Sprintf("function '%s' may not be defined", funcName))
 		}
 	}
 	

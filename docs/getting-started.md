@@ -32,10 +32,12 @@ go build -o vex cmd/vex-transpiler/main.go
 You should see the available commands: `transpile`, `run`, and `build`.
 
 The Vex transpiler includes:
-- **Macro system** with core macros (including `defn`) loaded from `core/core.vx`
+- **Macro system** with core macros (including `defn`) loaded from `core/core.vx` (auto-detected)
 - **Go interoperability** for calling standard library functions via `package/Function` syntax
 - **Code generation** that produces executable Go code with a `main` function
-- **Semantic analysis** with symbol table management and basic validations
+- **Package discovery (MVP)**: local directory packages, `vex.pkg` module root detection, cycle detection
+- **Exports (MVP)**: private-by-default; `(export [name1 name2 ...])` required for cross-package access
+- **Semantic analysis** with symbol table management and validations
 
 ## Your First Vex Program
 
@@ -236,6 +238,11 @@ Compile and execute Vex programs directly:
 ./vex run -input program.vx
 ```
 
+Notes:
+- Automatically discovers local packages starting from the entry file
+- Uses `vex.pkg` (if present) to detect the module root
+- Enforces exports when calling across local packages
+
 ### `vex transpile`
 Convert Vex to Go source code:
 ```bash
@@ -248,6 +255,11 @@ Create standalone binary executables:
 ./vex build -input program.vx -output my-program
 ./my-program  # Run the binary
 ```
+
+Notes:
+- Discovers and includes local packages
+- Generates a temporary `go.mod` and runs `go mod tidy` when external Go modules are detected
+- Enforces exports when calling across local packages
 
 ## Development Workflow
 

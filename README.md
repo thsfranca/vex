@@ -220,6 +220,14 @@ Current features working:
 - **Immutable data structures** with structural sharing
 - **Standard library** for common operations
 
+#### In Progress: Package Discovery System (MVP)
+
+- Directory-based packages: one package per directory; package name inferred from directory name
+- Import resolution: resolve local Vex packages by directory path first; fall back to Go imports if not found
+- Automatic package scanning: build a dependency graph starting from the entry file and topologically sort
+- Circular dependency prevention: cycles are detected and reported as compile-time errors; the build fails
+- CLI UX unchanged: `vex run` and `vex build` automatically include discovered packages
+
 ## Usage
 
 ### Prerequisites
@@ -325,7 +333,7 @@ This project explores key language implementation concepts with a focus on AI-fr
 
 ## Implementation Roadmap
 
-See [docs/vex-implementation-requirements.md](docs/vex-implementation-requirements.md) for the complete development plan, covering type systems, Go transpilation, immutable data structures, and production features.
+See [docs/vex-implementation-requirements.md](docs/vex-implementation-requirements.md) for the complete development plan, covering type systems, Go transpilation, immutable data structures, and production features. For the package system, see [docs/package-system.md](docs/package-system.md). For compiler error message conventions, see [docs/error-messages.md](docs/error-messages.md).
 
 ## AI Code Generation
 
@@ -335,6 +343,7 @@ For AI models and automated code generation, see [docs/ai-quick-reference.md](do
 
 **Current Phase**: Basic Transpiler Foundation + Macro System Complete (✅ Phase 1-2, 4 Complete)  
 **Next Phase**: Advanced Language Features (Phase 3: Type System & Semantic Analysis, Phase 5: Enhanced Functions)  
+**Active Work**: Package Discovery System MVP (directory packages, import resolution, cycle detection; `vex.pkg` module root detection implemented)
 **Timeline**: Personal study project for learning compiler concepts, developed for fun in spare time
 
 ### Infrastructure Achievements

@@ -32,6 +32,8 @@ func NewBuilder() *TranspilerBuilder {
 			CoreMacroPath:    "", // Will be determined dynamically
 			PackageName:      "main",
 			GenerateComments: true,
+            IgnoreImports:    make(map[string]bool),
+            Exports:          make(map[string]map[string]bool),
 		},
 	}
 }
@@ -90,6 +92,7 @@ func (b *TranspilerBuilder) Build() (*VexTranspiler, error) {
 		PackageName:      b.config.PackageName,
 		GenerateComments: b.config.GenerateComments,
 		IndentSize:       4,
+        IgnoreImports:    b.config.IgnoreImports,
 	}
 	codeGen := NewCodeGeneratorAdapter(codeGenConfig)
 

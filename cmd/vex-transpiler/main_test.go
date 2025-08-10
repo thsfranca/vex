@@ -342,6 +342,136 @@ func TestMainFunction_StdoutOutput(t *testing.T) {
 	}
 }
 
+func TestIntegration_MultiPackage_RunSuccess(t *testing.T) {
+    binaryPath := buildTestBinary(t)
+    defer os.Remove(binaryPath)
+
+    tempDir := t.TempDir()
+    ensureCoreMacros(t, tempDir)
+
+    // Create module root marker
+    if err := os.WriteFile(filepath.Join(tempDir, "vex.pkg"), []byte("module testapp\n"), 0o644); err != nil {
+        t.Fatalf("failed to write vex.pkg: %v", err)
+    }
+
+    // Package b: export add
+    if err := os.MkdirAll(filepath.Join(tempDir, "b"), 0o755); err != nil {
+        t.Fatalf("mkdir: %v", err)
+    }
+    bSrc := "(export [add])\n(defn add [x y] 6)\n"
+    if err := os.WriteFile(filepath.Join(tempDir, "b", "b.vx"), []byte(bSrc), 0o644); err != nil {
+        t.Fatalf("write b: %v", err)
+    }
+
+    // Package a: uses b/add
+    if err := os.MkdirAll(filepath.Join(tempDir, "a"), 0o755); err != nil {
+        t.Fatalf("mkdir: %v", err)
+    }
+    aSrc := "(import [\"b\"])\n(defn sum-three [x y z] (b/add x y))\n"
+    if err := os.WriteFile(filepath.Join(tempDir, "a", "a.vx"), []byte(aSrc), 0o644); err != nil {
+        t.Fatalf("write a: %v", err)
+    }
+
+    // main: imports a and fmt
+    mainSrc := "(import [\"a\" \"fmt\"])\n(fmt/Println (a/sum-three 1 2 3))\n"
+    mainFile := filepath.Join(tempDir, "main.vx")
+    if err := os.WriteFile(mainFile, []byte(mainSrc), 0o644); err != nil {
+        t.Fatalf("write main: %v", err)
+    }
+
+    cmd := exec.Command(binaryPath, "run", "-input", mainFile)
+    cmd.Dir = tempDir
+    var stdout, stderr bytes.Buffer
+    cmd.Stdout = &stdout
+    cmd.Stderr = &stderr
+
+    err := cmd.Run()
+    if err != nil {
+        t.Fatalf("run failed: %v\nstderr: %s", err, stderr.String())
+    }
+    if !strings.Contains(stdout.String(), "6") {
+        t.Fatalf("expected output to contain 6, got: %s", stdout.String())
+    }
+}
+
+func TestIntegration_MultiPackage_TranspileExportError(t *testing.T) {
+    binaryPath := buildTestBinary(t)
+    defer os.Remove(binaryPath)
+
+    tempDir := t.TempDir()
+    ensureCoreMacros(t, tempDir)
+
+    // Module root marker
+    if err := os.WriteFile(filepath.Join(tempDir, "vex.pkg"), []byte("module testapp\n"), 0o644); err != nil {
+        t.Fatalf("failed to write vex.pkg: %v", err)
+    }
+
+    // b exports only add
+    if err := os.MkdirAll(filepath.Join(tempDir, "b"), 0o755); err != nil {
+        t.Fatalf("mkdir: %v", err)
+    }
+    bSrc := "(export [add])\n(defn add [x y] (+ x y))\n(defn hidden [] 0)\n"
+    if err := os.WriteFile(filepath.Join(tempDir, "b", "b.vx"), []byte(bSrc), 0o644); err != nil {
+        t.Fatalf("write b: %v", err)
+    }
+
+    // a defines a function; main will call non-exported b/hidden at top-level to ensure enforcement triggers
+    if err := os.MkdirAll(filepath.Join(tempDir, "a"), 0o755); err != nil {
+        t.Fatalf("mkdir: %v", err)
+    }
+    aSrc := "(import [\"b\"])\n(defn bad [x] (b/hidden))\n"
+    if err := os.WriteFile(filepath.Join(tempDir, "a", "a.vx"), []byte(aSrc), 0o644); err != nil {
+        t.Fatalf("write a: %v", err)
+    }
+
+    mainSrc := "(import [\"b\"])\n(b/hidden)\n"
+    mainFile := filepath.Join(tempDir, "main.vx")
+    if err := os.WriteFile(mainFile, []byte(mainSrc), 0o644); err != nil {
+        t.Fatalf("write main: %v", err)
+    }
+
+    cmd := exec.Command(binaryPath, "run", "-input", mainFile)
+    cmd.Dir = tempDir
+    var stderr bytes.Buffer
+    cmd.Stderr = &stderr
+
+    err := cmd.Run()
+    if err == nil {
+        t.Fatal("expected run to fail due to non-exported symbol or build error")
+    }
+    serr := stderr.String()
+    if !strings.Contains(serr, "not exported") && !strings.Contains(serr, "Build error") && !strings.Contains(serr, "undefined") {
+        t.Fatalf("expected not exported or build failure, got: %s", serr)
+    }
+}
+
+// ensureCoreMacros copies repository core/core.vx into tempDir/core/core.vx so the binary can load macros.
+func ensureCoreMacros(t *testing.T, tempDir string) {
+    t.Helper()
+    // Attempt common relative paths from this package to repository core file
+    candidates := []string{
+        filepath.Join("..", "..", "core", "core.vx"),
+        filepath.Join("../../core/core.vx"),
+    }
+    var content []byte
+    var err error
+    for _, c := range candidates {
+        content, err = os.ReadFile(c)
+        if err == nil {
+            break
+        }
+    }
+    if err != nil {
+        t.Fatalf("could not locate core/core.vx relative to tests: %v", err)
+    }
+    coreDir := filepath.Join(tempDir, "core")
+    if err := os.MkdirAll(coreDir, 0o755); err != nil {
+        t.Fatalf("mkdir core dir: %v", err)
+    }
+    if err := os.WriteFile(filepath.Join(coreDir, "core.vx"), content, 0o644); err != nil {
+        t.Fatalf("write core macros: %v", err)
+    }
+}
 // buildTestBinary builds the main binary for testing
 func buildTestBinary(t *testing.T) string {
 	t.Helper()

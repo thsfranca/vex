@@ -32,6 +32,8 @@ func NewBuilder() *TranspilerBuilder {
 			CoreMacroPath:    "", // Will be determined dynamically
 			PackageName:      "main",
 			GenerateComments: true,
+            IgnoreImports:    make(map[string]bool),
+            Exports:          make(map[string]map[string]bool),
 		},
 	}
 }
@@ -90,6 +92,7 @@ func (b *TranspilerBuilder) Build() (*VexTranspiler, error) {
 		PackageName:      b.config.PackageName,
 		GenerateComments: b.config.GenerateComments,
 		IndentSize:       4,
+        IgnoreImports:    b.config.IgnoreImports,
 	}
 	codeGen := NewCodeGeneratorAdapter(codeGenConfig)
 
@@ -208,32 +211,7 @@ func NewTranspilerWithConfig(config TranspilerConfig) (*VexTranspiler, error) {
 //
 // fmt.Println(result)
 
-// Adapter for legacy tests - this allows existing tests to work with minimal changes
-type TranspilerAdapter struct {
-	vexTranspiler *VexTranspiler
-}
-
-// NewTranspilerAdapter creates an adapter for legacy compatibility
-func NewTranspilerAdapter() (*TranspilerAdapter, error) {
-	vt, err := NewVexTranspiler()
-	if err != nil {
-		return nil, err
-	}
-	
-	return &TranspilerAdapter{
-		vexTranspiler: vt,
-	}, nil
-}
-
-// TranspileFromInput adapts to the old interface
-func (ta *TranspilerAdapter) TranspileFromInput(input string) (string, error) {
-	return ta.vexTranspiler.TranspileFromInput(input)
-}
-
-// TranspileFromFile adapts to the old interface
-func (ta *TranspilerAdapter) TranspileFromFile(filename string) (string, error) {
-	return ta.vexTranspiler.TranspileFromFile(filename)
-}
+// Note: Legacy adapter removed; tests migrated to use current APIs.
 
 // detectThirdPartyModules scans input for import statements and identifies third-party modules
 func (vt *VexTranspiler) detectThirdPartyModules(input string) {

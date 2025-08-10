@@ -84,9 +84,12 @@ Compiles and executes Vex programs directly without creating intermediate files.
 - **Symbol Table**: Advanced variable scoping and resolution
 - **Go Interoperability**: Complete access to Go standard library
 - **Error Handling**: Detailed error reporting for all phases
-- **Core Library**: Automatically includes `core/core.vx` if present
+ - **Core Library**: Automatically includes `core.vx` from the working directory if present
 - **Go Compilation**: Uses Go's native compiler for execution
 - **Memory Management**: Leverages Go's garbage collector
+  - **Package Discovery (MVP)**: Automatically discovers local Vex packages from the entry file, resolves imports, orders packages, and prevents circular dependencies (compile-time error on cycles). `vex.pkg` is supported for module root detection.
+  - **Import arrays and aliases**: `(import ["fmt" ["net/http" http] ["encoding/json" json]])`. Calls use alias or package name: `(http/Get ...)`, `(json/Marshal ...)`, `(fmt/Println ...)`.
+  - **Exports (MVP)**: Private-by-default. Declare public API with `(export [name1 name2 ...])` at package top-level. Cross-package access to non-exported symbols fails.
 
 #### Examples
 ```bash
@@ -108,6 +111,9 @@ echo '(import "fmt") (defn greet [name] (fmt/Printf "Hello %s!\n" name)) (greet 
 echo '(import "fmt") (macro log [msg] (fmt/Printf "[LOG] %s\n" msg)) (log "Starting")' > macro.vx
 ./vex run -input macro.vx
 ```
+
+Note about external Go modules:
+- `run` does not create a `go.mod`. Programs that import third-party Go modules may fail to build under `run`. Use `build` for those cases.
 
 #### Execution Process
 1. Parse Vex source into AST using ANTLR parser
@@ -159,6 +165,9 @@ chmod +x myapp  # Ensure executable permissions
 - **Native performance**: Full Go compilation optimizations
 - **Cross-platform**: Can run on any platform Go supports
 - **Small size**: Only includes necessary code
+  - **Package Discovery (MVP)**: Includes all discovered local packages starting from the entry file; builds fail on circular dependencies. `vex.pkg` is supported for module root detection.
+  - **Import arrays and aliases**: Aliased imports are respected in generated Go (`import http "net/http"`).
+  - **Exports (MVP)**: Private-by-default. Public symbols must be listed in `(export [...])`; otherwise builds can fail when accessed from other packages.
 
 #### Distribution
 ```bash
@@ -315,3 +324,4 @@ go tool pprof ./app  # Use Go's profiling tools
 ```
 
 For more help, see [Getting Started](getting-started.md) or [Troubleshooting Guide](troubleshooting.md).
+Also see [Package System](package-system.md) for multi-package projects, import arrays/aliases, `vex.pkg`, and exports.

@@ -145,11 +145,11 @@ Update this section each week with:
 - Challenges encountered
 - Next week's focus
 
-### Current Session - Basic Language Foundation + Macro System Complete
-**Status**: Phases 1-2, 4 Complete - Basic transpiler foundation with macro system ready
-**Focus**: Ready for Phase 3 - Type System & Semantic Analysis and Phase 5 - Function Definitions
-**Achievement**: Successfully implemented basic language infrastructure: parser, core transpiler, and basic macro system
-**Next**: Type system with inference and checking, enhanced function definition support, semantic analysis for enhanced language capabilities
+### Package Discovery MVP Status
+**Status**: Implemented under Phase 3 scope
+**Focus**: Directory-based packages, local-first import resolution, automatic scanning with topological ordering, circular dependency detection, and `vex.pkg` module root detection
+**Implemented**: Resolver with topological ordering; explicit cycle detection with readable chain and file hints; import arrays/aliases; exports collection and codegen enforcement (private-by-default); CLI integration in `transpile`, `run`, and `build`; multi-package example and tests; error message conventions
+**Planned**: Analyzer-level export enforcement; broaden test coverage; refine third-party module detection in build; type system
 
 ---
 

@@ -508,6 +508,68 @@ func TestAnalyzer_analyzeFunctionCall(t *testing.T) {
 	}
 }
 
+func TestAnalyzer_ExportSpecialForm_NoError(t *testing.T) {
+    analyzer := NewAnalyzer()
+    listCtx := createMockListNode("export")
+    args := []Value{NewBasicValue("[x]", "array")}
+    _, err := analyzer.analyzeExport(listCtx, args)
+    if err != nil {
+        t.Fatalf("analyzeExport should not error for valid args: %v", err)
+    }
+}
+
+func TestAnalyzer_ErrorMessages_IncludeSuggestions(t *testing.T) {
+    analyzer := NewAnalyzer()
+
+    // def suggestion
+    analyzer.errorReporter.Clear()
+    listCtx := createMockListNode("def")
+    _, err := analyzer.analyzeDef(listCtx, []Value{})
+    if err == nil {
+        t.Error("analyzeDef should error for missing args")
+    }
+    errs := analyzer.errorReporter.GetErrors()
+    if len(errs) == 0 || !strings.Contains(errs[0].Message, "Suggestion: use (def name value)") {
+        t.Error("def error should include suggestion")
+    }
+
+    // if suggestion
+    analyzer.errorReporter.Clear()
+    listCtx = createMockListNode("if")
+    _, err = analyzer.analyzeIf(listCtx, []Value{NewBasicValue("true", "bool")})
+    if err == nil {
+        t.Error("analyzeIf should error for missing args")
+    }
+    errs = analyzer.errorReporter.GetErrors()
+    if len(errs) == 0 || !strings.Contains(errs[0].Message, "Suggestion: use (if condition then-expr [else-expr])") {
+        t.Error("if error should include suggestion")
+    }
+
+    // fn suggestion
+    analyzer.errorReporter.Clear()
+    listCtx = createMockListNode("fn")
+    _, err = analyzer.analyzeFn(listCtx, []Value{NewBasicValue("[x]", "array")})
+    if err == nil {
+        t.Error("analyzeFn should error for missing body")
+    }
+    errs = analyzer.errorReporter.GetErrors()
+    if len(errs) == 0 || !strings.Contains(errs[0].Message, "Suggestion: use (fn [params] body)") {
+        t.Error("fn error should include suggestion")
+    }
+
+    // reserved macro name suggestion
+    analyzer.errorReporter.Clear()
+    listCtx = createMockListNode("macro")
+    _, err = analyzer.analyzeMacro(listCtx, []Value{NewBasicValue("if", "symbol"), NewBasicValue("[x]", "array"), NewBasicValue("x", "expression")})
+    if err == nil {
+        t.Error("analyzeMacro should error for reserved name")
+    }
+    errs = analyzer.errorReporter.GetErrors()
+    if len(errs) == 0 || !strings.Contains(errs[0].Message, "Suggestion: choose a different macro name") {
+        t.Error("macro name error should include suggestion")
+    }
+}
+
 // Helper functions for testing
 
 func TestHelper_isNumber(t *testing.T) {

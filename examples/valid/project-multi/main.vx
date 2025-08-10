@@ -1,0 +1,6 @@
+(import ["a" "fmt"])
+
+(def result (a/sum-three 1 2 3))
+(fmt/Println result)
+
+

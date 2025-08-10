@@ -16,7 +16,7 @@ type ParserAdapter struct {
 
 func NewParserAdapter() *ParserAdapter {
 	return &ParserAdapter{
-		parser: ast.NewParser(),
+        parser:  ast.NewParser(),
 	}
 }
 

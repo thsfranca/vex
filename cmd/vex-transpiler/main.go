@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/thsfranca/vex/internal/transpiler"
+	"github.com/thsfranca/vex/internal/transpiler/packages"
 )
 
 func main() {
@@ -70,18 +70,42 @@ func transpileCommand(args []string) {
 		fmt.Fprintf(os.Stderr, "🔄 Transpiling: %s\n", *inputFile)
 	}
 
-	// Read input file
-	content, err := ioutil.ReadFile(*inputFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
-		os.Exit(1)
-	}
+    // Read input file (sanity check)
+    if _, err := os.ReadFile(*inputFile); err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
+        os.Exit(1)
+    }
 
-	// Create transpiler
-	t := transpiler.New()
+    // Load core.vx if present
+    coreContent := loadCoreVex(*verbose)
 
-	// Transpile
-	goCode, err := t.TranspileFromInput(string(content))
+    // Resolve packages and build full program
+    moduleRoot, _ := filepath.Abs(".")
+    resolver := packages.NewResolver(moduleRoot)
+    res, err := resolver.BuildProgramFromEntry(*inputFile)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Package resolution error: %v\n", err)
+        os.Exit(1)
+    }
+    fullProgram := coreContent + "\n" + res.CombinedSource
+
+    // Create transpiler with local package imports ignored in Go output
+    tCfg := transpiler.TranspilerConfig{
+        EnableMacros:     true,
+        CoreMacroPath:    "",
+        PackageName:      "main",
+        GenerateComments: true,
+        IgnoreImports:    res.IgnoreImports,
+        Exports:          res.Exports,
+    }
+    tImpl, err := transpiler.NewTranspilerWithConfig(tCfg)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Transpiler init error: %v\n", err)
+        os.Exit(1)
+    }
+
+    // Transpile
+    goCode, err := tImpl.TranspileFromInput(fullProgram)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Transpilation error: %v\n", err)
 		os.Exit(1)
@@ -89,7 +113,7 @@ func transpileCommand(args []string) {
 
 	// Output result
 	if *outputFile != "" {
-		err = ioutil.WriteFile(*outputFile, []byte(goCode), 0644)
+        err = os.WriteFile(*outputFile, []byte(goCode), 0644)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "❌ Error writing output file %s: %v\n", *outputFile, err)
 			os.Exit(1)
@@ -124,21 +148,40 @@ func runCommand(args []string) {
 	// Load core.vx if it exists
 	coreContent := loadCoreVex(*verbose)
 
-	// Read user input file
-	userContent, err := ioutil.ReadFile(*inputFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
-		os.Exit(1)
-	}
+    // Read user input file (kept for future use; resolution does its own reading)
+    _, err := os.ReadFile(*inputFile)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
+        os.Exit(1)
+    }
 
-	// Combine core + user code
-	fullProgram := coreContent + "\n" + string(userContent)
+    // Resolve packages and build full program
+    moduleRoot, _ := filepath.Abs(".")
+    resolver := packages.NewResolver(moduleRoot)
+    res, err := resolver.BuildProgramFromEntry(*inputFile)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Package resolution error: %v\n", err)
+        os.Exit(1)
+    }
+    fullProgram := coreContent + "\n" + res.CombinedSource
 
-	// Create transpiler
-	t := transpiler.New()
+    // Create transpiler with local package imports ignored in Go output
+    tCfg := transpiler.TranspilerConfig{
+        EnableMacros:     true,
+        CoreMacroPath:    "",
+        PackageName:      "main",
+        GenerateComments: true,
+        IgnoreImports:    res.IgnoreImports,
+        Exports:          res.Exports,
+    }
+    tImpl, err := transpiler.NewTranspilerWithConfig(tCfg)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Transpiler init error: %v\n", err)
+        os.Exit(1)
+    }
 
 	// Transpile combined program
-	goCode, err := t.TranspileFromInput(fullProgram)
+    goCode, err := tImpl.TranspileFromInput(fullProgram)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Transpilation error: %v\n", err)
 		os.Exit(1)
@@ -154,7 +197,7 @@ func runCommand(args []string) {
 	tmpGoFile := filepath.Join(tmpDir, baseName+"_temp.go")
 
 	// Write Go code to temporary file
-	err = ioutil.WriteFile(tmpGoFile, []byte(goCode), 0644)
+    err = os.WriteFile(tmpGoFile, []byte(goCode), 0644)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Error writing temporary Go file: %v\n", err)
 		os.Exit(1)
@@ -228,21 +271,39 @@ func buildCommand(args []string) {
 	// Load core.vx if it exists
 	coreContent := loadCoreVex(*verbose)
 
-	// Read user input file
-	userContent, err := ioutil.ReadFile(*inputFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
-		os.Exit(1)
-	}
+    // Read user input file (kept for future use; resolution does its own reading)
+    _, err := os.ReadFile(*inputFile)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
+        os.Exit(1)
+    }
 
-	// Combine core + user code
-	fullProgram := coreContent + "\n" + string(userContent)
+    // Resolve packages and build full program
+    moduleRoot, _ := filepath.Abs(".")
+    resolver := packages.NewResolver(moduleRoot)
+    res, err := resolver.BuildProgramFromEntry(*inputFile)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Package resolution error: %v\n", err)
+        os.Exit(1)
+    }
+    fullProgram := coreContent + "\n" + res.CombinedSource
 
-	// Create transpiler
-	t := transpiler.New()
+    // Create transpiler with local package imports ignored in Go output
+    tCfg := transpiler.TranspilerConfig{
+        EnableMacros:     true,
+        CoreMacroPath:    "",
+        PackageName:      "main",
+        GenerateComments: true,
+        IgnoreImports:    res.IgnoreImports,
+    }
+    tImpl, err := transpiler.NewTranspilerWithConfig(tCfg)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Transpiler init error: %v\n", err)
+        os.Exit(1)
+    }
 
 	// Transpile combined program
-	goCode, err := t.TranspileFromInput(fullProgram)
+    goCode, err := tImpl.TranspileFromInput(fullProgram)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Transpilation error: %v\n", err)
 		os.Exit(1)
@@ -255,7 +316,7 @@ func buildCommand(args []string) {
 	// Create temporary directory for build
 	tmpDir := os.TempDir()
 	buildDir := filepath.Join(tmpDir, "vex-build-"+strings.ReplaceAll(time.Now().Format("20060102-150405"), ":", ""))
-	if err := os.MkdirAll(buildDir, 0755); err != nil {
+    if err := os.MkdirAll(buildDir, 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Error creating build directory: %v\n", err)
 		os.Exit(1)
 	}
@@ -268,7 +329,7 @@ func buildCommand(args []string) {
 	}()
 
 	// Generate go.mod with detected dependencies
-	detectedModules := t.GetDetectedModules()
+    detectedModules := tImpl.GetDetectedModules()
 	if err := generateGoMod(buildDir, detectedModules, *verbose); err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Error generating go.mod: %v\n", err)
 		os.Exit(1)
@@ -276,7 +337,7 @@ func buildCommand(args []string) {
 
 	// Write Go code to build directory
 	mainGoFile := filepath.Join(buildDir, "main.go")
-	if err := ioutil.WriteFile(mainGoFile, []byte(goCode), 0644); err != nil {
+    if err := os.WriteFile(mainGoFile, []byte(goCode), 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Error writing Go file: %v\n", err)
 		os.Exit(1)
 	}
@@ -317,7 +378,7 @@ func buildCommand(args []string) {
 
 func loadCoreVex(verbose bool) string {
 	// Try to load core.vx from current directory
-	coreContent, err := ioutil.ReadFile("core.vx")
+	coreContent, err := os.ReadFile("core.vx")
 	if err != nil {
 		if verbose {
 			fmt.Fprintf(os.Stderr, "ℹ️  core.vx not found, using minimal bootstrap\n")
@@ -352,7 +413,7 @@ func generateGoMod(vexDir string, modules map[string]string, verbose bool) error
 		}
 	}
 	
-	return ioutil.WriteFile(goModPath, []byte(content), 0644)
+	return os.WriteFile(goModPath, []byte(content), 0o644)
 }
 
 func downloadDependencies(vexDir string, verbose bool) error {

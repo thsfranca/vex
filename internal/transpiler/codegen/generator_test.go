@@ -52,7 +52,7 @@ func TestGenerator_ImportAndPrintln(t *testing.T) {
 }
 
 func TestGenerator_ArithmeticAndComparison(t *testing.T) {
-	prog := parseProgram(t, "(+ 1 2)\n(= 1 1)")
+    prog := parseProgram(t, "(+ 1 2)\n(= 1 1)\n(> 2 1)\n(< 1 2)")
 	g := NewGoCodeGenerator(Config{PackageName: "main"})
 	if err := g.VisitProgram(prog); err != nil {
 		t.Fatalf("VisitProgram error: %v", err)
@@ -64,6 +64,12 @@ func TestGenerator_ArithmeticAndComparison(t *testing.T) {
 	if !strings.Contains(out, "_ = (1 == 1)") {
 		t.Fatalf("expected equality conversion to ==, got:\n%s", out)
 	}
+    if !strings.Contains(out, "_ = (2 > 1)") {
+        t.Fatalf("expected greater-than comparison, got:\n%s", out)
+    }
+    if !strings.Contains(out, "_ = (1 < 2)") {
+        t.Fatalf("expected less-than comparison, got:\n%s", out)
+    }
 }
 
 func TestGenerator_ArraysAndDoAndFn(t *testing.T) {
@@ -90,7 +96,7 @@ func TestGenerator_ArraysAndDoAndFn(t *testing.T) {
 }
 
 func TestGenerator_PrimitiveOps(t *testing.T) {
-	prog := parseProgram(t, "(get [1 2 3] 1)\n(slice [1 2 3] 1)\n(len [1 2])\n(append [1] [2 3])")
+    prog := parseProgram(t, "(get [1 2 3] 1)\n(slice [1 2 3] 1)\n(len [1 2])\n(append [1] [2 3])\n(get [] 0)\n(slice [] 0)")
 	g := NewGoCodeGenerator(Config{PackageName: "main"})
 	if err := g.VisitProgram(prog); err != nil {
 		t.Fatalf("VisitProgram error: %v", err)
@@ -108,6 +114,12 @@ func TestGenerator_PrimitiveOps(t *testing.T) {
 	if !strings.Contains(out, "_ = append([]interface{}{1}, []interface{}{2, 3}...)") {
 		t.Fatalf("expected append lowering, got:\n%s", out)
 	}
+    if !strings.Contains(out, "_ = func() interface{} { if len([]interface{}{}) > 0 {") {
+        t.Fatalf("expected get empty-array branch to be covered, got:\n%s", out)
+    }
+    if !strings.Contains(out, "_ = func() []interface{} { if len([]interface{}{}) > 0 {") {
+        t.Fatalf("expected slice empty-array branch to be covered, got:\n%s", out)
+    }
 }
 
 func TestGenerator_NestedFunctionNameAndPackageVar(t *testing.T) {

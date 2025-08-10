@@ -114,4 +114,6 @@ type TranspilerConfig struct {
 	CoreMacroPath    string
 	PackageName      string
 	GenerateComments bool
+    IgnoreImports    map[string]bool
+    Exports          map[string]map[string]bool
 }

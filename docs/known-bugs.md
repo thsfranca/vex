@@ -8,13 +8,13 @@ This document tracks known bugs, limitations, and issues in the Vex language imp
 
 ### High Priority
 
-#### Package Discovery System Missing
-- **Status**: ⚠️ HIGH PRIORITY - IMMEDIATE IMPLEMENTATION NEEDED
-- **Description**: The package discovery system outlined in the implementation requirements is not yet implemented
-- **Impact**: Cannot handle multi-file projects, circular dependency detection, or proper module management
-- **Workaround**: Use single-file programs only
-- **Tracking**: Phase 3 - moved from Phase 7 as critical infrastructure
-- **Next Steps**: Implement directory-based package structure and import path resolution
+#### Package Discovery System
+- **Status**: 🚧 IN PROGRESS (MVP)
+- **Description**: Directory-based packages, local-first import resolution, automatic scanning, and cycle detection are implemented; `vex.pkg` module root detection implemented; exports parsed but enforcement partial
+- **Impact**: Enables multi-file projects; cycles are compile-time errors
+- **Workaround**: Prefer simple structures; explicit exports are not yet fully enforced across packages
+- **Tracking**: Phase 3 - critical infrastructure
+- **Next Steps**: Enforce exports across packages; refine alias/import handling in analyzer
 
 #### Type System Limitations
 - **Status**: ⏳ PLANNED

@@ -56,4 +56,27 @@ func TestImportArrayWithAliasesAndCalls(t *testing.T) {
     }
 }
 
+func TestLocalPackageCall_DirectIdentifier(t *testing.T) {
+    // Configure generator to treat package "a" as local and export symbol "add"
+    g := NewGoCodeGenerator(Config{
+        PackageName:   "main",
+        IgnoreImports: map[string]bool{"a": true},
+        Exports:       map[string]map[string]bool{"a": {"add": true}},
+    })
+
+    // Program calls a/add without any import statement
+    prog := parseProgramHelper(t, "(a/add 1 2)")
+    if err := g.VisitProgram(prog); err != nil {
+        t.Fatalf("VisitProgram error: %v", err)
+    }
+    out := g.buildFinalCode()
+
+    if strings.Contains(out, "import \"a\"") {
+        t.Fatalf("should not emit Go import for local package 'a':\n%s", out)
+    }
+    if !strings.Contains(out, "add(1, 2)") {
+        t.Fatalf("expected direct call to add(1, 2), got:\n%s", out)
+    }
+}
+
 

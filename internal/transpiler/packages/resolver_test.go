@@ -51,4 +51,39 @@ func TestResolver_OrdersPackagesAndDetectsCycles(t *testing.T) {
     }
 }
 
+func TestResolver_NoVexPkg_UsesCWD(t *testing.T) {
+    dir := t.TempDir()
+    // No vex.pkg at root; should fallback to startDir
+    writeFile(t, filepath.Join(dir, "lib", "lib.vx"), "(def x 1)\n")
+    entry := filepath.Join(dir, "main.vx")
+    writeFile(t, entry, "(import [\"lib\"])\n(def main 0)\n")
+
+    r := NewResolver(dir)
+    res, err := r.BuildProgramFromEntry(entry)
+    if err != nil {
+        t.Fatalf("resolve error: %v", err)
+    }
+    if res == nil || len(res.CombinedSource) == 0 {
+        t.Fatalf("expected combined source")
+    }
+}
+
+func TestResolver_ImportArraysAndAliases_ParsingOnly(t *testing.T) {
+    dir := t.TempDir()
+    // Import arrays and alias pairs; only 'a' is local
+    writeFile(t, filepath.Join(dir, "a", "a.vx"), "(def x 1)\n")
+    entry := filepath.Join(dir, "main.vx")
+    writeFile(t, entry, "(import [\"a\" [\"net/http\" http] \"fmt\"])\n(def main 0)\n")
+
+    r := NewResolver(dir)
+    res, err := r.BuildProgramFromEntry(entry)
+    if err != nil {
+        t.Fatalf("resolve error: %v", err)
+    }
+    if !res.IgnoreImports["a"] {
+        t.Fatalf("expected local package 'a' to be ignored in Go imports")
+    }
+}
+
+
 

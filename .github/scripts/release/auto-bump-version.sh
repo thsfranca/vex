@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# Bump version using release manager tool
-# Usage: bump-version.sh <release-type>
+# Compute next version using release manager (from latest git tag)
+# Usage: auto-bump-version.sh <release-type>
 
 RELEASE_TYPE="$1"
 
@@ -17,7 +17,7 @@ cd tools/release-manager
 # Build the release-manager tool
 go build -o release-manager .
 
-# Bump version and capture output
+# Compute next version and capture output
 OUTPUT=$(./release-manager bump-version "$RELEASE_TYPE")
 echo "$OUTPUT"
 
@@ -28,4 +28,4 @@ NEW_VERSION=$(echo "$OUTPUT" | grep "^new-version=" | cut -d'=' -f2)
 echo "old-version=$OLD_VERSION" >> $GITHUB_OUTPUT
 echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-echo "✅ Version bumped from $OLD_VERSION to $NEW_VERSION"
+echo "✅ Computed next version: $OLD_VERSION -> $NEW_VERSION"

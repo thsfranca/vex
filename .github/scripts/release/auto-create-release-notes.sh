@@ -2,7 +2,7 @@
 set -e
 
 # Create release notes for GitHub Release
-# Usage: create-release-notes.sh <new-version> <old-version> <pr-number> <pr-title> <pr-body> <pr-author> <release-type>
+# Usage: auto-create-release-notes.sh <new-version> <old-version> <pr-number> <pr-title> <pr-body> <pr-author> <release-type>
 
 NEW_VERSION="$1"
 OLD_VERSION="$2"

@@ -28,8 +28,8 @@ Add one of these labels to your PR **before merging**:
 ### 2. Merge PR to Main
 When you merge the PR:
 - ✅ Auto-release workflow triggers
-- ✅ Version gets bumped automatically  
-- ✅ Git tag is created (`v0.1.1`)
+- ✅ Version is computed from the latest tag
+- ✅ New git tag is created (`v0.1.1`)
 - ✅ Release notes generated from PR
 - ✅ Language release workflow builds artifacts
 
@@ -72,9 +72,8 @@ When you merge the PR:
 
 If you prefer manual control, you can still:
 
-1. **Edit VERSION file**: Change `0.1.0` to `0.1.1`
-2. **Create tag manually**: `git tag v0.1.1 && git push origin v0.1.1`
-3. **Use existing workflow**: `language-release.yml` builds the release
+1. **Create tag manually**: `git tag v0.1.1 && git push origin v0.1.1`
+2. **Use existing workflow**: `language-release.yml` builds the release
 
 ## 📁 Files Involved
 
@@ -82,7 +81,6 @@ If you prefer manual control, you can still:
 .github/workflows/auto-release.yml     # Main auto-release workflow
 tools/release-manager/                 # Go tool for version management
 scripts/create-release-tag.sh          # Git tagging script
-VERSION                                # Current version file
 ```
 
 ## 🎯 Best Practices
@@ -138,19 +136,15 @@ Follow these patterns for consistent branch organization:
 - ✅ Check workflow logs in GitHub Actions
 
 ### Wrong Version
-- ✅ Check current VERSION file content
 - ✅ Verify label type (patch vs minor vs major)
-- ✅ Look at recent releases for version history
+- ✅ Look at the latest tag and recent releases for version history
 
 ### Manual Fix
 If something goes wrong:
 ```bash
-# Fix VERSION file manually
-echo "0.1.2" > VERSION
-git add VERSION
-git commit -m "fix: correct version"
-git tag v0.1.2
-git push origin main v0.1.2
+# Create a corrected tag and push it
+git tag -f v0.1.2
+git push -f origin v0.1.2
 ```
 
 ---

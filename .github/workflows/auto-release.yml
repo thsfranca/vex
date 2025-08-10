@@ -23,6 +23,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          fetch-tags: true
           persist-credentials: true
 
       - name: Setup Go

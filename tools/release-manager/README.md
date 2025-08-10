@@ -18,7 +18,7 @@ Checks for release labels and outputs the release type.
 ```bash
 ./release-manager bump-version patch
 ```
-Bumps the version in the VERSION file based on release type.
+Computes the next version from the latest git tag and prints `old-version` and `new-version` for CI consumption.
 
 ### Create Release Notes
 ```bash

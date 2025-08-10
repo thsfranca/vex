@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Create release commit and tag
+# Create and push a release tag (no commit of VERSION file)
 # Usage: ./scripts/create-release-tag.sh <new-version> <old-version> <pr-number> <release-type>
 
 set -e
@@ -15,43 +15,28 @@ if [ $# -ne 4 ]; then
     exit 1
 fi
 
-echo "Creating release commit and tag for v$NEW_VERSION"
+echo "Creating release tag v$NEW_VERSION"
 
 # Configure git (should be done by caller, but just in case)
 git config --local user.email "action@github.com" 2>/dev/null || true
 git config --local user.name "GitHub Action" 2>/dev/null || true
 
-echo "Current git status:"
-git status
-
-echo "Checking if VERSION file has changes:"
-git diff --name-only
-git diff VERSION || echo "No changes to VERSION file"
-
-# Commit version bump
-git add VERSION
-
-# Check if there are changes to commit
-if git diff --cached --quiet; then
-    echo "⚠️ No changes to commit - VERSION file may not have been modified"
-    exit 1
+# Validate version format (semver or semver with prerelease)
+if [[ ! "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-][A-Za-z]+\.[0-9]+)?$ ]]; then
+  echo "❌ Invalid version format: $NEW_VERSION"
+  exit 1
 fi
 
-git commit -m "release: bump version to $NEW_VERSION
-
-Auto-release triggered by PR #$PR_NUMBER
-Release type: $RELEASE_TYPE
-Previous version: $OLD_VERSION"
-
-echo "Commit created successfully, creating tag..."
+# Check if tag already exists
+if git rev-parse "v$NEW_VERSION" >/dev/null 2>&1; then
+  echo "⚠️ Tag v$NEW_VERSION already exists, nothing to do"
+  exit 0
+fi
 
 # Create and push tag
-git tag "v$NEW_VERSION"
-
-echo "Pushing commit and tag to remote..."
-git push origin main
+git tag -m "Release $NEW_VERSION (from PR #$PR_NUMBER, $RELEASE_TYPE)" "v$NEW_VERSION"
 git push origin "v$NEW_VERSION"
 
-echo "🎉 Created and pushed release v$NEW_VERSION"
+echo "🎉 Created and pushed tag v$NEW_VERSION"
 echo "🔗 Tag: v$NEW_VERSION"
 echo "📋 Triggered by PR #$PR_NUMBER ($RELEASE_TYPE release)"

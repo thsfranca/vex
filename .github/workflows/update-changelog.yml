@@ -24,6 +24,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GH_BOT_TOKEN }}
           fetch-depth: 0
 
       - name: Get release information
@@ -51,7 +52,7 @@ jobs:
           # Save body to file for multiline content
           echo "$RELEASE_BODY" > /tmp/release_body.txt
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_BOT_TOKEN }}
 
       - name: Update CHANGELOG contents
         run: |
@@ -76,7 +77,7 @@ jobs:
 
       - name: Open pull request
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_BOT_TOKEN }}
           TAG: ${{ steps.release-info.outputs.tag }}
           DATE: ${{ steps.release-info.outputs.date }}
         run: |

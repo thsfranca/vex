@@ -1,8 +1,8 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Create release notes for GitHub Release
-# Usage: create-release-notes.sh <new-version> <old-version> <pr-number> <pr-title> <pr-body> <pr-author> <release-type>
+# Usage: auto-create-release-notes.sh <new-version> <old-version> <pr-number> <pr-title> <pr-body> <pr-author> <release-type>
 
 NEW_VERSION="$1"
 OLD_VERSION="$2"
@@ -19,7 +19,8 @@ fi
 
 echo "📝 Creating release notes..."
 
-cd tools/release-manager
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$REPO_ROOT/tools/release-manager"
 
 # Build the release-manager tool
 go build -o release-manager .
@@ -42,13 +43,7 @@ PR_DATA=$(jq -n \
 # Create release notes via tool
 ./release-manager create-notes "$PR_DATA"
 
-# Create release notes for GitHub Release using the dedicated script
-cd ../..
-.github/scripts/release/create-release-notes.sh \
-  "$NEW_VERSION" \
-  "$OLD_VERSION" \
-  "$PR_NUMBER" \
-  "$PR_TITLE" \
-  "$RELEASE_TYPE"
+echo "Using release notes at: $(pwd)/release-notes.md"
+cp release-notes.md /tmp/release-notes.md
 
 echo "✅ Release notes created successfully"

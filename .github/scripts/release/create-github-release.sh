@@ -1,45 +1,19 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-# Script to create GitHub Release with artifacts
+# Wrapper that delegates to the Go release-manager
 # Usage: create-github-release.sh <version> <release_type>
+
+if [ $# -ne 2 ]; then
+  echo "Usage: $0 <version> <release_type>"
+  exit 1
+fi
 
 VERSION="$1"
 RELEASE_TYPE="$2"
 
-if [ -z "$VERSION" ] || [ -z "$RELEASE_TYPE" ]; then
-    echo "Error: Missing required parameters"
-    echo "Usage: $0 <version> <release_type>"
-    exit 1
-fi
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$REPO_ROOT/tools/release-manager"
 
-echo "🚀 Creating GitHub Release..."
-
-# Determine if this is a prerelease
-PRERELEASE_FLAG=""
-if [[ "$RELEASE_TYPE" =~ ^(alpha|beta|rc)$ ]]; then
-    PRERELEASE_FLAG="--prerelease"
-fi
-
-# Create placeholder artifacts
-mkdir -p dist
-echo "# Vex Language v${VERSION}" > dist/README.md
-echo "Basic transpiler with working features:" >> dist/README.md
-echo "- Variable definitions: (def x 10) → x := 10" >> dist/README.md
-echo "- Arithmetic expressions: (+ 1 2) → 1 + 2" >> dist/README.md
-echo "- CLI tool: vex-transpiler" >> dist/README.md
-
-# Package examples
-tar -czf "dist/vex-examples-v${VERSION}.tar.gz" examples/
-
-# Read release notes from temporary file
-RELEASE_NOTES=$(cat /tmp/release-notes.md)
-
-# Create the GitHub Release
-gh release create "v${VERSION}" \
-    --title "Vex v${VERSION}" \
-    --notes "$RELEASE_NOTES" \
-    $PRERELEASE_FLAG \
-    dist/*
-
-echo "✅ GitHub Release v${VERSION} created successfully"
+go build -o release-manager .
+./release-manager publish-release "$VERSION" "$RELEASE_TYPE"

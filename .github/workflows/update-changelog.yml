@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   update-changelog:
@@ -52,30 +53,37 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update CHANGELOG
+      - name: Update CHANGELOG contents
         run: |
-          # Get the release info
-          RELEASE_TAG="${{ steps.release-info.outputs.tag }}"
-          RELEASE_NAME="${{ steps.release-info.outputs.name }}"
-          RELEASE_DATE="${{ steps.release-info.outputs.date }}"
-          RELEASE_BODY=$(cat /tmp/release_body.txt)
+          chmod +x .github/scripts/changelog/update-changelog.sh
+          .github/scripts/changelog/update-changelog.sh \
+            "${{ steps.release-info.outputs.tag }}" \
+            "${{ steps.release-info.outputs.name }}" \
+            "${{ steps.release-info.outputs.date }}" \
+            "/tmp/release_body.txt"
 
-          # Prepare the new entry and insert it
-          {
-            echo ""
-            echo "## [$RELEASE_TAG] - $RELEASE_DATE"
-            echo ""
-            echo "$RELEASE_BODY"
-            echo ""
-          } > /tmp/new_entry.md
-
-          # Insert after [Unreleased] section
-          sed -i '/## \[Unreleased\]/r /tmp/new_entry.md' CHANGELOG.md
-
-      - name: Commit and push changes
+      - name: Create branch and commit
+        env:
+          TAG: ${{ steps.release-info.outputs.tag }}
         run: |
+          BRANCH="docs/update-changelog-${TAG}"
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          git checkout -b "$BRANCH"
           git add CHANGELOG.md
-          git commit -m "docs: update CHANGELOG for ${{ steps.release-info.outputs.tag }}" || exit 0
-          git push
+          git commit -m "docs: update CHANGELOG for ${TAG}" || exit 0
+          git push -u origin "$BRANCH"
+
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release-info.outputs.tag }}
+          DATE: ${{ steps.release-info.outputs.date }}
+        run: |
+          BRANCH="docs/update-changelog-${TAG}"
+          gh pr create \
+            --title "docs: update CHANGELOG for ${TAG}" \
+            --body "Add changelog entry for ${TAG} released on ${DATE}." \
+            --base main \
+            --head "$BRANCH" \
+            --draft

@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.3.1] - 2025-08-10
+
+## 🎉 Auto-Release from PR #51
+
+**Release Type:** patch  
+**Triggered by:** @thsfranca
+
+### 📋 Changes from PR #51
+
+**chore: switch auto-release to tag-based versioning; remove VERSION**
+
+What: Move auto-release to derive current version from latest git tag; remove VERSION dependency.
+
+Why: Prevent failures when VERSION is stale; make tags the single source of truth.
+
+Changes:
+- tools/release-manager: compute versions from latest tag; stop reading/writing VERSION.
+- .github/workflows/auto-release.yml: fetch tags for version computation.
+- .github/scripts/release/auto-bump-version.sh: compute next version only; no file writes.
+- scripts/create-release-tag.sh: only tag/push; no VERSION commit.
+- docs/release-process.md: remove VERSION references; document tag-based flow.
+- Remove VERSION file.
+
+CI: No functional changes to language build/tests; release flow now tag-driven.
+
+Testing: All Go tests passing locally.
+
+---
+
+*This release was automatically created from the merged pull request.*
+
 <!-- Release notes will be automatically generated here -->
 
 ## [v0.2.0] - 2025-08-04

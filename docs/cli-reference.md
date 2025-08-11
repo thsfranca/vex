@@ -1,8 +1,90 @@
 # Vex CLI Reference
+## Quickstart Tutorial
+
+Follow these steps to clone, build, write code, and run Vex programs.
+
+### Prerequisites
+
+- Go 1.21+
+- Git
+
+### 1) Clone the repository
+
+```bash
+git clone https://github.com/thsfranca/vex.git
+cd vex
+```
+
+### 2) Build the CLI
+
+```bash
+go build -o vex cmd/vex-transpiler/main.go
+./vex --help
+```
+
+You should see the commands: `transpile`, `run`, and `build`.
+
+### 3) Write your first program
+
+Create `hello.vx`:
+
+```vex
+(import "fmt")
+(def greeting "Hello, Vex!")
+(fmt/Println greeting)
+```
+
+### 4) Run it
+
+```bash
+./vex run -input hello.vx
+```
+
+Expected output:
+
+```
+Hello, Vex!
+```
+
+### 5) Transpile to Go (optional)
+
+```bash
+./vex transpile -input hello.vx -output hello.go
+cat hello.go
+```
+
+### 6) Build a binary (optional)
+
+```bash
+./vex build -input hello.vx -output hello
+./hello
+```
+
+### 7) Playground example
+
+Create `playground.vx`:
+
+```vex
+(import "fmt")
+(def sum (+ 5 3))
+(def product (* 4 7))
+(def items [1 "two" 3])
+(defn add [x y] (+ x y))
+(def result (add sum product))
+(fmt/Printf "sum=%d, product=%d, result=%d\n" sum product result)
+(fmt/Println items)
+```
+
+Run:
+
+```bash
+./vex run -input playground.vx
+```
+
 
 ## Overview
 
-The Vex CLI provides three main commands for working with Vex programs: `transpile`, `run`, and `build`. Built on a sophisticated transpiler architecture with advanced macro system, comprehensive Go interoperability, and clean code generation, all commands follow Go's performance characteristics and provide detailed error reporting.
+The Vex CLI provides the main commands for working with Vex programs: `transpile`, `run`, `build`, and `test`. Built on a sophisticated transpiler architecture with advanced macro system, comprehensive Go interoperability, and clean code generation, all commands follow Go's performance characteristics and provide detailed error reporting.
 
 ## Global Options
 
@@ -181,15 +263,47 @@ scp webserver user@server:/usr/local/bin/
 
 ---
 
+### `test` - Discover and Run Tests
+
+Runs Vex tests discovered as `*_test.vx` files.
+
+#### Syntax
+```bash
+./vex test [-dir <path>] [-verbose]
+```
+
+#### Behavior
+- Recursively finds files matching `*_test.vx` under `-dir` (default: current directory)
+- Transpiles and executes each test file; test files can use stdlib test macros from `stdlib/vex/test/test.vx`
+- Exits non-zero if any test fails
+
+#### Stdlib Test Macros
+- `assert-eq actual expected "message"` – prints ok/FAIL and exits process on failure
+- `deftest name (body...)` – prints RUN/PASS around the enclosed assertions
+
+#### Example
+```vex
+(import ["vex/test" test]) ; optional, macros are available via stdlib
+
+(deftest my-first-test
+  (assert-eq (+ 1 2) 3 "1+2=3"))
+```
+
+```bash
+./vex test -dir . -verbose
+```
+
+---
+
 ## Command Comparison
 
-| Feature | `transpile` | `run` | `build` |
-|---------|-------------|-------|---------|
-| **Output** | Go source | Direct execution | Binary executable |
-| **Use Case** | Inspection/Integration | Development/Testing | Distribution |
-| **Speed** | Fast | Medium | Slow (compilation) |
-| **Dependencies** | None | Go compiler | Go compiler |
-| **Result** | .go file | Temporary execution | Standalone binary |
+| Feature | `transpile` | `run` | `build` | `test` |
+|---------|-------------|-------|---------|--------|
+| **Output** | Go source | Direct execution | Binary executable | Test report |
+| **Use Case** | Inspection/Integration | Development | Distribution | Testing |
+| **Speed** | Fast | Medium | Slow (compilation) | Medium |
+| **Dependencies** | None | Go compiler | Go compiler | Go compiler |
+| **Result** | .go file | Temporary execution | Standalone binary | Exit code/pass-fail |
 
 ## File Handling
 
@@ -235,6 +349,24 @@ Error: Permission denied writing to '/usr/bin/app'
 - **1**: General error (syntax, file not found, etc.)
 - **2**: Compilation error (Go compilation failed)
 - **3**: Permission error (file system access)
+
+### HM Typing Diagnostics
+The compiler uses Hindley–Milner (HM) type inference with strict diagnostics. Common diagnostic codes:
+
+- `VEX-TYP-UNDEF`: Unknown identifier. Define the symbol or import the correct package.
+- `VEX-TYP-COND`: If-condition must be boolean. Adjust the condition to return `bool`.
+- `VEX-TYP-EQ`: Equality arguments differ in type. Make both sides the same type.
+- `VEX-TYP-ARRAY-ELEM`: Array elements have inconsistent types. Make all elements the same type.
+- `VEX-TYP-MAP-KEY` / `VEX-TYP-MAP-VAL`: Map keys/values have inconsistent types across pairs.
+- `VEX-TYP-REC-NOMINAL`: Nominal record mismatch (e.g., `A` used where `B` is required).
+
+Example (CLI stderr snippet):
+
+```
+path/to/file.vx:12:3: error: [VEX-TYP-COND]: if condition must be bool
+Expected: bool
+Got: number
+```
 
 ## Advanced Usage
 

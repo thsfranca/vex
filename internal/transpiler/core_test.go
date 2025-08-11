@@ -409,6 +409,13 @@ func TestTranspiler_ArrayHandling(t *testing.T) {
 			transpiler := New()
 			result, err := transpiler.TranspileFromInput(tt.input)
 
+			if tt.name == "Mixed array" {
+				if err == nil {
+					t.Errorf("Expected type error for mixed array, got success: %v", result)
+				}
+				return
+			}
+
 			if err != nil {
 				t.Errorf("Expected no error, got: %v", err)
 			}

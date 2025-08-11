@@ -1,8 +1,12 @@
 package transpiler
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	packages "github.com/thsfranca/vex/internal/transpiler/packages"
 )
 
 func TestTranspilerBuilder_WithersAndBuild(t *testing.T) {
@@ -42,6 +46,56 @@ func TestOrchestrator_TranspileFromInput_ThirdPartyDetection(t *testing.T) {
     mods := vt.GetDetectedModules()
     if _, ok := mods["golang.org/x/mod"]; !ok {
         t.Fatalf("expected third-party module to be detected")
+    }
+}
+
+func writeFileOrch(t *testing.T, path, content string) {
+    t.Helper()
+    if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+        t.Fatalf("mkdir: %v", err)
+    }
+    if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+        t.Fatalf("write: %v", err)
+    }
+}
+
+func TestEndToEnd_CrossPackageSchemes_Transpile(t *testing.T) {
+    dir := t.TempDir()
+    // Package a exporting id function
+    writeFileOrch(t, filepath.Join(dir, "a", "a.vx"), "(export [id])\n(defn id [x] x)\n")
+    // Entry that calls a/id with int and string
+    entry := filepath.Join(dir, "main.vx")
+    writeFileOrch(t, entry, "(import [\"a\"])\n(def main (do (a/id 1) (a/id \"s\")))\n")
+
+    r := packages.NewResolver(dir)
+    res, err := r.BuildProgramFromEntry(entry)
+    if err != nil { t.Fatalf("resolve error: %v", err) }
+
+    cfg := TranspilerConfig{
+        EnableMacros:     true,
+        PackageName:      "main",
+        GenerateComments: false,
+        IgnoreImports:    res.IgnoreImports,
+        Exports:          res.Exports,
+        PkgSchemes:       res.PkgSchemes,
+    }
+    tImpl, err := NewTranspilerWithConfig(cfg)
+    if err != nil { t.Fatalf("builder error: %v", err) }
+    if _, err := tImpl.TranspileFromInput(res.CombinedSource); err != nil {
+        t.Fatalf("transpile should succeed using cross-package schemes: %v", err)
+    }
+
+    // Now assert that non-exported symbol errors at analyzer
+    writeFileOrch(t, entry, "(import [\"a\"])\n(def main (a/hidden))\n")
+    res2, err := r.BuildProgramFromEntry(entry)
+    if err != nil { t.Fatalf("resolve error: %v", err) }
+    cfg.IgnoreImports = res2.IgnoreImports
+    cfg.Exports = res2.Exports
+    cfg.PkgSchemes = res2.PkgSchemes
+    tImpl2, err := NewTranspilerWithConfig(cfg)
+    if err != nil { t.Fatalf("builder2 error: %v", err) }
+    if _, err := tImpl2.TranspileFromInput(res2.CombinedSource); err == nil {
+        t.Fatalf("expected error when calling non-exported symbol a/hidden")
     }
 }
 

@@ -84,8 +84,10 @@ func (b *TranspilerBuilder) Build() (*VexTranspiler, error) {
 		macroSystem = NewMacroExpanderAdapter(macro.NewMacroExpander(registry))
 	}
 
-	// Create analyzer
-	analyzer := NewAnalyzerAdapter()
+    // Create analyzer
+    analyzer := NewAnalyzerAdapter()
+    // Provide package environment for analyzer (package exports/ignore/schemes)
+    analyzer.SetPackageEnv(b.config.IgnoreImports, b.config.Exports, b.config.PkgSchemes)
 
 	// Create code generator
 	codeGenConfig := codegen.Config{
@@ -183,12 +185,12 @@ func (vt *VexTranspiler) astToString(ast AST) string {
 	return "/* AST conversion not implemented yet */"
 }
 
-// Factory function for backward compatibility
+// NewVexTranspiler builds a VexTranspiler with default configuration.
 func NewVexTranspiler() (*VexTranspiler, error) {
 	return NewBuilder().Build()
 }
 
-// Factory function with custom configuration
+// NewTranspilerWithConfig builds a VexTranspiler using the provided configuration.
 func NewTranspilerWithConfig(config TranspilerConfig) (*VexTranspiler, error) {
 	return NewBuilder().WithConfig(config).Build()
 }

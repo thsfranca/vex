@@ -2,7 +2,7 @@
 title: "Vex Language - AI Quick Reference"
 version: "0.3.0"
 compatibility: "Go 1.21+"
-last-updated: "2025-08-08"
+last-updated: "2025-08-11"
 ai-model-compatibility: "GPT-4, Claude-3+, and similar models"
 purpose: "Machine-readable reference for AI code generation"
 ---
@@ -14,10 +14,10 @@ purpose: "Machine-readable reference for AI code generation"
 **Execution Pipeline**: Parse S-expressions → AST → Macro expansion → Semantic analysis → Go transpilation → Compile & execute  
 **Syntax Pattern**: `(operation arg1 arg2 ...)`  
 **Output Target**: Go source code  
-**Type System**: Basic types with Go interop | Advanced typing planned  
+**Type System**: HM-style inference (Algorithm W) with strict checks for primitives, arrays, maps, records; package-boundary schemes; equality via scheme  
 **Concurrency**: Automatic via Go goroutines  
 **Macro System**: Comprehensive user-defined macros with defn support  
-**Project Status**: Phase 1-4 complete | Phase 5+ planned  
+**Project Status**: Grammar, transpiler, macros complete; structured diagnostics in place; HM inference baseline implemented and expanding  
 
 ## Language Specification
 
@@ -40,6 +40,7 @@ comment     ::= ';' .* '\n'
 | String | ✅ | `"hello"` | `"hello"` | UTF-8 |
 | Symbol | ✅ | `variable-name` | `variableName` | Identifiers |
 | Array | ✅ | `[1 2 3]` | `[]interface{}{1, 2, 3}` | Generic arrays |
+| Record | ⏳ | `(record Name [field: Type ...])` | Analyzer-enforced (codegen WIP) | Schema and typing in analyzer |
 | Boolean | ✅ | `true false` | `true false` | Go booleans |
 
 ## Core Operations Reference
@@ -107,6 +108,14 @@ Purpose: Code generation and metaprogramming
 Syntax: (defn name [params] body)
 Example: (defn add [x y] (+ x y))
 Status: ✅ IMPLEMENTED (via defn macro)
+### Record Declarations (Nominal; analyzer-enforced)
+```
+Syntax: (record Name [field: Type ...])
+Example: (record Person [name: string age: number])
+Status: ✅ Analyzer support (nominal typing, mismatch diagnostic); codegen WIP
+Purpose: Define structured data with named fields
+```
+
 Purpose: Define reusable functions
 ```
 
@@ -235,6 +244,17 @@ Constants: ALL-CAPS (MAX-RETRIES, DEFAULT-PORT)
 | **HTTP** | ⏳ | `(http-server)` | Future | Web services |
 | **Loops** | ⏳ | `(for x in xs)` | Future | Iteration |
 
+## HM Typing Diagnostics (for AI)
+
+Common diagnostic codes to detect and fix:
+
+- `VEX-TYP-UNDEF`: Unknown identifier
+- `VEX-TYP-COND`: If-condition must be `bool`
+- `VEX-TYP-EQ`: Equality argument types differ
+- `VEX-TYP-ARRAY-ELEM`: Array elements mismatch
+- `VEX-TYP-MAP-KEY` / `VEX-TYP-MAP-VAL`: Map key/value types mismatch across pairs
+- `VEX-TYP-REC-NOMINAL`: Nominal record mismatch (A vs B)
+
 ## Error Prevention for AI
 
 ### Invalid Syntax (Avoid)
@@ -251,6 +271,9 @@ Constants: ALL-CAPS (MAX-RETRIES, DEFAULT-PORT)
 ;; ❌ Invalid symbols
 (def 123invalid "value")
 (def "string-name" 42)
+;; ❌ Invalid record fields
+(record Person [name string])    ; missing ':'
+(record Person [name:])          ; missing type
 ```
 
 ### Valid Syntax (Use)
@@ -283,6 +306,10 @@ echo '(def x (+ 5 3))' > test.vx
 # Expected Go output:
 # package main
 # func main() { x := 5 + 3 }
+
+# Experimental: records (analyzer validates; generation pending)
+echo '(record Person [name: string age: number])' > rec.vx
+./vex run -input rec.vx
 ```
 
 ## AI Model Integration Notes

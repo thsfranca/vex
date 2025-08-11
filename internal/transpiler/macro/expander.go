@@ -9,11 +9,13 @@ import (
 )
 
 // Expander handles macro expansion in AST
+// Expander applies registered macros to source fragments and parse trees.
 type Expander struct {
 	registry *Registry
 }
 
 // NewExpander creates a new macro expander
+// NewExpander creates an Expander bound to a macro Registry.
 func NewExpander(registry *Registry) *Expander {
 	return &Expander{
 		registry: registry,

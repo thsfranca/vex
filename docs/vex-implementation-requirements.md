@@ -60,7 +60,7 @@ Vex is a statically-typed functional programming language designed specifically 
 - Error handling and reporting
 - Multi-language parser support (Go, Java, Python, etc.)
 
-### Basic Type Support ✅ **BASIC IMPLEMENTATION**
+### Basic Type Support ✅ **BASIC/IN-PROGRESS**
 
 **Primitive Types** ✅ *Basic Support*
 - `int`: Integers mapping to Go's `int`
@@ -73,12 +73,16 @@ Vex is a statically-typed functional programming language designed specifically 
 - Basic array literal syntax support
 - Collection operations through Go interop
 
-**Type System Architecture** ⏳ **PLANNED**
-Advanced type system planned for future phases:
-- Type inference engine with Hindley-Milner style inference
-- Type checker with compatibility validation
-- Generic type support
-- Cross-expression type propagation
+**Type System Architecture** ✅ **HM IMPLEMENTED**
+Hindley–Milner (HM) type inference runs post-macro expansion with the following in place:
+- Algorithm W core with occur-check; substitutions threaded across arrays, calls, `if`, `do`, records
+- Let-polymorphism: generalize at `def`/`defn` (value restriction applied), instantiate at use sites
+- Function typing from AST body (no raw-text heuristics)
+- Collections: arrays unify element types; maps unify key and value types with precise diagnostics
+- Records: nominal typing; constructor attaches nominal type; dedicated `VEX-TYP-REC-NOMINAL` mismatch
+- Equality via scheme: `∀a. a -> a -> bool`, strict mismatch diagnostics
+- Package-boundary schemes: resolver computes `PkgSchemes`; analyzer enforces exports and types namespaced calls
+- Diagnostics: stable codes and CLI propagation (UNDEF, COND, EQ, ARRAY-ELEM, MAP-KEY/VAL, REC-NOMINAL)
 
 ### Symbol System Design ✅ **BASIC IMPLEMENTATION**
 
@@ -166,7 +170,7 @@ Advanced type system planned for future phases:
 1. ✅ Parse Vex source into AST using ANTLR parser
 2. ✅ Macro registration and expansion phase with full defn macro support
 3. ✅ Semantic analysis with symbol table management
-4. ⏳ Type inference with comprehensive type system (planned for future)
+4. 🚧 HM type inference baseline (post-macro) — expanding coverage incrementally
 5. ✅ Advanced code generation with clean Go output
 6. ✅ Sophisticated package structure with proper imports and main function
 
@@ -278,6 +282,58 @@ The defn macro provides comprehensive function definition capabilities:
 
 This metaprogramming capability enables sophisticated AI code generation patterns and demonstrates advanced language design concepts through uniform macro syntax.
 
+## Phase 4.5: Transpiler Performance Baseline — HIGH PRIORITY — IMMEDIATE IMPLEMENTATION
+
+### Goals
+
+- Establish a low-overhead baseline for the transpilation pipeline used by CLI (`transpile`, `run`, `build`) and APIs.
+- Reduce per-call allocations and avoid repeated I/O and object construction work.
+- Improve macro expansion efficiency without sacrificing correctness.
+
+### Tasks
+
+- Transpiler instance reuse
+  - Keep a long-lived `VexTranspiler` instance in the CLI and public API when processing multiple files; avoid rebuilding parser/analyzer/codegen and re-loading core macros on every call.
+  - Ensure `GetDetectedModules()` and other per-call state are explicitly reset between invocations.
+
+- Core macro caching
+  - Make core macro loading a process-wide singleton cache to eliminate repeated `core/core.vx` reads and parsing.
+  - Provide an override for tests to force reload when needed.
+
+- Parser/analyzer pooling
+  - Introduce `sync.Pool` for ANTLR lexer/parser/token streams and analyzer symbol tables to amortize allocations across calls.
+
+- Macro expansion without re-parsing
+  - Replace reconstruct+reparse loops with AST-level parameter substitution during macro expansion.
+  - Where parsing is still necessary, use a lightweight S-expression tokenizer instead of a full ANTLR roundtrip.
+
+- String building efficiency
+  - Replace string concatenations in macro reconstruction paths with `strings.Builder` to reduce temporary strings and GC pressure.
+
+- Reduce adapter churn
+  - Align `Value` and `SymbolTable` interfaces across analysis and codegen to avoid creating wrapper objects per visit.
+  - If full alignment is not yet feasible, introduce zero-allocation thin adapters.
+
+- Resolver graph cache
+  - Cache discovered package graphs keyed by module root and input file mtimes; skip re-walking stable trees.
+
+- CLI build-cache reuse
+  - Use a stable temporary module directory and prefer `go` build cache pathways, especially when only stdlib imports are present, to maximize compile-time reuse for `run`/`build`.
+
+### Expected Impact
+
+- Significant reduction in per-transpile allocations and time, especially in macro-heavy code.
+- Fewer filesystem accesses and object constructions per CLI invocation.
+
+### Acceptance Criteria
+
+- Benchmarks (guidelines; adjust with hardware):
+  - `internal/transpiler`: `BenchmarkTranspileSimple` < 40µs/op, < 40KB/op, < 600 allocs/op; macro-heavy cases show proportional improvements.
+  - `internal/transpiler/macro`: `BenchmarkMacro_ExpandChained` < 3µs/op, < 5KB/op, < 100 allocs/op.
+  - `internal/transpiler/packages`: Resolver benchmark shows cached steady-state in sub-10µs/op on repeated runs within the same process.
+
+Note: This phase executes before Phase 5. Subsequent phase numbers reflect execution order.
+
 ## Phase 5: Immutable Data Structures ⏳ **PLANNED**
 
 ### Persistent Collection Implementation
@@ -339,12 +395,14 @@ Built-in support for HTTP service development:
 
 ### Compiler Implementation
 
-**Error Reporting System**
-Comprehensive error messages that:
-- Provide precise source location information
-- Suggest fixes for common type errors
-- Include context about failed type inference
-- Map transpilation errors back to Vex source
+**Error Reporting System** ✅ **BASELINE IMPLEMENTED**
+Error messages now follow a Go-style, AI-friendly standard with stable error codes and structured details:
+- Format: `file:line:col: error: [CODE]: short-message`
+- Optional lines: `Expected: …`, `Got: …`, `Suggestion: …`, and location details (e.g., first mismatch index)
+- Examples include `VEX-TYP-IF-MISMATCH`, `VEX-ARI-ARGS`, `VEX-TYP-ARRAY-ELEM`, `VEX-TYP-MAP-KEY`, `VEX-TYP-MAP-VAL`
+Further work:
+- Add machine-readable output flag for structured diagnostics
+- Extend coverage beyond analyzer to package resolver and codegen diagnostics
 
 **Incremental Compilation**
 Fast development cycle through:
@@ -455,6 +513,8 @@ Specialized libraries for backend development:
 - Integration with Go's pprof for profiling transpiled code
 - Memory usage analysis and optimization suggestions
 - Concurrent load testing utilities
+
+Note: Baseline transpiler performance work (instance reuse, macro caching, pooling, macro expansion without re-parsing, builder usage, adapter reductions, resolver/CLI cache improvements) has been elevated to Phase 4.5. Phase 9 focuses on advanced codegen optimizations and production readiness.
 
 ### Production Deployment
 

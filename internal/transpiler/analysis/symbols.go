@@ -22,18 +22,56 @@ type Value interface {
 type BasicValue struct {
 	value string
 	typ   string
+    ty    Type
+    raw   bool
 }
 
-func NewBasicValue(value, typ string) *BasicValue {
-	return &BasicValue{value: value, typ: typ}
-}
+// NewBasicValue constructs a simple Value carrying a printable form and outward type.
+func NewBasicValue(value, typ string) *BasicValue { return &BasicValue{value: value, typ: typ} }
 
 func (v *BasicValue) String() string {
 	return v.value
 }
 
-func (v *BasicValue) Type() string {
-	return v.typ
+func (v *BasicValue) Type() string { return v.typ }
+
+// WithType attaches internal type information without changing the public type string.
+func (v *BasicValue) WithType(t Type) *BasicValue { v.ty = t; return v }
+
+// getType returns the internal type if present; otherwise nil.
+func (v *BasicValue) getType() Type { return v.ty }
+
+// MarkRaw marks this value as originating from a raw macro/body fragment.
+func (v *BasicValue) MarkRaw() *BasicValue { v.raw = true; return v }
+
+// isRaw reports whether this value is raw.
+func (v *BasicValue) isRaw() bool { return v.raw }
+
+// RecordValue represents a record type declaration
+type RecordValue struct {
+    name       string
+    fields     map[string]string
+    fieldOrder []string
+}
+
+// NewRecordValue creates a record declaration with a field map and order.
+func NewRecordValue(name string, fields map[string]string, order []string) *RecordValue {
+    return &RecordValue{name: name, fields: fields, fieldOrder: order}
+}
+
+func (r *RecordValue) String() string { return r.name }
+func (r *RecordValue) Type() string   { return "record" }
+
+func (r *RecordValue) GetFields() map[string]string {
+    cp := make(map[string]string, len(r.fields))
+    for k, v := range r.fields { cp[k] = v }
+    return cp
+}
+
+func (r *RecordValue) GetFieldOrder() []string {
+    out := make([]string, len(r.fieldOrder))
+    copy(out, r.fieldOrder)
+    return out
 }
 
 // SymbolTableImpl implements the SymbolTable interface
@@ -44,6 +82,7 @@ type SymbolTableImpl struct {
 }
 
 // NewSymbolTable creates a new symbol table
+// NewSymbolTable initializes a scoped symbol table with a global scope.
 func NewSymbolTable() *SymbolTableImpl {
 	st := &SymbolTableImpl{
 		symbols:      make(map[string]*Symbol),

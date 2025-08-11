@@ -47,13 +47,20 @@ vex/
 │       ├── ast/                    # AST wrapper for parser tree
 │       ├── codegen/                # Go code generation
 │       ├── macro/                  # Macro registry and expander
+│       ├── diagnostics/            # Structured diagnostics (codes, renderer)
 │       ├── parser/                 # Generated ANTLR parser files
 │       ├── adapters.go             # Adapters bridging subsystems
 │       ├── interfaces.go           # Core interfaces (Parser, Analyzer, etc.)
 │       ├── orchestrator.go         # Builder and multi-stage pipeline
 │       └── core.go                 # Public transpiler entrypoints
-├── core/                           # Core Vex standard library
-│   └── core.vx                     # Standard library definitions
+├── core/                           # Core macros (legacy compatibility)
+│   └── core.vx                     # Core macro definitions (defn, etc.)
+├── stdlib/
+│   └── vex/                        # Standard library macro packages (optional)
+│       ├── core/                   # Core language forms (defn, etc.)
+│       ├── conditions/             # when/unless macros
+│       ├── collections/            # first/rest/count/cons/empty?
+│       └── test/                   # test macros
 ├── docs/                           # Comprehensive documentation
 │   ├── getting-started.md          # Quick start tutorial
 │   ├── ai-quick-reference.md       # AI-optimized language reference
@@ -125,12 +132,13 @@ The uniform S-expression structure + functional design means AI models can:
 - **Scale automatically**: Every program handles thousands of concurrent requests
 - **Focus on logic**: No syntax complexity, no concurrency complexity
 
-### Current Status: Basic Transpiler Foundation ✅
+### Current Status: HM Typing and Package Schemes ✅
 
 The project currently includes:
 - **ANTLR4 grammar** for S-expressions, arrays, symbols, and strings
-- **Basic transpiler** that converts core Vex constructs to Go
+- **Basic transpiler** that converts core Vex constructs to Go with HM typing
 - **CLI tool** (`vex`) with `transpile`, `run`, and `build` commands
+- **Structured diagnostics** with stable error codes and AI-friendly formatting (VEX-TYP-UNDEF, VEX-TYP-COND, VEX-TYP-EQ, VEX-TYP-ARRAY-ELEM, VEX-TYP-MAP-KEY/VAL, VEX-TYP-REC-NOMINAL)
 - **Core language features**:
   - Variable definitions: `(def x 10)` → `x := 10`
   - Arithmetic expressions: `(+ 1 2)` → `1 + 2`
@@ -207,13 +215,16 @@ Current features working:
 
 ;; Function definitions using defn macro
 (defn add [x y] (+ x y))
+
+;; Record declarations (nominal typing; analyzer support)
+(record Person [name: string age: number])
+;; Record usage (shape/type checks in analyzer; codegen WIP)
+;; (Person [name: "Ada" age: 36])
 ```
 
 ### Next Phase 🚧
 
-- **Enhanced function definitions** with proper type checking and semantics
-- **Type system** with inference and checking for safety and performance
-- **Enhanced semantic analysis** for better error reporting and optimization
+- **Record construction/access codegen** based on analyzer schemas
 - **AI-friendly HTTP patterns** with semantic annotations for endpoints
 - **HTTP server framework** that AI can generate from simple descriptions
 - **JWT authentication patterns** as the most market-valuable auth method
@@ -318,6 +329,31 @@ The main grammar rules are:
 - `array`: Matches `[` followed by elements followed by `]`
 - Elements can be: arrays, lists, symbols, or strings
 - Supports arithmetic operators: `+`, `-`, `*`, `/`, and other symbols
+ - Arrays are heterogeneous at the language level and target Go's `[]interface{}`
+
+## Structured Diagnostics (AI-friendly)
+
+The compiler emits structured diagnostics with stable codes and predictable formatting (see `docs/error-messages.md`).
+
+Text format (Go-style):
+
+```
+path/to/file.vx:LINE:COL: error: [VEX-TYP-IF-MISMATCH]: branch types differ
+Expected: type(then) == type(else)
+Got: then=int, else=string
+Suggestion: make both branches the same type or add explicit cast.
+```
+
+Machine format (future `--machine` flag):
+
+```json
+{ "code":"VEX-TYP-IF-MISMATCH","file":"main.vx","line":12,"col":3,
+  "message":"branch types differ",
+  "params":{"Expected":"same-type","Got":{"then":"int","else":"string"}},
+  "suggestion":"make-branches-same-type" }
+```
+
+Implementation lives in `internal/transpiler/diagnostics` with a code catalog and text/JSON renderers. Analyzer and resolver use these to produce consistent, AI-friendly errors.
 
 ## Learning Goals
 
@@ -342,7 +378,7 @@ For AI models and automated code generation, see [docs/ai-quick-reference.md](do
 ## Project Status
 
 **Current Phase**: Basic Transpiler Foundation + Macro System Complete (✅ Phase 1-2, 4 Complete)  
-**Next Phase**: Advanced Language Features (Phase 3: Type System & Semantic Analysis, Phase 5: Enhanced Functions)  
+**Next Phase**: Advanced Language Features (Phase 3: Type System & Semantic Analysis, Phase 5: Enhanced Functions, Phase 6A: Concurrency Primitives — Goroutines & Channels)  
 **Active Work**: Package Discovery System MVP (directory packages, import resolution, cycle detection; `vex.pkg` module root detection implemented)
 **Timeline**: Personal study project for learning compiler concepts, developed for fun in spare time
 

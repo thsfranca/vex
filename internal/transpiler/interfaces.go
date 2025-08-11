@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/antlr4-go/antlr/v4"
+	"github.com/thsfranca/vex/internal/transpiler/analysis"
 	"github.com/thsfranca/vex/internal/transpiler/macro"
 	"github.com/thsfranca/vex/internal/transpiler/parser"
 )
@@ -25,6 +26,7 @@ type ConcreteAST struct {
 	root antlr.Tree
 }
 
+// NewConcreteAST wraps an ANTLR root node into a transpiler-compatible AST.
 func NewConcreteAST(root antlr.Tree) *ConcreteAST {
 	return &ConcreteAST{root: root}
 }
@@ -89,6 +91,9 @@ type Parser interface {
 type Analyzer interface {
 	Analyze(ast AST) (SymbolTable, error)
 	SetErrorReporter(reporter ErrorReporter)
+    // SetPackageEnv informs the analyzer about local Vex packages, their exports,
+    // and provided type schemes to enable package-boundary typing.
+    SetPackageEnv(ignore map[string]bool, exports map[string]map[string]bool, schemes map[string]map[string]*analysis.TypeScheme)
 }
 
 // Error represents a compilation error
@@ -99,6 +104,7 @@ type Error struct {
 	Type    ErrorType
 }
 
+// ErrorType classifies compiler errors reported by the transpiler.
 type ErrorType int
 
 const (
@@ -116,4 +122,5 @@ type TranspilerConfig struct {
 	GenerateComments bool
     IgnoreImports    map[string]bool
     Exports          map[string]map[string]bool
+    PkgSchemes       map[string]map[string]*analysis.TypeScheme
 }

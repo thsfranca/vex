@@ -1,0 +1,8 @@
+;; Experimental record declaration — analyzer validates; codegen WIP
+(record Person [name: string age: number])
+
+;; Future (subject to change):
+;; (def user (Person [name: "Ada" age: 36]))
+;; (Person :name)
+
+

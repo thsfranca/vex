@@ -13,6 +13,7 @@
 - [x] **Phase 4**: Macro System & Metaprogramming ✅ **BASIC IMPLEMENTATION**
 - [ ] **Phase 5**: Function Definitions & Control Flow
 - [ ] **Phase 6**: Immutable Data Structures
+- [ ] **Phase 6A**: Concurrency Primitives (Goroutines & Channels)
 - [ ] **Phase 7**: HTTP Server Framework  
 - [ ] **Phase 8**: Standard Library & Core Operations
 - [ ] **Phase 9**: AI Semantic Annotations
@@ -99,6 +100,36 @@ Implement comprehensive type system with inference and semantic validation.
 
 ---
 
+## HM Type System Roadmap (End-to-End)
+
+- **Algorithm W across all forms**: complete. Strict unification in arrays, maps, `if`, `do`, and calls; no tolerant shortcuts.
+- **Builtins via schemes**: equality as `∀a. a -> a -> bool`, arithmetic/comparison as numeric; unified at call sites.
+- **Unknown-function policy**: error unless callee has a definition or a scheme.
+- **Strict `if` conditions**: enforced; non-boolean is an error.
+- **Generalization policy (value restriction)**: implemented for `def`/`defn`; only syntactic values are generalized; instantiate at use.
+- **Public vs internal type mapping**: `int`/`float` map to public `number`; arrays/maps recorded properly.
+- **Records as nominal types**: construction attaches nominal type constants; outward type is `record`.
+- **Package-level schemes**: analyzer accepts exports/ignore/schemes; namespaced calls enforce exports and use schemes when present.
+- **Diagnostics**: expected vs got messages for arg mismatches, arrays/maps, if branches; occur-check and arity preserved.
+- **Codegen specialization hooks**: groundwork added; further specialization optional.
+- **Tests**: added for arrays, let‑polymorphism, value restriction scaffolding, and nominal records; expand for equality and cross‑package typing.
+- **Non-goals**: polymorphic recursion without annotations; no subtyping (FFI boundaries use annotations).
+- **Optional future**: qualified types (constraints) for numeric/equality.
+
+### Definition of Done (HM Type Checking)
+
+- Algorithm W enforced across arrays, maps, `if`, `do`, and calls with occur‑check.
+- Builtins typed via schemes; equality as `∀a. a -> a -> bool`; arithmetic/comparison numeric and unified at calls.
+- Unknown functions error unless a definition or a scheme exists.
+- `if` conditions must be `bool`; non‑bool is an error.
+- Value restriction: generalize only syntactic values at `def`/`defn` (post‑expansion); instantiate at each use.
+- Public vs internal types aligned: internal `int`/`float` map to public `number`; arrays/maps surfaced consistently.
+- Records nominal: constructors attach nominal type constants; outward type is `record`; unify nominally.
+- Package boundary typing: analyzer enforces exports and uses provided type schemes for namespaced local packages.
+- Diagnostics: consistent “expected vs got”, arity codes, and occur‑check messages.
+- Tests: cover let‑polymorphism, equality typing, array/map mismatches, record nominal mismatches, strict‑if failures, and package‑boundary typing.
+
+
 ## Phase 4: Macro System & Metaprogramming ✅ **BASIC IMPLEMENTATION**
 
 ### Goal ✅ **ACHIEVED**
@@ -173,6 +204,17 @@ Update this section each week with:
 - Efficient iteration patterns
 
 **Goal:** Provide thread-safe, efficient data structures that enable automatic concurrency.
+
+### Phase 6A: Concurrency Primitives (Goroutines & Channels)
+**What to build:**
+- Goroutine spawning primitive to run expressions concurrently
+- Channel types with analyzer support (buffered and unbuffered)
+- Channel operations: create, send, receive, close
+- `select` construct with multiple cases and default
+- Code generation mapping to Go goroutines, channels, send/recv, close, and `select`
+- Diagnostics for misuse (e.g., sends on closed channels, dead `select`)
+
+**Goal:** Native concurrency via goroutines and channels with clear typing and safe usage.
 
 ### Phase 7: HTTP Server Framework
 **What to build:**

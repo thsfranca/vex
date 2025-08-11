@@ -14,6 +14,7 @@ type ParserAdapter struct {
 	parser *ast.VexParser
 }
 
+// NewParserAdapter constructs a Parser backed by the AST-level Vex parser.
 func NewParserAdapter() *ParserAdapter {
 	return &ParserAdapter{
         parser:  ast.NewParser(),
@@ -44,6 +45,7 @@ type AnalyzerAdapter struct {
 	analyzer *analysis.AnalyzerImpl
 }
 
+// NewAnalyzerAdapter constructs an Analyzer using the analysis package.
 func NewAnalyzerAdapter() *AnalyzerAdapter {
 	return &AnalyzerAdapter{
 		analyzer: analysis.NewAnalyzer(),
@@ -69,11 +71,17 @@ func (aa *AnalyzerAdapter) SetErrorReporter(reporter ErrorReporter) {
 	aa.analyzer.SetErrorReporter(analysisReporter)
 }
 
+// SetPackageEnv passes package information to the underlying analyzer.
+func (aa *AnalyzerAdapter) SetPackageEnv(ignore map[string]bool, exports map[string]map[string]bool, schemes map[string]map[string]*analysis.TypeScheme) {
+    aa.analyzer.SetPackageEnv(ignore, exports, schemes)
+}
+
 // CodeGeneratorAdapter adapts codegen.GoCodeGenerator to the CodeGenerator interface
 type CodeGeneratorAdapter struct {
 	generator *codegen.GoCodeGenerator
 }
 
+// NewCodeGeneratorAdapter constructs a CodeGenerator that emits Go code.
 func NewCodeGeneratorAdapter(config codegen.Config) *CodeGeneratorAdapter {
 	return &CodeGeneratorAdapter{
 		generator: codegen.NewGoCodeGenerator(config),
@@ -288,6 +296,7 @@ type MacroExpanderAdapter struct {
 	expander *macro.MacroExpanderImpl
 }
 
+// NewMacroExpanderAdapter wraps a concrete macro expander with the MacroExpander interface.
 func NewMacroExpanderAdapter(expander *macro.MacroExpanderImpl) *MacroExpanderAdapter {
 	return &MacroExpanderAdapter{expander: expander}
 }

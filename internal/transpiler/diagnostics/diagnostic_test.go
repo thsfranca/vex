@@ -66,4 +66,17 @@ func TestDiagnostic_RenderHeaderVariants(t *testing.T) {
     }
 }
 
+func TestDiagnostic_RenderMessage_ExplicitAndCatalog(t *testing.T) {
+    // Explicit message should be returned as-is
+    d := New(CodeDefArgs, SeverityError, "", 0, 0, nil).WithMessage("explicit message")
+    if d.RenderMessage() != "explicit message" {
+        t.Fatalf("RenderMessage should prefer explicit message")
+    }
+    // Without explicit message, should use catalog
+    d2 := New(CodeDefArgs, SeverityError, "", 0, 0, nil)
+    if d2.RenderMessage() == "" {
+        t.Fatalf("RenderMessage should use catalog when Message is empty")
+    }
+}
+
 

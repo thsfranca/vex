@@ -60,6 +60,22 @@ func TestCompilerError_String(t *testing.T) {
 	if got != expected {
 		t.Errorf("CompilerError.String() = %v, want %v", got, expected)
 	}
+	
+	// Test with file
+	errWithFile := CompilerError{
+		File:    "test.vx",
+		Line:    5,
+		Column:  2,
+		Message: "file error",
+		Type:    TypeError,
+	}
+	
+	expectedWithFile := "test.vx:5:2: error: file error"
+	gotWithFile := errWithFile.String()
+	
+	if gotWithFile != expectedWithFile {
+		t.Errorf("CompilerError.String() with file = %v, want %v", gotWithFile, expectedWithFile)
+	}
 }
 
 func TestNewErrorReporter(t *testing.T) {

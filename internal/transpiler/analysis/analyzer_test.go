@@ -1078,6 +1078,61 @@ func TestHelper_isBuiltinFunction(t *testing.T) {
 	}
 }
 
+func TestBasicValue_isRaw_and_MarkRaw(t *testing.T) {
+	val := NewBasicValue("test", "string")
+	
+	// Initially not raw
+	if val.isRaw() {
+		t.Fatalf("new BasicValue should not be raw")
+	}
+	
+	// Mark as raw
+	val.MarkRaw()
+	if !val.isRaw() {
+		t.Fatalf("BasicValue should be raw after MarkRaw()")
+	}
+}
+
+func TestRecordValue_GetFieldOrder(t *testing.T) {
+	fields := map[string]string{"name": "string", "age": "int"}
+	order := []string{"name", "age"}
+	record := NewRecordValue("Person", fields, order)
+	
+	fieldOrder := record.GetFieldOrder()
+	if len(fieldOrder) != 2 {
+		t.Fatalf("expected 2 fields, got %d", len(fieldOrder))
+	}
+	if fieldOrder[0] != "name" || fieldOrder[1] != "age" {
+		t.Fatalf("field order mismatch: got %v", fieldOrder)
+	}
+}
+
+func TestHelper_isInt(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"123", true},
+		{"0", true},
+		{"+42", true},
+		{"-17", true},
+		{"", false},
+		{"+", false},
+		{"-", false},
+		{"12a", false},
+		{"a12", false},
+		{"12.5", false},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := isInt(tt.input); got != tt.want {
+				t.Errorf("isInt(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 // Mock implementations for testing
 
 type MockAST struct {

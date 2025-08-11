@@ -72,6 +72,30 @@ func TestOrchestrator_TranspileFromInput_ThirdPartyDetection(t *testing.T) {
     }
 }
 
+func TestOrchestrator_isThirdPartyModule_Heuristics(t *testing.T) {
+    vt, err := NewBuilder().WithMacros(false).WithPackageName("main").Build()
+    if err != nil {
+        t.Fatalf("build: %v", err)
+    }
+    if !vt.isThirdPartyModule("golang.org/x/mod") {
+        t.Fatalf("expected golang.org/x/mod to be treated as third-party")
+    }
+    if vt.isThirdPartyModule("fmt") {
+        t.Fatalf("expected fmt to not be treated as third-party")
+    }
+}
+
+func TestOrchestrator_astToString_Placeholder(t *testing.T) {
+    vt, err := NewBuilder().WithMacros(false).WithPackageName("main").Build()
+    if err != nil { t.Fatalf("build: %v", err) }
+    pa := NewParserAdapter()
+    ast, err := pa.Parse("(+ 1 2)")
+    if err != nil { t.Fatalf("parse: %v", err) }
+    if s := vt.astToString(ast); s == "" {
+        t.Fatalf("astToString placeholder should not be empty")
+    }
+}
+
 func writeFileOrch(t *testing.T, path, content string) {
     t.Helper()
     if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

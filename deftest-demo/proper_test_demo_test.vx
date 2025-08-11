@@ -1,0 +1,8 @@
+;; Test file that would FAIL validation if it had code outside deftest
+;; This demonstrates that only deftest blocks are allowed
+(import "fmt")
+
+;; This would fail: (fmt/Println "Code outside deftest - not allowed!")
+
+(deftest "basic-math-test"
+  (fmt/Println "All basic math operations work correctly"))

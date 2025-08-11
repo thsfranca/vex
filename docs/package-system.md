@@ -101,5 +101,5 @@ Run:
 Resolver computes type schemes (`PkgSchemes`) for exported symbols of local packages by expanding macros (loading core macros) and running the analyzer per package. Analyzer uses these schemes across package boundaries to type namespaced calls and enforce exports.
 
 ### Standard Library Macros
-The transpiler loads core macros; in CI/tests it prefers `core/core.vx` under the module root. Built-in stdlib packages under `stdlib/vex/` can provide additional macros (e.g., `conditions`, `collections`).
+The transpiler loads core macros from built-in stdlib packages under `stdlib/vex/` (e.g., `core`, `conditions`, `collections`).
 

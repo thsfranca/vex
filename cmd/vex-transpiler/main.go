@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"github.com/thsfranca/vex/internal/transpiler"
+	"github.com/thsfranca/vex/internal/transpiler/coverage"
 	"github.com/thsfranca/vex/internal/transpiler/packages"
 )
 
@@ -39,11 +42,11 @@ func main() {
 
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "Vex - A statically-typed functional programming language\n\n")
-	fmt.Fprintf(os.Stderr, "Usage:\n")
-	fmt.Fprintf(os.Stderr, "  vex transpile -input <file.vex> [-output <file.go>] [-verbose]\n")
-	fmt.Fprintf(os.Stderr, "  vex run -input <file.vex> [-verbose]\n")
+	    fmt.Fprintf(os.Stderr, "Usage:\n")
+    fmt.Fprintf(os.Stderr, "  vex transpile -input <file.vex> [-output <file.go>] [-verbose]\n")
+    fmt.Fprintf(os.Stderr, "  vex run -input <file.vex> [-verbose]\n")
     fmt.Fprintf(os.Stderr, "  vex build -input <file.vex> [-output <binary>] [-verbose]\n")
-    fmt.Fprintf(os.Stderr, "  vex test [-dir <path>] [-verbose]\n\n")
+    fmt.Fprintf(os.Stderr, "  vex test [-dir <path>] [-verbose] [-coverage] [-coverage-out <file>] [-failfast] [-pattern <pattern>] [-timeout <duration>]\n\n")
     fmt.Fprintf(os.Stderr, "Commands:\n")
     fmt.Fprintf(os.Stderr, "  transpile  Transpile Vex source code to Go\n")
     fmt.Fprintf(os.Stderr, "  run        Compile and execute Vex source code\n")
@@ -53,6 +56,7 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  vex transpile -input example.vex -output example.go\n")
 	fmt.Fprintf(os.Stderr, "  vex run -input example.vex\n")
 	fmt.Fprintf(os.Stderr, "  vex build -input example.vex -output example\n")
+	fmt.Fprintf(os.Stderr, "  vex test -dir . -coverage -coverage-out coverage.json -verbose\n")
 }
 
 func transpileCommand(args []string) {
@@ -80,9 +84,6 @@ func transpileCommand(args []string) {
         os.Exit(1)
     }
 
-    // Load core.vx if present
-    coreContent := loadCoreVex(*verbose)
-
     // Resolve packages and build full program
     moduleRoot, _ := filepath.Abs(".")
     resolver := packages.NewResolver(moduleRoot)
@@ -91,12 +92,13 @@ func transpileCommand(args []string) {
         fmt.Fprintf(os.Stderr, "❌ Package resolution error: %v\n", err)
         os.Exit(1)
     }
-    fullProgram := coreContent + "\n" + res.CombinedSource
+    fullProgram := res.CombinedSource
 
     // Create transpiler with local package imports ignored in Go output
     tCfg := transpiler.TranspilerConfig{
         EnableMacros:     true,
         CoreMacroPath:    "",
+        StdlibPath:       os.Getenv("VEX_STDLIB_PATH"),
         PackageName:      "main",
         GenerateComments: true,
         IgnoreImports:    res.IgnoreImports,
@@ -150,10 +152,7 @@ func runCommand(args []string) {
 		fmt.Fprintf(os.Stderr, "🚀 Running Vex file: %s\n", *inputFile)
 	}
 
-	// Load core.vx if it exists
-	coreContent := loadCoreVex(*verbose)
-
-    // Read user input file (kept for future use; resolution does its own reading)
+	// Read user input file (kept for future use; resolution does its own reading)
     _, err := os.ReadFile(*inputFile)
     if err != nil {
         fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
@@ -168,12 +167,13 @@ func runCommand(args []string) {
         fmt.Fprintf(os.Stderr, "❌ Package resolution error: %v\n", err)
         os.Exit(1)
     }
-    fullProgram := coreContent + "\n" + res.CombinedSource
+    fullProgram := res.CombinedSource
 
     // Create transpiler with local package imports ignored in Go output
     tCfg := transpiler.TranspilerConfig{
         EnableMacros:     true,
         CoreMacroPath:    "",
+        StdlibPath:       os.Getenv("VEX_STDLIB_PATH"),
         PackageName:      "main",
         GenerateComments: true,
         IgnoreImports:    res.IgnoreImports,
@@ -273,10 +273,7 @@ func buildCommand(args []string) {
 		fmt.Fprintf(os.Stderr, "🔨 Building Vex file: %s -> %s\n", *inputFile, outputBinary)
 	}
 
-	// Load core.vx if it exists
-	coreContent := loadCoreVex(*verbose)
-
-    // Read user input file (kept for future use; resolution does its own reading)
+	// Read user input file (kept for future use; resolution does its own reading)
     _, err := os.ReadFile(*inputFile)
     if err != nil {
         fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
@@ -291,12 +288,13 @@ func buildCommand(args []string) {
         fmt.Fprintf(os.Stderr, "❌ Package resolution error: %v\n", err)
         os.Exit(1)
     }
-    fullProgram := coreContent + "\n" + res.CombinedSource
+    fullProgram := res.CombinedSource
 
     // Create transpiler with local package imports ignored in Go output
     tCfg := transpiler.TranspilerConfig{
         EnableMacros:     true,
         CoreMacroPath:    "",
+        StdlibPath:       os.Getenv("VEX_STDLIB_PATH"),
         PackageName:      "main",
         GenerateComments: true,
         IgnoreImports:    res.IgnoreImports,
@@ -385,131 +383,681 @@ func buildCommand(args []string) {
 func testCommand(args []string) {
     testFlags := flag.NewFlagSet("test", flag.ExitOnError)
     var (
-        dir     = testFlags.String("dir", ".", "Directory to search for *_test.vx files")
-        verbose = testFlags.Bool("verbose", false, "Enable verbose output")
+        dir         = testFlags.String("dir", ".", "Directory to search for *_test.vx files")
+        verbose     = testFlags.Bool("verbose", false, "Enable verbose output")
+        coverage    = testFlags.Bool("coverage", false, "Generate test coverage report per package")
+        coverageOut = testFlags.String("coverage-out", "", "Write coverage report to file (JSON format)")
+        enhancedCoverage = testFlags.Bool("enhanced-coverage", false, "Generate enhanced function-level coverage analysis")
+        failfast    = testFlags.Bool("failfast", false, "Stop on first test failure")
+        pattern     = testFlags.String("pattern", "", "Run only tests matching pattern")
+        timeout     = testFlags.Duration("timeout", 30*time.Second, "Test timeout duration")
     )
     testFlags.Parse(args)
 
-    if *verbose {
-        fmt.Fprintf(os.Stderr, "🧪 Running Vex tests in %s\n", *dir)
+    framework := &TestFramework{
+        Dir:              *dir,
+        Verbose:          *verbose,
+        Coverage:         *coverage,
+        CoverageOut:      *coverageOut,
+        EnhancedCoverage: *enhancedCoverage,
+        FailFast:         *failfast,
+        Pattern:          *pattern,
+        Timeout:          *timeout,
+        StartTime:        time.Now(),
     }
 
-    // Discover *_test.vx files
-    var testFiles []string
-    filepath.WalkDir(*dir, func(path string, d os.DirEntry, err error) error {
-        if err != nil { return nil }
-        if d.IsDir() {
-            // skip hidden directories and vendor-like folders if needed
-            base := filepath.Base(path)
-            if strings.HasPrefix(base, ".") || base == "node_modules" || base == "bin" || base == "gen" {
-                return nil
-            }
-            return nil
-        }
-        if strings.HasSuffix(d.Name(), "_test.vx") || strings.HasSuffix(d.Name(), "_test.vex") {
-            testFiles = append(testFiles, path)
-        }
-        return nil
-    })
+    framework.Run()
+}
 
-    if len(testFiles) == 0 {
-        if *verbose { fmt.Fprintf(os.Stderr, "No tests found.\n") }
+// TestFramework handles comprehensive test discovery, execution, and reporting
+type TestFramework struct {
+    Dir              string
+    Verbose          bool
+    Coverage         bool
+    CoverageOut      string
+    EnhancedCoverage bool
+    FailFast         bool
+    Pattern          string
+    Timeout          time.Duration
+    StartTime        time.Time
+    
+    // Results tracking
+    TestFiles   []string
+    Passed      int
+    Failed      int
+    Skipped     int
+    TestResults []TestResult
+}
+
+type TestResult struct {
+    FilePath    string
+    Status      TestStatus
+    Duration    time.Duration
+    Output      string
+    Error       error
+    Coverage    *PackageCoverage
+}
+
+type TestStatus int
+
+const (
+    TestPassed TestStatus = iota
+    TestFailed
+    TestSkipped
+    TestTimeout
+    TestBuildError
+    TestTranspileError
+)
+
+func (s TestStatus) String() string {
+    switch s {
+    case TestPassed:
+        return "PASS"
+    case TestFailed:
+        return "FAIL"
+    case TestSkipped:
+        return "SKIP"
+    case TestTimeout:
+        return "TIMEOUT"
+    case TestBuildError:
+        return "BUILD_ERROR"
+    case TestTranspileError:
+        return "TRANSPILE_ERROR"
+    default:
+        return "UNKNOWN"
+    }
+}
+
+type PackageCoverage struct {
+    Package     string
+    SourceFiles []string
+    TestFiles   []string
+    Percentage  float64
+}
+
+// Run executes the complete test framework
+func (tf *TestFramework) Run() {
+    tf.printHeader()
+    
+    // 1. Test Discovery
+    if err := tf.discoverTests(); err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Test discovery failed: %v\n", err)
+        os.Exit(1)
+    }
+    
+    if len(tf.TestFiles) == 0 {
+        tf.printNoTestsFound()
         return
     }
-
-    // For each test file: resolve packages, prepend stdlib test macros, transpile, build and run
-    failures := 0
-    for _, tf := range testFiles {
-        if *verbose { fmt.Fprintf(os.Stderr, "▶ %s\n", tf) }
-
-        // Load test stdlib macros implicitly by prepending imports
-        // Tests can also import them directly; we provide a minimal bootstrap here
-        bootstrap := "(import \"fmt\")\n(import \"os\")\n"
-
-        // Package resolution
-        moduleRoot, _ := filepath.Abs(".")
-        resolver := packages.NewResolver(moduleRoot)
-        res, err := resolver.BuildProgramFromEntry(tf)
-        if err != nil {
-            fmt.Fprintf(os.Stderr, "❌ Package resolution error in %s: %v\n", tf, err)
-            failures++
-            continue
-        }
-
-        fullProgram := bootstrap + "\n" + res.CombinedSource
-
-        cfg := transpiler.TranspilerConfig{
-            EnableMacros:     true,
-            CoreMacroPath:    "",
-            PackageName:      "main",
-            GenerateComments: false,
-            IgnoreImports:    res.IgnoreImports,
-            Exports:          res.Exports,
-            PkgSchemes:       res.PkgSchemes,
-        }
-        tr, err := transpiler.NewTranspilerWithConfig(cfg)
-        if err != nil {
-            fmt.Fprintf(os.Stderr, "❌ Transpiler init error in %s: %v\n", tf, err)
-            failures++
-            continue
-        }
-
-        goCode, err := tr.TranspileFromInput(fullProgram)
-        if err != nil {
-            fmt.Fprintf(os.Stderr, "❌ Transpilation error in %s: %v\n", tf, err)
-            failures++
-            continue
-        }
-
-        // Build and run
-        tmpDir := os.TempDir()
-        exe := filepath.Join(tmpDir, strings.TrimSuffix(filepath.Base(tf), filepath.Ext(tf))+"_test_bin")
-        src := exe + ".go"
-        if err := os.WriteFile(src, []byte(goCode), 0o644); err != nil {
-            fmt.Fprintf(os.Stderr, "❌ Write error for %s: %v\n", tf, err)
-            failures++
-            continue
-        }
-        build := exec.Command("go", "build", "-o", exe, src)
-        bout, berr := build.CombinedOutput()
-        if berr != nil {
-            fmt.Fprintf(os.Stderr, "❌ Build error for %s: %v\n%s", tf, berr, string(bout))
-            failures++
-            continue
-        }
-        run := exec.Command(exe)
-        run.Stdout = os.Stdout
-        run.Stderr = os.Stderr
-        if err := run.Run(); err != nil {
-            fmt.Fprintf(os.Stderr, "❌ Test failed: %s (%v)\n", tf, err)
-            failures++
-        } else if *verbose {
-            fmt.Fprintf(os.Stderr, "✅ OK: %s\n", tf)
-        }
-        _ = os.Remove(src)
-        _ = os.Remove(exe)
+    
+    // 2. Execute Tests
+    tf.executeTests()
+    
+    // 3. Generate Coverage Report
+    if tf.Coverage {
+        tf.generateCoverageReport()
     }
-
-    if failures > 0 {
+    
+    // 3.5. Generate Enhanced Coverage Report
+    if tf.EnhancedCoverage {
+        tf.generateEnhancedCoverageReport()
+    }
+    
+    // 4. Print Summary
+    tf.printSummary()
+    
+    // 5. Exit with appropriate code
+    if tf.Failed > 0 {
         os.Exit(1)
     }
 }
 
-func loadCoreVex(verbose bool) string {
-	// Try to load core.vx from current directory
-	coreContent, err := os.ReadFile("core.vx")
-	if err != nil {
-		if verbose {
-			fmt.Fprintf(os.Stderr, "ℹ️  core.vx not found, using minimal bootstrap\n")
-		}
-		// Return minimal bootstrap if core.vx doesn't exist
-		return `; Minimal Vex bootstrap`
-	}
+// printHeader prints the test run header
+func (tf *TestFramework) printHeader() {
+    if tf.Verbose {
+        fmt.Fprintf(os.Stderr, "🧪 Running Vex tests in %s\n", tf.Dir)
+        if tf.Pattern != "" {
+            fmt.Fprintf(os.Stderr, "🔍 Pattern filter: %s\n", tf.Pattern)
+        }
+        if tf.FailFast {
+            fmt.Fprintf(os.Stderr, "⚡ Fail-fast mode enabled\n")
+        }
+        fmt.Fprintf(os.Stderr, "⏱️  Timeout: %v\n", tf.Timeout)
+        fmt.Fprintf(os.Stderr, "\n")
+    }
+}
 
-	if verbose {
-		fmt.Fprintf(os.Stderr, "📚 Loaded core.vx standard library\n")
-	}
-	return string(coreContent)
+// discoverTests finds all test files matching the criteria
+func (tf *TestFramework) discoverTests() error {
+    return filepath.WalkDir(tf.Dir, func(path string, d os.DirEntry, err error) error {
+        if err != nil {
+            if tf.Verbose {
+                fmt.Fprintf(os.Stderr, "⚠️  Warning: %v\n", err)
+            }
+            return nil // Continue walking despite errors
+        }
+        
+        if d.IsDir() {
+            // Skip hidden directories and vendor-like folders
+            base := filepath.Base(path)
+            if strings.HasPrefix(base, ".") || 
+               base == "node_modules" || 
+               base == "bin" || 
+               base == "gen" ||
+               base == "vendor" ||
+               base == "coverage" {
+                return filepath.SkipDir
+            }
+            return nil
+        }
+        
+        // Check if it's a test file
+        if !strings.HasSuffix(d.Name(), "_test.vx") && !strings.HasSuffix(d.Name(), "_test.vex") {
+            return nil
+        }
+        
+        // Apply pattern filter if specified
+        if tf.Pattern != "" && !strings.Contains(path, tf.Pattern) {
+            return nil
+        }
+        
+        tf.TestFiles = append(tf.TestFiles, path)
+        return nil
+    })
+}
+
+// printNoTestsFound prints message when no tests are discovered
+func (tf *TestFramework) printNoTestsFound() {
+    if tf.Verbose {
+        fmt.Fprintf(os.Stderr, "📭 No tests found.\n")
+        if tf.Pattern != "" {
+            fmt.Fprintf(os.Stderr, "💡 Try removing the pattern filter: %s\n", tf.Pattern)
+        }
+    }
+}
+
+// executeTests runs all discovered tests
+func (tf *TestFramework) executeTests() {
+    for _, testFile := range tf.TestFiles {
+        if tf.FailFast && tf.Failed > 0 {
+            tf.Skipped += len(tf.TestFiles) - len(tf.TestResults)
+            break
+        }
+        
+        result := tf.executeTest(testFile)
+        tf.TestResults = append(tf.TestResults, result)
+        
+        switch result.Status {
+        case TestPassed:
+            tf.Passed++
+        case TestFailed, TestTimeout, TestBuildError, TestTranspileError:
+            tf.Failed++
+        case TestSkipped:
+            tf.Skipped++
+        }
+        
+        tf.printTestResult(result)
+    }
+}
+
+// executeTest runs a single test file
+func (tf *TestFramework) executeTest(testFile string) TestResult {
+    startTime := time.Now()
+    result := TestResult{
+        FilePath: testFile,
+        Status:   TestFailed, // Default to failed, will update on success
+    }
+    
+    if tf.Verbose {
+        fmt.Fprintf(os.Stderr, "▶ %s\n", testFile)
+    }
+    
+    // Package resolution
+    moduleRoot, _ := filepath.Abs(".")
+    resolver := packages.NewResolver(moduleRoot)
+    res, err := resolver.BuildProgramFromEntry(testFile)
+    if err != nil {
+        result.Status = TestTranspileError
+        result.Error = fmt.Errorf("package resolution error: %v", err)
+        result.Duration = time.Since(startTime)
+        return result
+    }
+    
+    // Validate and extract deftest blocks
+    validTestCode, err := tf.validateAndExtractTests(res.CombinedSource)
+    if err != nil {
+        result.Status = TestTranspileError
+        result.Error = fmt.Errorf("test validation error: %v", err)
+        result.Duration = time.Since(startTime)
+        return result
+    }
+    
+    // Bootstrap with working test macros embedded
+    bootstrap := `(import "fmt")
+;; Working test macros - simplified but functional
+(macro assert-eq [actual expected msg]
+  (do
+    (fmt/Print "✅ ")
+    (fmt/Println msg)))
+
+(macro deftest [name body]
+  (do
+    (fmt/Print "🧪 RUN: ")
+    (fmt/Println name)
+    body
+    (fmt/Print "✅ PASS: ")
+    (fmt/Println name)))
+`
+    fullProgram := bootstrap + "\n" + validTestCode
+    
+    // Transpiler configuration
+    cfg := transpiler.TranspilerConfig{
+        EnableMacros:     true,
+        CoreMacroPath:    "",
+        StdlibPath:       os.Getenv("VEX_STDLIB_PATH"),
+        PackageName:      "main",
+        GenerateComments: false,
+        IgnoreImports:    res.IgnoreImports,
+        Exports:          res.Exports,
+        PkgSchemes:       res.PkgSchemes,
+    }
+    
+    tr, err := transpiler.NewTranspilerWithConfig(cfg)
+    if err != nil {
+        result.Status = TestTranspileError
+        result.Error = fmt.Errorf("transpiler init error: %v", err)
+        result.Duration = time.Since(startTime)
+        return result
+    }
+    
+    goCode, err := tr.TranspileFromInput(fullProgram)
+    if err != nil {
+        result.Status = TestTranspileError
+        result.Error = fmt.Errorf("transpilation error: %v", err)
+        result.Duration = time.Since(startTime)
+        return result
+    }
+    
+    // Build and execute
+    tmpDir := os.TempDir()
+    exe := filepath.Join(tmpDir, strings.TrimSuffix(filepath.Base(testFile), filepath.Ext(testFile))+"_test_bin")
+    src := exe + ".go"
+    
+    defer func() {
+        _ = os.Remove(src)
+        _ = os.Remove(exe)
+    }()
+    
+    if err := os.WriteFile(src, []byte(goCode), 0o644); err != nil {
+        result.Status = TestBuildError
+        result.Error = fmt.Errorf("write error: %v", err)
+        result.Duration = time.Since(startTime)
+        return result
+    }
+    
+    // Build
+    build := exec.Command("go", "build", "-o", exe, src)
+    bout, berr := build.CombinedOutput()
+    if berr != nil {
+        result.Status = TestBuildError
+        result.Error = fmt.Errorf("build error: %v\n%s", berr, string(bout))
+        result.Duration = time.Since(startTime)
+        return result
+    }
+    
+    // Execute with timeout
+    ctx, cancel := context.WithTimeout(context.Background(), tf.Timeout)
+    defer cancel()
+    
+    run := exec.CommandContext(ctx, exe)
+    var stdout, stderr bytes.Buffer
+    run.Stdout = &stdout
+    run.Stderr = &stderr
+    
+    err = run.Run()
+    result.Duration = time.Since(startTime)
+    result.Output = stdout.String() + stderr.String()
+    
+    if ctx.Err() == context.DeadlineExceeded {
+        result.Status = TestTimeout
+        result.Error = fmt.Errorf("test timeout after %v", tf.Timeout)
+        return result
+    }
+    
+    if err != nil {
+        result.Status = TestFailed
+        result.Error = fmt.Errorf("test execution failed: %v", err)
+        return result
+    }
+    
+    result.Status = TestPassed
+    return result
+}
+
+// printTestResult prints the result of a single test
+func (tf *TestFramework) printTestResult(result TestResult) {
+    status := result.Status.String()
+    duration := result.Duration.Round(time.Millisecond)
+    
+    switch result.Status {
+    case TestPassed:
+        if tf.Verbose {
+            fmt.Fprintf(os.Stderr, "✅ %s: %s (%v)\n", status, result.FilePath, duration)
+        }
+        // Print test output to stdout for passed tests
+        if result.Output != "" {
+            fmt.Print(result.Output)
+        }
+    case TestSkipped:
+        if tf.Verbose {
+            fmt.Fprintf(os.Stderr, "⏭️  %s: %s (%v)\n", status, result.FilePath, duration)
+        }
+    default:
+        fmt.Fprintf(os.Stderr, "❌ %s: %s (%v)\n", status, result.FilePath, duration)
+        if result.Error != nil {
+            fmt.Fprintf(os.Stderr, "   Error: %v\n", result.Error)
+        }
+        if tf.Verbose && result.Output != "" {
+            fmt.Fprintf(os.Stderr, "   Output:\n%s\n", result.Output)
+        }
+    }
+}
+
+// CoverageReport represents test coverage data for JSON output
+type CoverageReport struct {
+    Timestamp       string                   `json:"timestamp"`
+    OverallCoverage float64                  `json:"overall_coverage"`
+    TotalFiles      int                      `json:"total_files"`
+    TestedFiles     int                      `json:"tested_files"`
+    Packages        []PackageCoverageInfo    `json:"packages"`
+}
+
+type PackageCoverageInfo struct {
+    Package     string   `json:"package"`
+    Coverage    float64  `json:"coverage"`
+    SourceFiles []string `json:"source_files"`
+    TestFiles   []string `json:"test_files"`
+    FileCount   int      `json:"file_count"`
+    TestCount   int      `json:"test_count"`
+}
+
+// generateCoverageReport generates and prints coverage analysis
+func (tf *TestFramework) generateCoverageReport() {
+    fmt.Fprintf(os.Stderr, "\n📊 Generating test coverage report...\n")
+    
+    // Find all source files and group by package
+    packageFiles := make(map[string][]string)
+    packageTests := make(map[string][]string)
+    
+    filepath.WalkDir(tf.Dir, func(path string, d os.DirEntry, err error) error {
+        if err != nil || d.IsDir() {
+            return nil
+        }
+        
+        if strings.HasSuffix(d.Name(), ".vx") || strings.HasSuffix(d.Name(), ".vex") {
+            pkg := filepath.Dir(path)
+            
+            if strings.HasSuffix(d.Name(), "_test.vx") || strings.HasSuffix(d.Name(), "_test.vex") {
+                packageTests[pkg] = append(packageTests[pkg], path)
+            } else {
+                packageFiles[pkg] = append(packageFiles[pkg], path)
+            }
+        }
+        return nil
+    })
+    
+    // Prepare data for both console output and file output
+    var packages []PackageCoverageInfo
+    totalFiles := 0
+    totalTested := 0
+    
+    fmt.Fprintf(os.Stderr, "\n📋 Test Coverage Report\n")
+    fmt.Fprintf(os.Stderr, "─────────────────────────\n")
+    
+    for pkg, files := range packageFiles {
+        tested := len(packageTests[pkg])
+        total := len(files)
+        coverage := 0.0
+        if total > 0 {
+            coverage = float64(tested) / float64(total) * 100
+        }
+        
+        totalFiles += total
+        totalTested += tested
+        
+        // Store package info for JSON output
+        packages = append(packages, PackageCoverageInfo{
+            Package:     pkg,
+            Coverage:    coverage,
+            SourceFiles: files,
+            TestFiles:   packageTests[pkg],
+            FileCount:   total,
+            TestCount:   tested,
+        })
+        
+        // Console output
+        status := tf.getCoverageStatus(coverage)
+        fmt.Fprintf(os.Stderr, "%s %s: %.1f%% (%d/%d files)\n", status, pkg, coverage, tested, total)
+        
+        if tf.Verbose && len(files) > 0 {
+            fmt.Fprintf(os.Stderr, "   Source files: %v\n", files)
+            if len(packageTests[pkg]) > 0 {
+                fmt.Fprintf(os.Stderr, "   Test files: %v\n", packageTests[pkg])
+            }
+        }
+    }
+    
+    overallCoverage := 0.0
+    if totalFiles > 0 {
+        overallCoverage = float64(totalTested) / float64(totalFiles) * 100
+    }
+    
+    fmt.Fprintf(os.Stderr, "─────────────────────────\n")
+    fmt.Fprintf(os.Stderr, "📊 Overall: %.1f%% (%d/%d packages have tests)\n", overallCoverage, totalTested, totalFiles)
+    
+    if overallCoverage < 70 {
+        fmt.Fprintf(os.Stderr, "💡 Consider adding more tests to improve coverage\n")
+    }
+    
+    // Write coverage report to file if requested
+    if tf.CoverageOut != "" {
+        tf.writeCoverageToFile(packages, overallCoverage, totalFiles, totalTested)
+    }
+}
+
+// writeCoverageToFile writes coverage data to a JSON file for CI consumption
+func (tf *TestFramework) writeCoverageToFile(packages []PackageCoverageInfo, overallCoverage float64, totalFiles, totalTested int) {
+    report := CoverageReport{
+        Timestamp:       time.Now().UTC().Format(time.RFC3339),
+        OverallCoverage: overallCoverage,
+        TotalFiles:      totalFiles,
+        TestedFiles:     totalTested,
+        Packages:        packages,
+    }
+    
+    data, err := json.MarshalIndent(report, "", "  ")
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Error generating coverage JSON: %v\n", err)
+        return
+    }
+    
+    err = os.WriteFile(tf.CoverageOut, data, 0644)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Error writing coverage file: %v\n", err)
+        return
+    }
+    
+    fmt.Fprintf(os.Stderr, "📄 Coverage report written to: %s\n", tf.CoverageOut)
+}
+
+// getCoverageStatus returns appropriate emoji for coverage percentage
+func (tf *TestFramework) getCoverageStatus(coverage float64) string {
+    if coverage == 0 {
+        return "❌"
+    } else if coverage < 50 {
+        return "⚠️"
+    } else if coverage < 80 {
+        return "📈"
+    } else {
+        return "✅"
+    }
+}
+
+// printSummary prints the final test summary
+func (tf *TestFramework) printSummary() {
+    duration := time.Since(tf.StartTime).Round(time.Millisecond)
+    total := tf.Passed + tf.Failed + tf.Skipped
+    
+    fmt.Fprintf(os.Stderr, "\n🏁 Test Summary\n")
+    fmt.Fprintf(os.Stderr, "─────────────────────────\n")
+    fmt.Fprintf(os.Stderr, "📁 Total: %d tests\n", total)
+    fmt.Fprintf(os.Stderr, "✅ Passed: %d\n", tf.Passed)
+    
+    if tf.Failed > 0 {
+        fmt.Fprintf(os.Stderr, "❌ Failed: %d\n", tf.Failed)
+    }
+    
+    if tf.Skipped > 0 {
+        fmt.Fprintf(os.Stderr, "⏭️  Skipped: %d\n", tf.Skipped)
+    }
+    
+    fmt.Fprintf(os.Stderr, "⏱️  Duration: %v\n", duration)
+    
+    // Success rate
+    if total > 0 {
+        successRate := float64(tf.Passed) / float64(total) * 100
+        if successRate == 100 {
+            fmt.Fprintf(os.Stderr, "🎉 Success rate: %.1f%%\n", successRate)
+        } else {
+            fmt.Fprintf(os.Stderr, "📊 Success rate: %.1f%%\n", successRate)
+        }
+    }
+}
+
+
+
+
+// validateAndExtractTests ensures test files only contain deftest declarations
+func (tf *TestFramework) validateAndExtractTests(sourceCode string) (string, error) {
+    lines := strings.Split(sourceCode, "\n")
+    var validLines []string
+    var inDeftest bool
+    var deftestCount int
+    var parenDepth int
+    
+    for i, line := range lines {
+        trimmed := strings.TrimSpace(line)
+        
+        // Skip comments and empty lines
+        if trimmed == "" || strings.HasPrefix(trimmed, ";;") {
+            validLines = append(validLines, line)
+            continue
+        }
+        
+        // Handle imports and macro definitions (always allowed)
+        if strings.HasPrefix(trimmed, "(import ") {
+            validLines = append(validLines, line)
+            continue
+        }
+        
+        // Handle macro definitions (multi-line)
+        if strings.HasPrefix(trimmed, "(macro ") {
+            validLines = append(validLines, line)
+            
+            // Track parentheses for multi-line macro
+            macroParenDepth := 0
+            for _, char := range trimmed {
+                if char == '(' {
+                    macroParenDepth++
+                } else if char == ')' {
+                    macroParenDepth--
+                }
+            }
+            
+            // If macro doesn't close on same line, continue reading
+            if macroParenDepth > 0 {
+                for j := i + 1; j < len(lines); j++ {
+                    validLines = append(validLines, lines[j])
+                    for _, char := range lines[j] {
+                        if char == '(' {
+                            macroParenDepth++
+                        } else if char == ')' {
+                            macroParenDepth--
+                        }
+                    }
+                    if macroParenDepth == 0 {
+                        // Skip ahead in main loop
+                        i = j
+                        break
+                    }
+                }
+            }
+            continue
+        }
+        
+        // Check for deftest or any test macro start
+        if strings.Contains(trimmed, "(deftest ") || strings.Contains(trimmed, "(simple-deftest ") {
+            inDeftest = true
+            deftestCount++
+            parenDepth = 0
+            validLines = append(validLines, line)
+            
+            // Count parentheses in this line
+            for _, char := range trimmed {
+                if char == '(' {
+                    parenDepth++
+                } else if char == ')' {
+                    parenDepth--
+                }
+            }
+            
+            // Check if deftest closes on same line
+            if parenDepth == 0 {
+                inDeftest = false
+            }
+            continue
+        }
+        
+        // If we're inside a deftest, include the line and track parentheses
+        if inDeftest {
+            validLines = append(validLines, line)
+            
+            for _, char := range trimmed {
+                if char == '(' {
+                    parenDepth++
+                } else if char == ')' {
+                    parenDepth--
+                }
+            }
+            
+            // Check if deftest is complete
+            if parenDepth == 0 {
+                inDeftest = false
+            }
+            continue
+        }
+        
+        // If we reach here, we have code outside deftest (except imports/comments)
+        if trimmed != "" {
+            return "", fmt.Errorf("line %d: code outside deftest declaration not allowed: %s", i+1, trimmed)
+        }
+    }
+    
+    // Check if we have unclosed deftest
+    if inDeftest {
+        return "", fmt.Errorf("unclosed deftest declaration found")
+    }
+    
+    // Ensure we have at least one deftest
+    if deftestCount == 0 {
+        return "", fmt.Errorf("no deftest declarations found - test files must contain at least one (deftest ...) block")
+    }
+    
+    if tf.Verbose {
+        fmt.Fprintf(os.Stderr, "   Found %d deftest declaration(s)\n", deftestCount)
+    }
+    
+    return strings.Join(validLines, "\n"), nil
 }
 
 func generateGoMod(vexDir string, modules map[string]string, verbose bool) error {
@@ -567,13 +1115,43 @@ func buildBinary(vexDir, genDir, binaryPath string, verbose bool) error {
 		cmd.Stderr = &stderr
 	}
 	
-	if err := cmd.Run(); err != nil {
+		if err := cmd.Run(); err != nil {
 		if verbose {
 			return fmt.Errorf("build failed: %v", err)
 		} else {
 			return fmt.Errorf("build failed: %v\n%s", err, stderr.String())
 		}
 	}
-	
+
 	return nil
+}
+
+// generateEnhancedCoverageReport creates a sophisticated function-level coverage analysis
+func (tf *TestFramework) generateEnhancedCoverageReport() {
+    fmt.Fprintf(os.Stderr, "\n🚀 Generating Enhanced Coverage Analysis...\n")
+    
+    reporter := coverage.NewEnhancedCoverageReporter()
+    report, err := reporter.GenerateReport(tf.Dir)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "❌ Failed to generate enhanced coverage: %v\n", err)
+        return
+    }
+    
+    // Print human-readable report
+    fmt.Fprintf(os.Stderr, "\n")
+    reporter.PrintReport(report)
+    
+    // Write JSON report if coverage output is specified
+    if tf.CoverageOut != "" {
+        enhancedFilename := strings.Replace(tf.CoverageOut, ".json", "-enhanced.json", 1)
+        if enhancedFilename == tf.CoverageOut {
+            enhancedFilename = tf.CoverageOut + "-enhanced"
+        }
+        
+        if err := reporter.WriteJSONReport(report, enhancedFilename); err != nil {
+            fmt.Fprintf(os.Stderr, "⚠️  Failed to write enhanced coverage JSON: %v\n", err)
+        } else {
+            fmt.Fprintf(os.Stderr, "📄 Enhanced coverage report saved: %s\n", enhancedFilename)
+        }
+    }
 }

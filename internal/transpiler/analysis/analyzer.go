@@ -10,13 +10,12 @@ import (
 )
 
 // AnalyzerImpl implements the Analyzer interface
-// AnalyzerImpl performs semantic analysis and HM type inference over Vex AST.
+// AnalyzerImpl performs semantic analysis and explicit type checking over Vex AST.
 type AnalyzerImpl struct {
 	symbolTable   *SymbolTableImpl
 	errorReporter *ErrorReporterImpl
     typeEnv       TypeEnv
     freshId       int
-    inferenceMode bool
     subst         Subst
     // Package environment (optional): provided by resolver/build when available
     ignoreImports map[string]bool                     // local Vex packages (not real Go imports)
@@ -77,7 +76,6 @@ func NewAnalyzer() *AnalyzerImpl {
         errorReporter: NewErrorReporter(),
         typeEnv:       make(TypeEnv),
         freshId:       0,
-        inferenceMode: false,
         subst:         Subst{},
         ignoreImports: make(map[string]bool),
         pkgExports:    make(map[string]map[string]bool),
@@ -95,7 +93,6 @@ func (a *AnalyzerImpl) Analyze(ast AST) (SymbolTable, error) {
     a.typeEnv = make(TypeEnv)
     a.installBuiltinSchemes()
     a.freshId = 0
-    a.inferenceMode = false
     a.subst = Subst{}
 	
 	// Visit the AST
@@ -161,7 +158,7 @@ func (a *AnalyzerImpl) VisitList(ctx *parser.ListContext) (Value, error) {
     if childCount < 3 { // Need at least: '(', function, ')'
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        diag := diagnostics.New(diagnostics.CodeSynEmpty, diagnostics.SeverityError, "", line, column, nil)
+        diag := diagnostics.New(diagnostics.CodeSyntaxEmpty, diagnostics.SeverityError, "", line, column, nil)
         a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
         return nil, fmt.Errorf("empty expression")
     }
@@ -201,8 +198,9 @@ func (a *AnalyzerImpl) VisitList(ctx *parser.ListContext) (Value, error) {
             }
             fallthrough
         case "fn":
-            // For 'fn', capture first two arguments (param vector and body) as raw
-            if funcName == "fn" && (len(args) == 0 || len(args) == 1) {
+            // For 'fn', capture arguments as raw to preserve type annotations
+            // Handle both (fn [params] body) and (fn [params] -> type body)
+            if funcName == "fn" && len(args) < 4 {
                 argText := a.nodeToFlatText(child)
                 args = append(args, NewBasicValue(argText, "raw").MarkRaw())
                 continue
@@ -243,7 +241,17 @@ func (a *AnalyzerImpl) VisitList(ctx *parser.ListContext) (Value, error) {
 	case "macro":
 		return a.analyzeMacro(ctx, args)
     case "import":
-        // accept imports during analysis; actual handling happens in codegen/pipeline
+        // Handle stdlib imports - they are already loaded during macro expansion phase
+        if len(args) > 0 {
+            importName := args[0].String()
+            // Remove quotes if present
+            importName = strings.Trim(importName, "\"")
+            // Stdlib imports (vex.*) are handled by macro system, just accept them
+            if strings.HasPrefix(importName, "vex.") {
+                return NewBasicValue("import", "void"), nil
+            }
+        }
+        // Other imports are handled in codegen/pipeline
         return NewBasicValue("import", "void"), nil
     case "export":
         return a.analyzeExport(ctx, args)
@@ -260,7 +268,8 @@ func (a *AnalyzerImpl) analyzeExport(ctx *parser.ListContext, args []Value) (Val
     if len(args) < 1 {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        a.errorReporter.ReportError(line, column, "export requires a list of symbols")
+        diag := diagnostics.New(diagnostics.CodeExportArguments, diagnostics.SeverityError, "", line, column, nil)
+        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
         return nil, fmt.Errorf("invalid export")
     }
     // Minimal placeholder: accept and no-op. Enforcement will be performed cross-package in future step.
@@ -294,7 +303,7 @@ func (a *AnalyzerImpl) VisitArray(ctx *parser.ArrayContext) (Value, error) {
             } else {
                 // Strict HM: incompatible element types should be an error
                 line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-                diag := diagnostics.New(diagnostics.CodeTypArrayElem, diagnostics.SeverityError, "", line, column, map[string]any{"Got": fmt.Sprintf("%s vs %s", a.publicTypeString(elemT), a.publicTypeString(nextT))})
+                diag := diagnostics.New(diagnostics.CodeTypeArrayElement, diagnostics.SeverityError, "", line, column, map[string]any{"Got": fmt.Sprintf("%s vs %s", a.publicTypeString(elemT), a.publicTypeString(nextT))})
                 a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
             }
         }
@@ -346,7 +355,7 @@ func (a *AnalyzerImpl) VisitTerminal(node antlr.TerminalNode) (Value, error) {
         line = tok.GetLine()
         col = tok.GetColumn()
     }
-    diag := diagnostics.New(diagnostics.CodeTypUndef, diagnostics.SeverityError, "", line, col, map[string]any{"Name": text})
+    diag := diagnostics.New(diagnostics.CodeTypeUndefined, diagnostics.SeverityError, "", line, col, map[string]any{"Name": text})
     a.errorReporter.ReportDiagnosticBody(line, col, diag.RenderBody(), TypeError)
     return NewBasicValue(text, "undefined"), fmt.Errorf("undefined identifier: %s", text)
 }
@@ -356,7 +365,7 @@ func (a *AnalyzerImpl) analyzeDef(ctx *parser.ListContext, args []Value) (Value,
     if len(args) < 2 {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        diag := diagnostics.New(diagnostics.CodeDefArgs, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (def name value)")
+        diag := diagnostics.New(diagnostics.CodeDefArguments, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (def name value)")
         a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
 		return nil, fmt.Errorf("invalid def")
 	}
@@ -364,6 +373,15 @@ func (a *AnalyzerImpl) analyzeDef(ctx *parser.ListContext, args []Value) (Value,
 	name := args[0].String()
 	value := args[1]
 	
+	// Validate function naming convention for function definitions
+	if isFunction(value) && !isValidFunctionName(name) {
+		line := ctx.GetStart().GetLine()
+		column := ctx.GetStart().GetColumn()
+		        diag := diagnostics.New(diagnostics.CodeFunctionNaming, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("use kebab-case with dashes (e.g., 'my-function')")
+		a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+		return nil, fmt.Errorf("invalid function name: %s", name)
+	}
+
     // Define the symbol
     if err := a.symbolTable.Define(name, value); err != nil {
 		line := ctx.GetStart().GetLine()
@@ -429,7 +447,7 @@ func (a *AnalyzerImpl) analyzeIf(ctx *parser.ListContext, args []Value) (Value, 
     if len(args) < 2 {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        diag := diagnostics.New(diagnostics.CodeIfArgs, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (if condition then-expr [else-expr])")
+        diag := diagnostics.New(diagnostics.CodeIfArguments, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (if condition then-expr [else-expr])")
         a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
 		return nil, fmt.Errorf("invalid if")
 	}
@@ -448,7 +466,7 @@ func (a *AnalyzerImpl) analyzeIf(ctx *parser.ListContext, args []Value) (Value, 
     if condition.Type() != "bool" {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        diag := diagnostics.New(diagnostics.CodeTypCond, diagnostics.SeverityError, "", line, column, map[string]any{"Got": condition.Type()})
+        diag := diagnostics.New(diagnostics.CodeTypeCondition, diagnostics.SeverityError, "", line, column, map[string]any{"Got": condition.Type()})
         a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
     }
 	
@@ -466,35 +484,33 @@ func (a *AnalyzerImpl) analyzeIf(ctx *parser.ListContext, args []Value) (Value, 
             // If both are nominal records but different names, emit specific nominal mismatch
             if ttc, ok1 := thenT.(*TypeConstant); ok1 && ttc.Name != "record" {
                 if etc, ok2 := elseT.(*TypeConstant); ok2 && etc.Name != "record" && etc.Name != ttc.Name {
-                    diag := diagnostics.New(diagnostics.CodeRecNominal, diagnostics.SeverityError, "", line, column, map[string]any{"Got": fmt.Sprintf("then=%s, else=%s", ttc.Name, etc.Name)})
+                    diag := diagnostics.New(diagnostics.CodeRecordNominal, diagnostics.SeverityError, "", line, column, map[string]any{"Got": fmt.Sprintf("then=%s, else=%s", ttc.Name, etc.Name)})
                     a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
                 }
             }
-            diag := diagnostics.New(diagnostics.CodeTypIfMismatch, diagnostics.SeverityError, "", line, column, map[string]any{"Expected": "type(then) == type(else)", "Got": fmt.Sprintf("then=%s, else=%s", a.publicTypeString(thenT), a.publicTypeString(elseT))})
+            diag := diagnostics.New(diagnostics.CodeTypeIfMismatch, diagnostics.SeverityError, "", line, column, map[string]any{"Expected": "type(then) == type(else)", "Got": fmt.Sprintf("then=%s, else=%s", a.publicTypeString(thenT), a.publicTypeString(elseT))})
             a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
         }
     }
     return NewBasicValue("if-result", a.publicTypeString(resultT)).WithType(resultT), nil
 }
 
-// analyzeDo infers the type of a do/block by unifying types across forms and returning the last form's type
+// analyzeDo analyzes a do/block by evaluating all forms and returning the last form's type
 func (a *AnalyzerImpl) analyzeDo(ctx *parser.ListContext, args []Value) (Value, error) {
     if len(args) == 0 {
         return NewBasicValue("do", "interface{}"), nil
     }
-    var lastT Type = a.typeFromValue(args[0]).apply(a.subst)
+    
+    // Process all expressions in the do block
+    // We don't need to unify all types - just evaluate each expression for side effects
+    // and return the type of the last expression
+    var lastValue Value = args[0]
     for i := 1; i < len(args); i++ {
-        t := a.typeFromValue(args[i]).apply(a.subst)
-        if s, err := unify(lastT, t); err == nil {
-            a.subst = a.subst.compose(s)
-            lastT = lastT.apply(a.subst)
-        } else {
-            // Strict HM: mismatched forms in do-block is an error
-            line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-            diag := diagnostics.New(diagnostics.CodeTypIfMismatch, diagnostics.SeverityError, "", line, column, map[string]any{"Expected": a.publicTypeString(lastT), "Got": a.publicTypeString(t)})
-            a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
-        }
+        lastValue = args[i]
     }
+    
+    // Return the type of the last expression
+    lastT := a.typeFromValue(lastValue).apply(a.subst)
     return NewBasicValue("do-result", a.publicTypeString(lastT)).WithType(lastT), nil
 }
 
@@ -503,7 +519,7 @@ func (a *AnalyzerImpl) analyzeFn(ctx *parser.ListContext, args []Value) (Value, 
     if len(args) < 2 {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        diag := diagnostics.New(diagnostics.CodeFnArgs, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (fn [params] body)")
+        diag := diagnostics.New(diagnostics.CodeFunctionArguments, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (fn [params] body)")
         a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
 		return nil, fmt.Errorf("invalid fn")
 	}
@@ -512,30 +528,53 @@ func (a *AnalyzerImpl) analyzeFn(ctx *parser.ListContext, args []Value) (Value, 
     a.symbolTable.EnterScope()
     defer a.symbolTable.ExitScope()
 
-    // Assign fresh type variables to each parameter
+    // Parse parameter list with required type annotations
     paramTypes := make([]Type, 0)
     paramList := args[0].String()
     if strings.HasPrefix(paramList, "[") && strings.HasSuffix(paramList, "]") {
         inner := strings.TrimSpace(paramList[1 : len(paramList)-1])
         if inner != "" {
-            params := strings.Fields(inner)
-            for _, param := range params {
-                tv := a.freshTypeVar()
-                _ = a.symbolTable.Define(param, NewBasicValue(param, "interface{}").WithType(tv))
-                paramTypes = append(paramTypes, tv)
+            paramTypes = a.parseParameterListWithTypes(inner)
+            if paramTypes == nil {
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeFunctionParameters, diagnostics.SeverityError, "", line, column, nil)
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                return nil, fmt.Errorf("missing parameter type annotations")
             }
         }
     }
 
-    // Create function type with fresh result variable
-    fnType := &TypeFunction{Params: paramTypes, Result: a.freshTypeVar()}
+    // Parse required return type annotation
+    var resultType Type
+    if len(args) >= 3 && args[1].String() == "->" {
+        // (fn [params] -> ReturnType body)
+        returnTypeStr := args[2].String()
+        resultType = a.typeNameToType(returnTypeStr)
+        // Body is now args[3]
+        bodyText := ""
+        if len(args) > 3 {
+            bodyText = args[3].String()
+        }
+        args = append(args[:1], &BasicValue{value: bodyText, typ: "expression"}) // Replace with body
+    } else {
+        // ERROR: Return type annotation is required
+        line := ctx.GetStart().GetLine()
+        column := ctx.GetStart().GetColumn()
+        diag := diagnostics.New(diagnostics.CodeFunctionReturnType, diagnostics.SeverityError, "", line, column, nil)
+        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+        return nil, fmt.Errorf("missing return type annotation")
+    }
+    
+    // Create function type with explicit result type
+    fnType := &TypeFunction{Params: paramTypes, Result: resultType}
 
-    // Infer body type by parsing the body and visiting the AST
+    // Check body type by parsing the body and visiting the AST
     bodyText := args[1].String()
     if len(bodyText) > 0 && bodyText[0] != '(' && bodyText[0] != '[' {
-        // Primitive or symbol literal in body; infer directly without parsing
-        inferred := inferPrimitiveTypeString(bodyText)
-        bodyType := a.typeNameToType(inferred)
+        // Primitive or symbol literal in body; determine type directly without parsing
+        primitiveType := inferPrimitiveTypeString(bodyText)
+        bodyType := a.typeNameToType(primitiveType)
         if s, errU := unify(fnType.Result, bodyType); errU == nil {
             appliedParams := make([]Type, len(fnType.Params))
             for i, p := range fnType.Params { appliedParams[i] = p.apply(s) }
@@ -564,7 +603,7 @@ func (a *AnalyzerImpl) analyzeMacro(ctx *parser.ListContext, args []Value) (Valu
     if len(args) < 3 {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        diag := diagnostics.New(diagnostics.CodeMacArgs, diagnostics.SeverityError, "", line, column, nil)
+        diag := diagnostics.New(diagnostics.CodeMacroArguments, diagnostics.SeverityError, "", line, column, nil)
         a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), MacroError)
 		return nil, fmt.Errorf("invalid macro")
 	}
@@ -575,7 +614,7 @@ func (a *AnalyzerImpl) analyzeMacro(ctx *parser.ListContext, args []Value) (Valu
     if isReservedWord(name) {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        diag := diagnostics.New(diagnostics.CodeMacReserved, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("choose a different macro name")
+        diag := diagnostics.New(diagnostics.CodeMacroReserved, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("choose a different macro name")
         a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), MacroError)
 		return nil, fmt.Errorf("invalid macro name")
 	}
@@ -603,7 +642,7 @@ func (a *AnalyzerImpl) analyzeFunctionCall(ctx *parser.ListContext, funcName str
             return NewBasicValue("call-result", "bool").WithType(&TypeConstant{Name: "bool"}), nil
         }
         line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-        diag := diagnostics.New(diagnostics.CodeTypEq, diagnostics.SeverityError, "", line, column, map[string]any{"Got": a.publicTypeString(t1) + " vs " + a.publicTypeString(t2)}).WithMessage("occur-check or mismatch: cannot unify")
+        diag := diagnostics.New(diagnostics.CodeTypeEquality, diagnostics.SeverityError, "", line, column, map[string]any{"Got": a.publicTypeString(t1) + " vs " + a.publicTypeString(t2)}).WithMessage("occur-check or mismatch: cannot unify")
         a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
         return NewBasicValue("call-result", "bool").WithType(&TypeConstant{Name: "bool"}), nil
     }
@@ -618,7 +657,7 @@ func (a *AnalyzerImpl) analyzeFunctionCall(ctx *parser.ListContext, funcName str
                 if ex, ok := a.pkgExports[importPath]; ok {
                     if !ex[function] {
                         line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-                        diag := diagnostics.New(diagnostics.CodePkgNotExported, diagnostics.SeverityError, "", line, column, map[string]any{"Name": function, "Pkg": importPath})
+                        diag := diagnostics.New(diagnostics.CodePackageNotExported, diagnostics.SeverityError, "", line, column, map[string]any{"Name": function, "Pkg": importPath})
                         a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
                         return NewBasicValue("call-result", "interface{}"), fmt.Errorf("symbol '%s' is not exported from package '%s'", function, importPath)
                     }
@@ -767,7 +806,8 @@ func (a *AnalyzerImpl) analyzeFunctionCall(ctx *parser.ListContext, funcName str
             a.subst = a.subst.compose(sidx)
         } else {
             line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-            a.errorReporter.ReportTypedError(line, column, "index must be number", TypeError)
+            diag := diagnostics.New(diagnostics.CodeTypeIndex, diagnostics.SeverityError, "", line, column, nil)
+            a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
         }
         elemVar := a.freshTypeVar()
         if s, err := unify(arrT, &TypeArray{Elem: elemVar}); err == nil {
@@ -785,7 +825,8 @@ func (a *AnalyzerImpl) analyzeFunctionCall(ctx *parser.ListContext, funcName str
             a.subst = a.subst.compose(sidx)
         } else {
             line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-            a.errorReporter.ReportTypedError(line, column, "index must be number", TypeError)
+            diag := diagnostics.New(diagnostics.CodeTypeIndex, diagnostics.SeverityError, "", line, column, nil)
+            a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
         }
         elemVar := a.freshTypeVar()
         if s, err := unify(arrT, &TypeArray{Elem: elemVar}); err == nil {
@@ -820,7 +861,7 @@ SCHEME:
         if !isBuiltinFunction(funcName) {
             line := ctx.GetStart().GetLine()
             column := ctx.GetStart().GetColumn()
-            diag := diagnostics.New(diagnostics.CodeTypUndef, diagnostics.SeverityError, "", line, column, map[string]any{"Name": funcName})
+            diag := diagnostics.New(diagnostics.CodeTypeUndefined, diagnostics.SeverityError, "", line, column, map[string]any{"Name": funcName})
             a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
             return NewBasicValue("call-result", "interface{}"), fmt.Errorf("undefined function: %s", funcName)
         }
@@ -898,7 +939,7 @@ SCHEME:
                 if len(fn.Params) != len(args) {
                     // For '+' handled earlier; others must match arity
                     line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-                    diag := diagnostics.New(diagnostics.CodeAriArgs, diagnostics.SeverityError, "", line, column, map[string]any{"Op": funcName, "Expected": len(fn.Params), "Got": len(args)})
+                    diag := diagnostics.New(diagnostics.CodeArityArguments, diagnostics.SeverityError, "", line, column, map[string]any{"Op": funcName, "Expected": len(fn.Params), "Got": len(args)})
                     a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
                     return NewBasicValue("call-result", "interface{}"), nil
                 }
@@ -927,7 +968,7 @@ SCHEME:
     }
     // Unknown function: strict HM requires a definition or scheme
     line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-    diag := diagnostics.New(diagnostics.CodeTypUndef, diagnostics.SeverityError, "", line, column, map[string]any{"Name": funcName})
+    diag := diagnostics.New(diagnostics.CodeTypeUndefined, diagnostics.SeverityError, "", line, column, map[string]any{"Name": funcName})
     a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
     return NewBasicValue("call-result", "interface{}"), fmt.Errorf("undefined function: %s", funcName)
 
@@ -973,7 +1014,7 @@ func (a *AnalyzerImpl) typeFromValue(v Value) Type {
     case "map[interface{}]interface{}":
         return &TypeConstant{Name: v.Type()}
     case "symbol":
-        // Undefined/bare symbols are treated as fresh type variables to avoid spurious errors in inference
+        // Undefined/bare symbols are treated as fresh type variables for unification
         return a.freshTypeVar()
     default:
         return &TypeConstant{Name: v.Type()}
@@ -1016,6 +1057,48 @@ func (a *AnalyzerImpl) typeNameToType(name string) Type {
         // Record names map to record for now; future: distinct nominal types
         return &TypeConstant{Name: name}
     }
+}
+
+// parseParameterListWithTypes parses parameter list with required type annotations
+// Only supports explicit types: "x: int y: string z: bool" syntax
+func (a *AnalyzerImpl) parseParameterListWithTypes(paramListInner string) []Type {
+    paramTypes := make([]Type, 0)
+    
+    // Split by whitespace but handle type annotations
+    tokens := strings.Fields(paramListInner)
+    
+    for i := 0; i < len(tokens); {
+        paramToken := tokens[i]
+        
+        // Check if this token ends with ":" indicating type annotation follows
+        if strings.HasSuffix(paramToken, ":") && i+1 < len(tokens) {
+            // param: type format - "x:" followed by "int"
+            paramName := strings.TrimSuffix(paramToken, ":")
+            typeStr := tokens[i+1]
+            paramType := a.typeNameToType(typeStr)
+            _ = a.symbolTable.Define(paramName, NewBasicValue(paramName, "interface{}").WithType(paramType))
+            paramTypes = append(paramTypes, paramType)
+            i += 2 // Skip param: and type
+        } else if strings.Contains(paramToken, ":") {
+            // param:type format (no space) - "x:int"
+            parts := strings.Split(paramToken, ":")
+            if len(parts) == 2 && parts[1] != "" {
+                paramName := parts[0]
+                typeStr := parts[1]
+                paramType := a.typeNameToType(typeStr)
+                _ = a.symbolTable.Define(paramName, NewBasicValue(paramName, "interface{}").WithType(paramType))
+                paramTypes = append(paramTypes, paramType)
+                i += 1 // Skip this combined token
+            } else {
+                return nil // Malformed type annotation
+            }
+        } else {
+            // param without type annotation - ERROR in explicit-only mode
+            return nil
+        }
+    }
+    
+    return paramTypes
 }
 
 // parseSingleExpression parses a Vex expression from a raw string into a parse tree node
@@ -1132,7 +1215,8 @@ func (a *AnalyzerImpl) analyzeRecord(ctx *parser.ListContext, args []Value) (Val
     if ctx.GetChildCount() < 4 {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        a.errorReporter.ReportError(line, column, "record requires name and fields\nSuggestion: use (record Name [field: Type ...])")
+        diag := diagnostics.New(diagnostics.CodeRecordArguments, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (record Name [field: Type ...])")
+        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
         return nil, fmt.Errorf("invalid record")
     }
     nameNode := ctx.GetChild(2)
@@ -1140,7 +1224,8 @@ func (a *AnalyzerImpl) analyzeRecord(ctx *parser.ListContext, args []Value) (Val
     if name == "" || isReservedWord(name) {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        a.errorReporter.ReportError(line, column, "invalid record name")
+        diag := diagnostics.New(diagnostics.CodeRecordName, diagnostics.SeverityError, "", line, column, nil)
+        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
         return nil, fmt.Errorf("invalid record name")
     }
     var fields map[string]string
@@ -1158,7 +1243,8 @@ func (a *AnalyzerImpl) analyzeRecord(ctx *parser.ListContext, args []Value) (Val
     } else {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        a.errorReporter.ReportError(line, column, "record expects a field vector [field: Type ...]")
+        diag := diagnostics.New(diagnostics.CodeRecordFields, diagnostics.SeverityError, "", line, column, nil)
+        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
         return nil, fmt.Errorf("invalid record fields")
     }
     rec := NewRecordValue(name, fields, order)
@@ -1213,13 +1299,15 @@ func (a *AnalyzerImpl) parseRecordFields(arr *parser.ArrayContext) (map[string]s
 func (a *AnalyzerImpl) analyzeRecordConstructor(ctx *parser.ListContext, rec *RecordValue) (Value, error) {
     if ctx.GetChildCount() < 4 {
         line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-        a.errorReporter.ReportTypedError(line, column, "record construction requires field vector", TypeError)
+        diag := diagnostics.New(diagnostics.CodeRecordConstruct, diagnostics.SeverityError, "", line, column, nil)
+        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
         return nil, fmt.Errorf("invalid record construction")
     }
     arr, ok := ctx.GetChild(2).(*parser.ArrayContext)
     if !ok {
         line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-        a.errorReporter.ReportTypedError(line, column, "record construction expects [fields]", TypeError)
+        diag := diagnostics.New(diagnostics.CodeRecordConstruct, diagnostics.SeverityError, "", line, column, nil).WithMessage("record construction expects [fields]")
+        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
         return nil, fmt.Errorf("invalid record construction")
     }
 
@@ -1270,7 +1358,8 @@ func (a *AnalyzerImpl) analyzeRecordFieldCall(ctx *parser.ListContext, sym *Symb
     // Expect: (User :field)
     if ctx.GetChildCount() < 4 { // '(', User, arg, ')'
         line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-        a.errorReporter.ReportTypedError(line, column, "record field call requires one field argument", TypeError)
+        diag := diagnostics.New(diagnostics.CodeRecordConstruct, diagnostics.SeverityError, "", line, column, nil).WithMessage("record field call requires one field argument")
+        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
         return nil, fmt.Errorf("invalid record field call")
     }
     argNode := ctx.GetChild(2)
@@ -1294,14 +1383,14 @@ func (a *AnalyzerImpl) analyzeMap(ctx *parser.ListContext, args []Value) (Value,
     if ctx.GetChildCount() < 3 {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        a.errorReporter.ReportDiagnosticBody(line, column, diagnostics.New(diagnostics.CodeMapArgs, diagnostics.SeverityError, "", line, column, nil).RenderBody(), SemanticError)
+        a.errorReporter.ReportDiagnosticBody(line, column, diagnostics.New(diagnostics.CodeMapArguments, diagnostics.SeverityError, "", line, column, nil).RenderBody(), SemanticError)
         return nil, fmt.Errorf("invalid map")
     }
     arr, ok := ctx.GetChild(2).(*parser.ArrayContext)
     if !ok {
         line := ctx.GetStart().GetLine()
         column := ctx.GetStart().GetColumn()
-        a.errorReporter.ReportDiagnosticBody(line, column, diagnostics.New(diagnostics.CodeMapArgs, diagnostics.SeverityError, "", line, column, nil).WithMessage("map expects [key value ...]").RenderBody(), SemanticError)
+        a.errorReporter.ReportDiagnosticBody(line, column, diagnostics.New(diagnostics.CodeMapArguments, diagnostics.SeverityError, "", line, column, nil).WithMessage("map expects [key value ...]").RenderBody(), SemanticError)
         return nil, fmt.Errorf("invalid map")
     }
     // HM: visit child nodes and unify key/value types across pairs
@@ -1325,7 +1414,7 @@ func (a *AnalyzerImpl) analyzeMap(ctx *parser.ListContext, args []Value) (Value,
                 keyT = keyT.apply(a.subst)
             } else {
                 line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-                diag := diagnostics.New(diagnostics.CodeTypMapKey, diagnostics.SeverityError, "", line, column, map[string]any{"Offender": fmt.Sprintf("pair %d", pairIndex)})
+                diag := diagnostics.New(diagnostics.CodeTypeMapKey, diagnostics.SeverityError, "", line, column, map[string]any{"Offender": fmt.Sprintf("pair %d", pairIndex)})
                 a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
             }
         }
@@ -1335,7 +1424,7 @@ func (a *AnalyzerImpl) analyzeMap(ctx *parser.ListContext, args []Value) (Value,
                 valT = valT.apply(a.subst)
             } else {
                 line := ctx.GetStart().GetLine(); column := ctx.GetStart().GetColumn()
-                diag := diagnostics.New(diagnostics.CodeTypMapVal, diagnostics.SeverityError, "", line, column, map[string]any{"Offender": fmt.Sprintf("pair %d", pairIndex)})
+                diag := diagnostics.New(diagnostics.CodeTypeMapValue, diagnostics.SeverityError, "", line, column, map[string]any{"Offender": fmt.Sprintf("pair %d", pairIndex)})
                 a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
             }
         }
@@ -1389,6 +1478,20 @@ func isCollectionHelper(name string) bool {
     default:
         return false
     }
+}
+
+// isFunction checks if a value represents a function
+func isFunction(value Value) bool {
+    if bv, ok := value.(*BasicValue); ok {
+        return bv.Type() == "func"
+    }
+    return false
+}
+
+// isValidFunctionName validates that function names use kebab-case (dashes, not underscores)
+func isValidFunctionName(name string) bool {
+    // Function names should not contain underscores (use dashes instead)
+    return !strings.Contains(name, "_")
 }
 
 // Interface implementations to satisfy the imports

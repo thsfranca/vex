@@ -1,0 +1,11 @@
+;; Simple test demonstrating test framework capabilities
+(import "fmt")
+
+(fmt/Println "Running simple test...")
+
+;; Basic arithmetic test
+(def sum (+ 2 3))
+(fmt/Println "Addition completed")
+
+;; Simple completion message
+(fmt/Println "Test completed successfully")

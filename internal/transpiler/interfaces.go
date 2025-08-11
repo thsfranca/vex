@@ -56,6 +56,7 @@ type MacroExpander interface {
 	RegisterMacro(name string, macro *macro.Macro) error
 	HasMacro(name string) bool
 	GetMacro(name string) (*macro.Macro, bool)
+	LoadStdlibModule(moduleName string) error
 }
 
 // SymbolTable manages variable and function definitions
@@ -118,6 +119,7 @@ const (
 type TranspilerConfig struct {
 	EnableMacros     bool
 	CoreMacroPath    string
+	StdlibPath       string
 	PackageName      string
 	GenerateComments bool
     IgnoreImports    map[string]bool

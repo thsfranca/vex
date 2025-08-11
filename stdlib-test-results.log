@@ -1,0 +1,239 @@
+Vex Stdlib Test Results
+========================
+Timestamp: 2025-08-11 23:25:19 UTC
+
+Running: stdlib/vex/core/core_test.vx
+🧪 Running Vex tests in stdlib/vex/core
+⏱️  Timeout: 30s
+
+▶ stdlib/vex/core/core_test.vx
+   Found 3 deftest declaration(s)
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+✅ PASS: stdlib/vex/core/core_test.vx (446ms)
+✅ defn macro is available from core stdlib
+✅ Basic arithmetic operations work
+✅ Test framework and assert-eq work correctly
+
+📊 Generating test coverage report...
+
+📋 Test Coverage Report
+─────────────────────────
+✅ stdlib/vex/core: 100.0% (1/1 files)
+   Source files: [stdlib/vex/core/core.vx]
+   Test files: [stdlib/vex/core/core_test.vx]
+─────────────────────────
+📊 Overall: 100.0% (1/1 packages have tests)
+📄 Coverage report written to: stdlib/vex/core-coverage.json
+
+🏁 Test Summary
+─────────────────────────
+📁 Total: 1 tests
+✅ Passed: 1
+⏱️  Duration: 447ms
+🎉 Success rate: 100.0%
+PASSED: stdlib/vex/core/core_test.vx
+
+Running: stdlib/vex/test/test_test.vx
+🧪 Running Vex tests in stdlib/vex/test
+⏱️  Timeout: 30s
+
+▶ stdlib/vex/test/test_test.vx
+   Found 3 deftest declaration(s)
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+✅ PASS: stdlib/vex/test/test_test.vx (315ms)
+✅ deftest macro creates named tests
+✅ Test framework is functional
+✅ Simple test output works
+
+📊 Generating test coverage report...
+
+📋 Test Coverage Report
+─────────────────────────
+✅ stdlib/vex/test: 100.0% (1/1 files)
+   Source files: [stdlib/vex/test/test.vx]
+   Test files: [stdlib/vex/test/test_test.vx]
+─────────────────────────
+📊 Overall: 100.0% (1/1 packages have tests)
+📄 Coverage report written to: stdlib/vex/test-coverage.json
+
+🏁 Test Summary
+─────────────────────────
+📁 Total: 1 tests
+✅ Passed: 1
+⏱️  Duration: 316ms
+🎉 Success rate: 100.0%
+PASSED: stdlib/vex/test/test_test.vx
+
+Running: stdlib/vex/conditions/conditions_test.vx
+🧪 Running Vex tests in stdlib/vex/conditions
+⏱️  Timeout: 30s
+
+▶ stdlib/vex/conditions/conditions_test.vx
+   Found 3 deftest declaration(s)
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+✅ PASS: stdlib/vex/conditions/conditions_test.vx (325ms)
+✅ when macro from conditions available
+✅ unless macro from conditions available
+✅ Conditional macros provide control flow
+
+📊 Generating test coverage report...
+
+📋 Test Coverage Report
+─────────────────────────
+✅ stdlib/vex/conditions: 100.0% (1/1 files)
+   Source files: [stdlib/vex/conditions/conditions.vx]
+   Test files: [stdlib/vex/conditions/conditions_test.vx]
+─────────────────────────
+📊 Overall: 100.0% (1/1 packages have tests)
+📄 Coverage report written to: stdlib/vex/conditions-coverage.json
+
+🏁 Test Summary
+─────────────────────────
+📁 Total: 1 tests
+✅ Passed: 1
+⏱️  Duration: 325ms
+🎉 Success rate: 100.0%
+PASSED: stdlib/vex/conditions/conditions_test.vx
+
+Running: stdlib/vex/bindings/bindings_test.vx
+🧪 Running Vex tests in stdlib/vex/bindings
+⏱️  Timeout: 30s
+
+▶ stdlib/vex/bindings/bindings_test.vx
+   Found 3 deftest declaration(s)
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+✅ PASS: stdlib/vex/bindings/bindings_test.vx (320ms)
+✅ let macro from bindings available
+✅ Local bindings functionality works
+✅ Lexical scoping through let works
+
+📊 Generating test coverage report...
+
+📋 Test Coverage Report
+─────────────────────────
+✅ stdlib/vex/bindings: 100.0% (1/1 files)
+   Source files: [stdlib/vex/bindings/bindings.vx]
+   Test files: [stdlib/vex/bindings/bindings_test.vx]
+─────────────────────────
+📊 Overall: 100.0% (1/1 packages have tests)
+📄 Coverage report written to: stdlib/vex/bindings-coverage.json
+
+🏁 Test Summary
+─────────────────────────
+📁 Total: 1 tests
+✅ Passed: 1
+⏱️  Duration: 321ms
+🎉 Success rate: 100.0%
+PASSED: stdlib/vex/bindings/bindings_test.vx
+
+Running: stdlib/vex/threading/threading_test.vx
+🧪 Running Vex tests in stdlib/vex/threading
+⏱️  Timeout: 30s
+
+▶ stdlib/vex/threading/threading_test.vx
+   Found 3 deftest declaration(s)
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+✅ PASS: stdlib/vex/threading/threading_test.vx (332ms)
+✅ Threading module is available
+✅ Thread operations work
+✅ Synchronization works
+
+📊 Generating test coverage report...
+
+📋 Test Coverage Report
+─────────────────────────
+✅ stdlib/vex/threading: 100.0% (1/1 files)
+   Source files: [stdlib/vex/threading/threading.vx]
+   Test files: [stdlib/vex/threading/threading_test.vx]
+─────────────────────────
+📊 Overall: 100.0% (1/1 packages have tests)
+📄 Coverage report written to: stdlib/vex/threading-coverage.json
+
+🏁 Test Summary
+─────────────────────────
+📁 Total: 1 tests
+✅ Passed: 1
+⏱️  Duration: 333ms
+🎉 Success rate: 100.0%
+PASSED: stdlib/vex/threading/threading_test.vx
+
+Running: stdlib/vex/collections/collections_test.vx
+🧪 Running Vex tests in stdlib/vex/collections
+⏱️  Timeout: 30s
+
+▶ stdlib/vex/collections/collections_test.vx
+   Found 5 deftest declaration(s)
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+✅ PASS: stdlib/vex/collections/collections_test.vx (507ms)
+✅ first macro extracts first element
+✅ count macro returns array length
+✅ empty? macro detects empty arrays
+✅ rest macro returns array without first element
+✅ cons macro prepends element to array
+
+📊 Generating test coverage report...
+
+📋 Test Coverage Report
+─────────────────────────
+✅ stdlib/vex/collections: 100.0% (1/1 files)
+   Source files: [stdlib/vex/collections/collections.vx]
+   Test files: [stdlib/vex/collections/collections_test.vx]
+─────────────────────────
+📊 Overall: 100.0% (1/1 packages have tests)
+📄 Coverage report written to: stdlib/vex/collections-coverage.json
+
+🏁 Test Summary
+─────────────────────────
+📁 Total: 1 tests
+✅ Passed: 1
+⏱️  Duration: 509ms
+🎉 Success rate: 100.0%
+PASSED: stdlib/vex/collections/collections_test.vx
+
+Running: stdlib/vex/flow/flow_test.vx
+🧪 Running Vex tests in stdlib/vex/flow
+⏱️  Timeout: 30s
+
+▶ stdlib/vex/flow/flow_test.vx
+   Found 3 deftest declaration(s)
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+line 1:0 mismatched input 'body' expecting '('
+✅ PASS: stdlib/vex/flow/flow_test.vx (397ms)
+✅ Flow module is available
+✅ Control flow works
+✅ Iteration works
+
+📊 Generating test coverage report...
+
+📋 Test Coverage Report
+─────────────────────────
+✅ stdlib/vex/flow: 100.0% (1/1 files)
+   Source files: [stdlib/vex/flow/flow.vx]
+   Test files: [stdlib/vex/flow/flow_test.vx]
+─────────────────────────
+📊 Overall: 100.0% (1/1 packages have tests)
+📄 Coverage report written to: stdlib/vex/flow-coverage.json
+
+🏁 Test Summary
+─────────────────────────
+📁 Total: 1 tests
+✅ Passed: 1
+⏱️  Duration: 398ms
+🎉 Success rate: 100.0%
+PASSED: stdlib/vex/flow/flow_test.vx
+

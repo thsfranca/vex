@@ -208,8 +208,8 @@ func TestRegistry_GetMacro(t *testing.T) {
 	}
 }
 
-// Obsolete tests removed - all macros are in core/core.vx
-// LoadCoreMacros will always succeed when core/core.vx exists
+// Obsolete tests removed - all macros are in stdlib packages
+// LoadCoreMacros will load from stdlib packages when available
 
 func TestRegistry_LoadCoreMacros_PreventDuplicate(t *testing.T) {
 	registry := NewRegistry(Config{

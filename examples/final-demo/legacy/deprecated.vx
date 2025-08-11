@@ -1,0 +1,6 @@
+;; Legacy code without tests
+(import "fmt")
+
+(defn old-method [x: int] -> int (+ x 1))
+
+(fmt/Println "Legacy module loaded")

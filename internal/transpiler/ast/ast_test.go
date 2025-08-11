@@ -123,10 +123,10 @@ func TestVexParser_Parse(t *testing.T) {
 func TestVexParser_ParseFile(t *testing.T) {
 	parser := NewParser()
 	
-	// Test parsing existing core.vx file
-	ast, err := parser.ParseFile("../../../core/core.vx")
+	// Test parsing existing example file
+	ast, err := parser.ParseFile("../../../examples/valid/hello-world.vx")
 	if err != nil {
-		t.Errorf("ParseFile should parse core.vx successfully: %v", err)
+		t.Errorf("ParseFile should parse hello-world.vx successfully: %v", err)
 		return
 	}
 	

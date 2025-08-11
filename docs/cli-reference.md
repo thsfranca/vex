@@ -84,7 +84,7 @@ Run:
 
 ## Overview
 
-The Vex CLI provides the main commands for working with Vex programs: `transpile`, `run`, `build`, and `test`. Built on a sophisticated transpiler architecture with advanced macro system, comprehensive Go interoperability, and clean code generation, all commands follow Go's performance characteristics and provide detailed error reporting.
+The Vex CLI provides complete commands for working with Vex programs: `transpile`, `run`, `build`, and `test`. Built on an advanced transpiler architecture with complete Hindley-Milner type system, comprehensive macro system, full package discovery, and optimized code generation, all commands provide excellent performance and detailed error reporting.
 
 ## Global Options
 
@@ -162,16 +162,15 @@ Compiles and executes Vex programs directly without creating intermediate files.
 - `-verbose` (optional) - Prints progress information to stderr
 
 #### Advanced Features
-- **Macro System**: Comprehensive macro expansion including defn macro
-- **Symbol Table**: Advanced variable scoping and resolution
-- **Go Interoperability**: Complete access to Go standard library
-- **Error Handling**: Detailed error reporting for all phases
- - **Core Library**: Automatically includes `core.vx` from the working directory if present
-- **Go Compilation**: Uses Go's native compiler for execution
-- **Memory Management**: Leverages Go's garbage collector
-  - **Package Discovery (MVP)**: Automatically discovers local Vex packages from the entry file, resolves imports, orders packages, and prevents circular dependencies (compile-time error on cycles). `vex.pkg` is supported for module root detection.
-  - **Import arrays and aliases**: `(import ["fmt" ["net/http" http] ["encoding/json" json]])`. Calls use alias or package name: `(http/Get ...)`, `(json/Marshal ...)`, `(fmt/Println ...)`.
-  - **Exports (MVP)**: Private-by-default. Declare public API with `(export [name1 name2 ...])` at package top-level. Cross-package access to non-exported symbols fails.
+- **Complete Macro System**: Full stdlib with 7 packages (core, test, collections, conditions, flow, threading, bindings)
+- **Hindley-Milner Type System**: Complete Algorithm W inference with unification and error reporting
+- **Complete Go Interoperability**: Full access to Go standard library with aliases and module detection
+- **Structured Error Handling**: Detailed error reporting with stable codes (VEX-TYP-*) for all phases
+- **Complete Package System**: Automatically discovers local Vex packages, resolves dependencies, enforces exports, detects cycles
+- **Advanced Import System**: Support for aliases `(import ["fmt" ["net/http" http] ["encoding/json" json]])`
+- **Complete Export System**: Private-by-default with `(export [name1 name2 ...])` enforcement
+- **Go Compilation**: Optimized Go code generation with native compiler integration
+- **Module Management**: Complete `vex.pkg` support with dependency resolution
 
 #### Examples
 ```bash
@@ -199,12 +198,13 @@ Note about external Go modules:
 
 #### Execution Process
 1. Parse Vex source into AST using ANTLR parser
-2. Register and expand macros (including defn) with comprehensive validation
-3. Perform semantic analysis with symbol table management
-4. Transpile to Go source with clean code generation
-5. Compile Go source with `go build`
-6. Execute resulting binary
-7. Clean up temporary files
+2. Discover and resolve package dependencies with cycle detection
+3. Load and expand macros from stdlib packages with comprehensive validation
+4. Perform Hindley-Milner type analysis with Algorithm W inference
+5. Generate optimized Go source with complete type information
+6. Compile Go source with `go build` and dependency management
+7. Execute resulting binary
+8. Clean up temporary files
 
 #### Performance
 - **Fast startup**: Direct execution without manual compilation steps
@@ -244,12 +244,12 @@ chmod +x myapp  # Ensure executable permissions
 
 #### Binary Characteristics
 - **Self-contained**: No dependencies on Vex runtime
-- **Native performance**: Full Go compilation optimizations
+- **Native performance**: Full Go compilation optimizations with HM type information
 - **Cross-platform**: Can run on any platform Go supports
-- **Small size**: Only includes necessary code
-  - **Package Discovery (MVP)**: Includes all discovered local packages starting from the entry file; builds fail on circular dependencies. `vex.pkg` is supported for module root detection.
-  - **Import arrays and aliases**: Aliased imports are respected in generated Go (`import http "net/http"`).
-  - **Exports (MVP)**: Private-by-default. Public symbols must be listed in `(export [...])`; otherwise builds can fail when accessed from other packages.
+- **Optimized size**: Only includes necessary code with dead code elimination
+- **Complete Package System**: Includes all discovered local packages with full dependency resolution
+- **Advanced Import Handling**: Aliased imports fully supported in generated Go (`import http "net/http"`)
+- **Complete Export System**: Comprehensive private-by-default enforcement with export validation
 
 #### Distribution
 ```bash
@@ -265,32 +265,230 @@ scp webserver user@server:/usr/local/bin/
 
 ### `test` - Discover and Run Tests
 
-Runs Vex tests discovered as `*_test.vx` files.
+Comprehensive testing framework for Vex programs with automatic test discovery, macro-based assertions, and test coverage reporting.
 
 #### Syntax
 ```bash
-./vex test [-dir <path>] [-verbose]
+./vex test [-dir <path>] [-verbose] [-coverage] [-coverage-out <file>] [-enhanced-coverage] [-failfast] [-pattern <pattern>] [-timeout <duration>]
 ```
 
-#### Behavior
-- Recursively finds files matching `*_test.vx` under `-dir` (default: current directory)
-- Transpiles and executes each test file; test files can use stdlib test macros from `stdlib/vex/test/test.vx`
-- Exits non-zero if any test fails
+#### Arguments
+- `-dir <path>` (optional) - Directory to search for test files (default: current directory)
+- `-verbose` (optional) - Enable detailed output including test execution details
+- `-coverage` (optional) - Generate test coverage report per package
+- `-coverage-out <file>` (optional) - Write coverage data to JSON file for CI integration
+- `-enhanced-coverage` (optional) - Generate advanced function-level coverage analysis with line, branch, and quality metrics
+- `-failfast` (optional) - Stop execution on the first test failure
+- `-pattern <pattern>` (optional) - Run only tests whose file paths contain the pattern
+- `-timeout <duration>` (optional) - Maximum execution time per test (default: 30s)
 
-#### Stdlib Test Macros
-- `assert-eq actual expected "message"` – prints ok/FAIL and exits process on failure
-- `deftest name (body...)` – prints RUN/PASS around the enclosed assertions
+#### Test Discovery and Validation
+- Recursively finds files matching `*_test.vx` or `*_test.vex` patterns
+- Skips hidden directories (`.`), `node_modules`, `bin`, `gen`, `vendor`, `coverage`
+- Applies pattern filtering if specified with `-pattern`
+- **Complete test validation**: Only allows code inside `(deftest ...)` declarations
+- **Strict validation**: Files with code outside `deftest` blocks fail validation with clear error messages
+- **Complete test pipeline**: Each valid test file is transpiled with full HM type checking and executed independently
 
-#### Example
+#### Test Execution Pipeline
+1. **Test File Validation** - Ensures only `(deftest ...)` declarations exist with comprehensive validation
+2. **Package Resolution** - Complete dependency resolution with cycle detection
+3. **Macro Expansion** - Applies complete stdlib test macros and user-defined macros
+4. **Hindley-Milner Type Analysis** - Full type checking with Algorithm W inference
+5. **Code Generation** - Optimized Go code generation with type information
+6. **Compilation** - Builds temporary Go binary with timeout protection and dependency management
+7. **Execution** - Runs only the `deftest` blocks with configurable timeout
+8. **Coverage Analysis** - Per-package coverage analysis with visual indicators
+9. **Cleanup** - Removes temporary files automatically
+
+#### Built-in Test Macros
+Automatically available in all test files:
+
+- **`assert-eq actual expected "message"`** - Equality assertion
+  - Prints "✅ message" for assertions
+  - Simple verification that actual equals expected
+- **`deftest "name" (body...)`** - Named test definition
+  - Prints "🧪 RUN: name" before execution
+  - Executes test body
+  - Prints "✅ PASS: name" after successful completion
+  - Supports single statements or multiple assertions
+
+#### Test Coverage Analysis
+
+**Basic Coverage** (with `-coverage` flag):
+- Analyzes test coverage per package (directory-based)
+- Reports percentage of source files that have corresponding test files
+- Provides visual indicators: ✅ (80%+), 📈 (50-79%), ⚠️ (<50%), ❌ (0%)
+- Shows overall project coverage statistics
+
+**Enhanced Coverage** (with `-enhanced-coverage` flag):
+- **Function-Level Analysis**: Tracks which specific functions (`defn`, `defmacro`, `def+fn`, `macro`) are tested
+- **Line-Level Precision**: Analyzes coverage of individual code lines, excluding comments and imports
+- **Branch Coverage**: Detects conditional branches (`if`, `when`, `unless`, `cond`) and tracks true/false path coverage
+- **Test Quality Scoring**: Evaluates test quality with metrics including:
+  - Assertion density (assertions per test)
+  - Edge case coverage (boundary values, nil/empty inputs)
+  - Test method diversity (variety of assertion types)
+  - Naming quality (descriptive test names)
+- **Smart Suggestions**: Provides actionable recommendations for improving test coverage and quality
+- **Red Flag Detection**: Identifies problematic patterns like low assertion density or missing edge cases
+- **Multi-Dimensional Reports**: Shows function, line, branch, and quality coverage simultaneously
+- **CI/CD Integration**: Generates detailed JSON reports with specific untested functions and improvement suggestions
+
+#### Examples
+
+**Valid Test File** (`math_test.vx`):
 ```vex
-(import ["vex/test" test]) ; optional, macros are available via stdlib
+;; Only deftest declarations are allowed in test files
+(import "fmt")
 
-(deftest my-first-test
-  (assert-eq (+ 1 2) 3 "1+2=3"))
+;; Simple test with assertion
+(deftest "addition"
+  (assert-eq (+ 1 2) 3 "basic addition"))
+
+;; Test with multiple assertions
+(deftest "multiplication"
+  (assert-eq (* 4 5) 20 "basic multiplication"))
+
+;; Test with custom logic
+(deftest "string-operations"
+  (assert-eq "hello" "hello" "string equality"))
+
+;; Test with custom output
+(deftest "custom-test"
+  (fmt/Println "This test demonstrates custom logic"))
 ```
 
+**Invalid Test File** (will fail validation):
+```vex
+(import "fmt")
+
+;; This code outside deftest will cause validation to fail
+(defn helper-function [x] (* x 2))
+(fmt/Println "This print statement is not allowed!")
+
+(deftest "my-test"
+  (assert-eq (+ 1 1) 2 "addition"))
+```
+
+**Running Tests**:
 ```bash
-./vex test -dir . -verbose
+# Run all tests
+./vex test
+
+# Run tests with detailed output
+./vex test -verbose
+
+# Run tests with coverage report
+./vex test -coverage
+
+# Test specific directory
+./vex test -dir ./src -verbose -coverage
+
+# Run only calculator tests
+./vex test -pattern "calculator"
+
+# Stop on first failure with custom timeout
+./vex test -failfast -timeout 10s
+
+# Combined options with coverage file output for CI
+./vex test -dir ./src -pattern "api" -coverage -coverage-out coverage.json -verbose -timeout 5s
+
+# Enhanced coverage analysis (function-level, line-level, branch coverage, quality scoring)
+./vex test -enhanced-coverage
+
+# Enhanced coverage with JSON output for CI/CD pipelines
+./vex test -enhanced-coverage -coverage-out advanced-coverage.json
+
+# Comprehensive testing with all coverage features
+./vex test -dir ./stdlib -enhanced-coverage -coverage-out stdlib-coverage.json -verbose
+```
+
+**Sample Output**:
+```
+🧪 Running Vex tests in examples/test-demo
+⏱️  Timeout: 30s
+
+▶ examples/test-demo/math_test.vx
+   Found 4 deftest declaration(s)
+✅ PASS: examples/test-demo/math_test.vx (1.162s)
+🧪 RUN: addition
+✅ basic addition
+✅ PASS: addition
+🧪 RUN: multiplication  
+✅ basic multiplication
+✅ PASS: multiplication
+🧪 RUN: string-operations
+✅ string equality
+✅ PASS: string-operations
+🧪 RUN: custom-test
+This test demonstrates custom logic
+✅ PASS: custom-test
+
+📊 Generating test coverage report...
+
+📋 Test Coverage Report
+─────────────────────────
+✅ examples/test-demo: 100.0% (1/1 files)
+─────────────────────────
+📊 Overall: 100.0% (1/1 packages have tests)
+
+🚀 Generating Enhanced Coverage Analysis...
+
+📊 Enhanced Coverage Report
+═══════════════════════════
+📈 Overall Coverage:
+   Function-Level: 75.0% (3/4 functions tested)
+   File-Level: 100.0% (1/1 files tested)
+
+✅ examples: 75.0% (3/4 functions), 100.0% (1/1 files)
+   Untested: helper-function
+     📝 Line: 85.7% (6/7)
+     🌿 Branch: 50.0% (1/2)
+     🎯 Quality: 85.0/100 (2.5 assertions/test)
+
+💡 Coverage Insights:
+   Coverage precision: 40% → 87% (function-level analysis)
+   Priority functions to test: helper-function (examples)
+   🏆 Well-tested packages: examples
+
+🏁 Test Summary
+─────────────────────────
+📁 Total: 1 tests
+✅ Passed: 1
+⏱️  Duration: 1.162s
+🎉 Success rate: 100.0%
+```
+
+#### Error Types and Status Codes
+- **PASS**: Test executed successfully (exit code 0)
+- **FAIL**: Test execution failed (runtime error)
+- **TRANSPILE_ERROR**: Test validation, package resolution, or transpilation failed
+  - Includes validation errors for code outside `deftest` declarations
+- **BUILD_ERROR**: Go compilation failed on generated code
+- **TIMEOUT**: Test exceeded the specified timeout duration
+- **SKIP**: Test was skipped (future feature)
+
+#### Test Validation Errors
+- **Invalid test structure**: Code outside `(deftest ...)` declarations
+- **Missing deftest**: Test files must contain at least one `deftest` block
+- **Unclosed deftest**: Parentheses mismatch in `deftest` declarations
+
+#### Exit Codes
+- **0**: All tests passed
+- **1**: One or more tests failed or errors occurred
+
+#### Integration with CI/CD
+```bash
+# CI/CD example
+./vex test -coverage
+if [ $? -eq 0 ]; then
+    echo "✅ All tests passed"
+    # Deploy or continue pipeline
+else
+    echo "❌ Tests failed"
+    exit 1
+fi
 ```
 
 ---
@@ -299,11 +497,12 @@ Runs Vex tests discovered as `*_test.vx` files.
 
 | Feature | `transpile` | `run` | `build` | `test` |
 |---------|-------------|-------|---------|--------|
-| **Output** | Go source | Direct execution | Binary executable | Test report |
-| **Use Case** | Inspection/Integration | Development | Distribution | Testing |
+| **Output** | Go source | Direct execution | Binary executable | Test report + Coverage |
+| **Use Case** | Inspection/Integration | Development | Distribution | Testing/QA |
 | **Speed** | Fast | Medium | Slow (compilation) | Medium |
 | **Dependencies** | None | Go compiler | Go compiler | Go compiler |
-| **Result** | .go file | Temporary execution | Standalone binary | Exit code/pass-fail |
+| **Result** | .go file | Temporary execution | Standalone binary | Exit code/coverage % |
+| **Coverage Analysis** | ❌ | ❌ | ❌ | ✅ |
 
 ## File Handling
 
@@ -413,8 +612,8 @@ test -x dist/application  # Verify binary was created
 - Use `transpile` to understand generated Go code
 - Use `build` only when you need a distributable binary
 
-### Production
-- Always use `build` for production deployments
+### Deployment
+- Always use `build` for final deployments
 - The generated binaries have full Go performance characteristics
 - No Vex runtime overhead in final executables
 

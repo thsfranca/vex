@@ -21,15 +21,17 @@ type Macro struct {
 // Registry manages macro registration and expansion
 // Registry stores macros and loads core macros from disk.
 type Registry struct {
-	macros     map[string]*Macro
-	coreLoaded bool
-	config     Config
+	macros         map[string]*Macro
+	coreLoaded     bool
+	loadedModules  map[string]bool // Track which stdlib modules have been loaded
+	config         Config
 }
 
 // Config holds macro system configuration
 // Config controls core macro loading and validation behavior.
 type Config struct {
 	CoreMacroPath    string
+	StdlibPath       string // Absolute path to stdlib directory (for tests)
 	EnableValidation bool
 }
 
@@ -37,8 +39,9 @@ type Config struct {
 // NewRegistry constructs a macro registry with the given configuration.
 func NewRegistry(config Config) *Registry {
 	return &Registry{
-		macros: make(map[string]*Macro),
-		config: config,
+		macros:        make(map[string]*Macro),
+		loadedModules: make(map[string]bool),
+		config:        config,
 	}
 }
 
@@ -67,7 +70,43 @@ func (r *Registry) GetMacro(name string) (*Macro, bool) {
 	return macro, exists
 }
 
-// LoadCoreMacros loads core macros from file
+// LoadStdlibModule loads a specific stdlib module (e.g., "vex.core", "vex.collections")
+func (r *Registry) LoadStdlibModule(moduleName string) error {
+	// Check if already loaded
+	if r.loadedModules[moduleName] {
+		return nil
+	}
+	
+	// Convert module name to path (e.g., "vex.core" -> "vex/core")
+	modulePath := strings.ReplaceAll(moduleName, ".", "/")
+	
+	// Try different stdlib locations
+	var stdlibDirs []string
+	
+	// If explicit stdlib path is provided, use it first
+	if r.config.StdlibPath != "" {
+		stdlibDirs = append(stdlibDirs, filepath.Join(r.config.StdlibPath, modulePath))
+	}
+	
+	// Add relative paths as fallback
+	stdlibDirs = append(stdlibDirs,
+		filepath.Join("stdlib", modulePath),
+		filepath.Join("../../stdlib", modulePath),
+		filepath.Join("../../../stdlib", modulePath),
+	)
+	
+	// Try to load from one of the directories
+	for _, dir := range stdlibDirs {
+		if err := r.loadFromDirectory(dir); err == nil {
+			r.loadedModules[moduleName] = true
+			return nil
+		}
+	}
+	
+	return fmt.Errorf("stdlib module '%s' not found in any of the search paths", moduleName)
+}
+
+// LoadCoreMacros loads core macros from file (legacy auto-loading)
 func (r *Registry) LoadCoreMacros() error {
 	if r.coreLoaded {
 		return nil
@@ -82,7 +121,23 @@ func (r *Registry) LoadCoreMacros() error {
     }
 
     // 2) Stdlib package directories (load all that exist)
-    stdlibDirs := []string{
+    var stdlibDirs []string
+    
+    // If explicit stdlib path is provided, use it first
+    if r.config.StdlibPath != "" {
+        stdlibDirs = append(stdlibDirs,
+            filepath.Join(r.config.StdlibPath, "vex/core"),
+            filepath.Join(r.config.StdlibPath, "vex/conditions"),
+            filepath.Join(r.config.StdlibPath, "vex/collections"),
+            filepath.Join(r.config.StdlibPath, "vex/bindings"),
+            filepath.Join(r.config.StdlibPath, "vex/flow"),
+            filepath.Join(r.config.StdlibPath, "vex/threading"),
+            filepath.Join(r.config.StdlibPath, "vex/test"),
+        )
+    }
+    
+    // Add relative paths as fallback
+    stdlibDirs = append(stdlibDirs,
         "stdlib/vex/core",
         "stdlib/vex/conditions",
         "stdlib/vex/collections",
@@ -104,7 +159,7 @@ func (r *Registry) LoadCoreMacros() error {
         "../../../stdlib/vex/flow",
         "../../../stdlib/vex/threading",
         "../../../stdlib/vex/test",
-    }
+    )
     loadedAny := false
     for _, dir := range stdlibDirs {
         if err := r.loadFromDirectory(dir); err == nil {
@@ -115,19 +170,7 @@ func (r *Registry) LoadCoreMacros() error {
         return nil
     }
 
-    // 3) Legacy single-file fallback
-    legacyFiles := []string{
-        "core/core.vx",
-        "../../core/core.vx",
-        "../../../core/core.vx",
-    }
-    for _, f := range legacyFiles {
-        if err := r.loadFromFile(f); err == nil {
-            return nil
-        }
-    }
-
-    return fmt.Errorf("no core macros available - tried stdlib and legacy paths")
+    return fmt.Errorf("no core macros available - tried stdlib paths")
 }
 
 // loadMacrosFromContent parses macro definitions from Vex code
@@ -274,7 +317,7 @@ func (r *Registry) validateMacro(name string, macro *Macro) error {
 	reservedWords := []string{"if", "def", "fn", "let", "do", "when", "unless"}
 	for _, reserved := range reservedWords {
 		if name == reserved {
-			return fmt.Errorf("'%s' is a reserved word", name)
+			return fmt.Errorf("[MACRO-RESERVED]: '%s' is a reserved word", name)
 		}
 	}
 

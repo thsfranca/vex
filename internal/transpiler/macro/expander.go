@@ -26,11 +26,11 @@ func NewExpander(registry *Registry) *Expander {
 func (e *Expander) ExpandMacro(macroName string, args []string) (string, error) {
 	macro, exists := e.registry.GetMacro(macroName)
 	if !exists {
-		return "", fmt.Errorf("macro '%s' not found", macroName)
+		return "", fmt.Errorf("[MACRO-UNDEFINED]: macro '%s' not found", macroName)
 	}
 
 	if len(args) != len(macro.Params) {
-		return "", fmt.Errorf("macro '%s' expects %d arguments, got %d", 
+		return "", fmt.Errorf("[ARITY-ARGUMENTS]: macro '%s' expects %d arguments, got %d", 
 			macroName, len(macro.Params), len(args))
 	}
 

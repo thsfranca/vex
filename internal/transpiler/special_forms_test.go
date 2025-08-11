@@ -345,17 +345,17 @@ func TestTranspiler_LambdaFunctions(t *testing.T) {
 	}{
 		{
 			name:     "Simple lambda with one parameter",
-			input:    `(def identity (fn [x] x))`,
+			input:    `(def identity (fn [x: int] -> int x))`,
 			expected: `func(x interface{}) interface{} { return x }`,
 		},
 		{
 			name:     "Lambda with multiple parameters",
-			input:    `(def add (fn [x y] (+ x y)))`,
+			input:    `(def add (fn [x: int y: int] -> int (+ x y)))`,
 			expected: `func(x interface{}, y interface{}) interface{} { return (x + y) }`,
 		},
 		{
 			name:     "Lambda with no parameters",
-			input:    `(def greet (fn [] "hello"))`,
+			input:    `(def greet (fn [] -> string "hello"))`,
 			expected: `func() interface{} { return "hello" }`,
 		},
 	}
@@ -545,22 +545,22 @@ func TestTranspiler_HandleLambdaSuccess(t *testing.T) {
 	}{
 		{
 			name:     "Lambda with single parameter",
-			input:    "(def f (fn [x] x)) (f 42)",
+			input:    "(def f (fn [x: int] -> int x)) (f 42)",
 			expected: "func(x interface{}) interface{} { return x }",
 		},
 		{
 			name:     "Lambda with multiple parameters",
-			input:    "(def add (fn [x y] (+ x y))) (add 1 2)",
+			input:    "(def add (fn [x: int y: int] -> int (+ x y))) (add 1 2)",
 			expected: "func(x interface{}, y interface{}) interface{} { return (x + y) }",
 		},
 		{
 			name:     "Lambda with no parameters",
-			input:    "(def get-val (fn [] 42)) (get-val)",
+			input:    "(def get-val (fn [] -> int 42)) (get-val)",
 			expected: "func() interface{} { return 42 }",
 		},
 		{
 			name:     "Lambda with complex body",
-			input:    `(def print-num (fn [n] (fmt/Printf "Number: %d" n))) (print-num 5)`,
+			input:    `(def print-num (fn [n: int] -> string (fmt/Printf "Number: %d" n))) (print-num 5)`,
 			expected: "func(n interface{}) interface{} { return fmt.Printf(\"Number: %d\", n) }",
 		},
 		{

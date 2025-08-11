@@ -105,7 +105,7 @@ func (st *SymbolTableImpl) Define(name string, value Value) error {
 	// Check if already defined in current scope
 	currentScopeSymbols := st.scopes[st.currentScope]
 	if _, exists := currentScopeSymbols[name]; exists {
-		return fmt.Errorf("symbol '%s' already defined in current scope", name)
+		return fmt.Errorf("[SYMBOL-DUPLICATE]: symbol '%s' already defined in current scope", name)
 	}
 	
 	// Create new symbol

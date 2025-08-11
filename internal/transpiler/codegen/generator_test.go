@@ -101,7 +101,7 @@ func TestGenerator_ArithmeticAndComparison(t *testing.T) {
 
 func TestGenerator_ArraysAndDoAndFn(t *testing.T) {
 	// Use list forms at top-level so the generator visits them
-	src := "(def arr [1 2 3])\n(do (+ 1 2) (* 3 4))\n(def f (fn [x y] (+ x y)))"
+	src := "(def arr [1 2 3])\n(do (+ 1 2) (* 3 4))\n(def f (fn [x: int y: int] -> int (+ x y)))"
 	prog := parseProgram(t, src)
 	g := NewGoCodeGenerator(Config{PackageName: "main"})
 	if err := g.VisitProgram(prog); err != nil {
@@ -151,7 +151,7 @@ func TestGenerator_PrimitiveOps(t *testing.T) {
 
 func TestGenerator_NestedFunctionNameAndPackageVar(t *testing.T) {
 	// ((fn [x] x) 10) and os.Args access
-	prog := parseProgram(t, "((fn [x] x) 10)\n(def args (os/Args))")
+	prog := parseProgram(t, "((fn [x: int] -> int x) 10)\n(def args (os/Args))")
 	g := NewGoCodeGenerator(Config{PackageName: "main"})
 	if err := g.VisitProgram(prog); err != nil {
 		t.Fatalf("VisitProgram error: %v", err)

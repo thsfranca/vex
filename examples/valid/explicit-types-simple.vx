@@ -1,0 +1,4 @@
+;; Simple example with explicit types and explicit imports
+(import "vex.core")
+
+(defn add [x: int y: int] -> int (+ x y))

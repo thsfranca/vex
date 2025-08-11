@@ -1,0 +1,7 @@
+(import "vex.core")
+(import "vex.test")
+
+(deftest "simple-defn-in-do"
+  (do
+    (defn add [x: int y: int] -> int (+ x y))
+    (assert-eq (add 3 5) 8 "✅ defn works inside do blocks")))

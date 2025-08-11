@@ -91,11 +91,18 @@ func (g *GoCodeGenerator) VisitProgram(ctx *parser.ProgramContext) error {
 			}
 			// Write the generated value to output
 			if value != nil && value.String() != "" {
-				// Special handling for def statements at top level
-				if strings.Contains(value.String(), " := ") {
-					g.output.WriteString(value.String() + "\n")
+				valueStr := value.String()
+				
+				// Check if this is a simple top-level def (not a complex expression)
+				isSimpleDef := strings.Contains(valueStr, " := ") && 
+					!strings.Contains(valueStr, "func() interface{}") &&
+					!strings.Contains(valueStr, "return ")
+				
+				if isSimpleDef {
+					// Simple top-level definition like: x := 42
+					g.output.WriteString(valueStr + "\n")
 					// Extract variable name for implicit return
-					parts := strings.Split(value.String(), " := ")
+					parts := strings.Split(valueStr, " := ")
 					if len(parts) >= 1 {
 						varName := strings.TrimSpace(parts[0])
 						currentDef++
@@ -108,8 +115,7 @@ func (g *GoCodeGenerator) VisitProgram(ctx *parser.ProgramContext) error {
 						}
 					}
 				} else {
-					// Special handling for certain statements that don't need assignments
-					valueStr := value.String()
+					// Complex expressions (function literals, etc.) or simple statements
 					if strings.HasPrefix(valueStr, "fmt.Println(") || 
 					   strings.HasPrefix(valueStr, "fmt.Printf(") || 
 					   strings.HasPrefix(valueStr, "\"import completed\"") {
@@ -322,10 +328,23 @@ func (g *GoCodeGenerator) generateFn(args []string) (Value, error) {
 	}
 	
 	paramList := args[0]
-	body := args[1]
+	var body string
+	
+	// Handle explicit type syntax only: (fn [params] _> returnType body)
+	// Note: analyzer converts -> to _>
+	if len(args) == 4 && args[1] == "_>" {
+		// Explicit type syntax: (fn [params] _> returnType body)
+		// returnType := args[2] // For now, ignore return type in codegen
+		body = args[3]
+	} else {
+		return nil, fmt.Errorf("fn requires explicit return type annotation: [params] -> returnType body, got %d args", len(args))
+	}
 	
 	// Parse parameter list
 	params := g.parseParameterList(paramList)
+	if params == nil {
+		return nil, fmt.Errorf("function parameters require explicit type annotations (param: type)")
+	}
 	
 	// Generate parameter declarations
 	paramDecls := make([]string, len(params))
@@ -472,19 +491,41 @@ func (g *GoCodeGenerator) generateDo(args []string) (Value, error) {
 	// Generate a function that executes all expressions and returns the last one
 	var statements []string
 	for i, arg := range args {
-		// Convert def assignments to function call format inside do blocks
 		processedArg := arg
+		
+		// Handle def assignments - keep function assignments as Go variable assignments
 		if strings.Contains(arg, " := ") {
-			// Convert "x := 10" to "def(x, 10)"
 			parts := strings.Split(arg, " := ")
 			if len(parts) == 2 {
-				processedArg = "def(" + strings.TrimSpace(parts[0]) + ", " + strings.TrimSpace(parts[1]) + ")"
+				varName := strings.TrimSpace(parts[0])
+				varValue := strings.TrimSpace(parts[1])
+				
+				// Check if this is a function assignment
+				if strings.Contains(varValue, "func(") {
+					// Keep function assignments as variable assignments
+					processedArg = fmt.Sprintf("%s := %s", varName, varValue)
+				} else {
+					// For simple values, we can also keep as assignment
+					processedArg = fmt.Sprintf("%s := %s", varName, varValue)
+				}
 			}
 		}
 		
 		if i == len(args)-1 {
 			// Last expression is the return value
-			statements = append(statements, "return "+processedArg)
+			if strings.Contains(processedArg, " := ") {
+				// If the last statement is a definition, execute it and return the variable
+				parts := strings.Split(processedArg, " := ")
+				if len(parts) == 2 {
+					varName := strings.TrimSpace(parts[0])
+					statements = append(statements, processedArg)
+					statements = append(statements, fmt.Sprintf("return %s", varName))
+				} else {
+					statements = append(statements, "return "+processedArg)
+				}
+			} else {
+				statements = append(statements, "return "+processedArg)
+			}
 		} else {
 			// Other expressions are executed for side effects
 			statements = append(statements, processedArg)
@@ -542,7 +583,7 @@ func (g *GoCodeGenerator) generateFunctionCall(funcName string, args []string) (
                 // Enforce exports for local packages
                 if ex, ok := g.exports[importPath]; ok {
                     if !ex[function] {
-                        return nil, fmt.Errorf("symbol '%s' is not exported from package '%s'. Export it with (export [%s]) in that package.", function, importPath, function)
+                        return nil, fmt.Errorf("[PACKAGE-NOT-EXPORTED]: symbol '%s' is not exported from package '%s'\nSuggestion: Export it with (export [%s]) in that package.", function, importPath, function)
                     }
                 }
                 // Direct call by identifier (convert to Go-compatible)
@@ -559,7 +600,7 @@ func (g *GoCodeGenerator) generateFunctionCall(funcName string, args []string) (
                 // then function must be exported
                 if ex, ok := g.exports[importPath]; ok {
                     if !ex[function] {
-                        return nil, fmt.Errorf("symbol '%s' is not exported from package '%s'. Export it with (export [%s]) in that package.", function, importPath, function)
+                        return nil, fmt.Errorf("[PACKAGE-NOT-EXPORTED]: symbol '%s' is not exported from package '%s'\nSuggestion: Export it with (export [%s]) in that package.", function, importPath, function)
                     }
                 }
             } else {
@@ -614,14 +655,18 @@ func (g *GoCodeGenerator) parseParameterList(paramList string) []string {
 	trimmed := strings.TrimSpace(paramList)
 	
 	if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") && !strings.Contains(trimmed, "interface{}") {
-		// Vex format
+		// Vex format - requires explicit type annotations
 		inner := strings.TrimSpace(trimmed[1 : len(trimmed)-1])
 		if inner == "" {
 			return []string{}
 		}
-		return strings.Fields(inner)
+		result := g.parseVexParameterList(inner)
+		if result == nil {
+			return nil // Error: missing type annotations
+		}
+		return result
 	} else if strings.HasPrefix(trimmed, "[]interface{}") {
-		// Go format
+		// Go format - extract parameter names from comma-separated list
 		if start := strings.Index(trimmed, "}{"); start != -1 {
 			start += 2
 			if end := strings.LastIndex(trimmed, "}"); end > start {
@@ -633,12 +678,71 @@ func (g *GoCodeGenerator) parseParameterList(paramList string) []string {
 				for i, param := range params {
 					params[i] = strings.TrimSpace(param)
 				}
-				return params
+				// Parse type annotations from comma-separated format like ["x:", "int", "y:", "int"]
+				return g.parseGoFormatParams(params)
 			}
 		}
 	}
 	
 	return []string{}
+}
+
+// parseGoFormatParams parses comma-separated Go format parameter list with type annotations
+// Input: ["x:", "int", "y:", "int"] -> Output: ["x", "y"]
+func (g *GoCodeGenerator) parseGoFormatParams(params []string) []string {
+	var result []string
+	
+	for i := 0; i < len(params); {
+		param := params[i]
+		
+		// Check if this is a parameter name ending with ":"
+		if strings.HasSuffix(param, ":") {
+			paramName := strings.TrimSuffix(param, ":")
+			result = append(result, paramName)
+			// Skip the next token which should be the type
+			i += 2
+		} else {
+			// Handle malformed case - just skip
+			i += 1
+		}
+	}
+	
+	return result
+}
+
+// parseVexParameterList parses Vex parameter list with required type annotations
+// Only supports explicit types: "x: int y: string z: bool" syntax
+func (g *GoCodeGenerator) parseVexParameterList(paramListInner string) []string {
+	tokens := strings.Fields(paramListInner)
+	var params []string
+	
+	for i := 0; i < len(tokens); {
+		token := tokens[i]
+		
+		// Check if this token ends with ":" indicating type annotation follows
+		if strings.HasSuffix(token, ":") && i+1 < len(tokens) {
+			// param: type format - "x:" followed by "int"
+			paramName := strings.TrimSuffix(token, ":")
+			params = append(params, paramName)
+			i += 2 // Skip param: and type
+		} else if strings.Contains(token, ":") {
+			// param:type format (no space) - "x:int"
+			parts := strings.Split(token, ":")
+			if len(parts) == 2 && parts[1] != "" {
+				paramName := parts[0]
+				params = append(params, paramName)
+				i += 1 // Skip this combined token
+			} else {
+				// ERROR: Malformed type annotation
+				return nil
+			}
+		} else {
+			// ERROR: param without type annotation - not allowed in explicit-only mode
+			return nil
+		}
+	}
+	
+	return params
 }
 
 func (g *GoCodeGenerator) buildFinalCode() string {

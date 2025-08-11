@@ -54,6 +54,11 @@ func (me *MacroExpanderImpl) GetMacro(name string) (*Macro, bool) {
 	return me.registry.GetMacro(name)
 }
 
+// LoadStdlibModule loads a specific stdlib module
+func (me *MacroExpanderImpl) LoadStdlibModule(moduleName string) error {
+	return me.registry.LoadStdlibModule(moduleName)
+}
+
 // expandMacrosInTree recursively expands macros in an AST tree
 func (me *MacroExpanderImpl) expandMacrosInTree(node antlr.Tree) (antlr.Tree, error) {
 	switch n := node.(type) {

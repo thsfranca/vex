@@ -326,6 +326,10 @@ func (mea *MacroExpanderAdapter) GetMacro(name string) (*macro.Macro, bool) {
 	return mea.expander.GetMacro(name)
 }
 
+func (mea *MacroExpanderAdapter) LoadStdlibModule(moduleName string) error {
+	return mea.expander.LoadStdlibModule(moduleName)
+}
+
 // MacroASTAdapter adapts our AST to macro.AST
 type MacroASTAdapter struct {
 	ast AST

@@ -9,69 +9,7 @@ import (
 	"github.com/thsfranca/vex/internal/transpiler"
 )
 
-func TestLoadCoreVex(t *testing.T) {
-	tests := []struct {
-		name     string
-		setup    func(string) error
-		expected string
-		hasError bool
-	}{
-		{
-			name: "Valid core.vx file",
-			setup: func(dir string) error {
-				coreContent := `(import "fmt")
-(fmt/Println "Core loaded")`
-				return os.WriteFile(filepath.Join(dir, "core.vx"), []byte(coreContent), 0644)
-			},
-			expected: `(import "fmt")`,
-			hasError: false,
-		},
-		{
-			name: "Missing core.vx file",
-			setup: func(dir string) error {
-				// Don't create the file
-				return nil
-			},
-			expected: "",
-			hasError: false, // loadCoreVex returns empty string, not error
-		},
-		{
-			name: "Empty core.vx file",
-			setup: func(dir string) error {
-				return os.WriteFile(filepath.Join(dir, "core.vx"), []byte(""), 0644)
-			},
-			expected: "",
-			hasError: false,
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tempDir := t.TempDir()
-			
-			// Setup test environment
-			if err := tt.setup(tempDir); err != nil {
-				t.Fatalf("Setup failed: %v", err)
-			}
-
-			// Change to temp directory for the test
-			oldWd, _ := os.Getwd()
-			defer os.Chdir(oldWd)
-			os.Chdir(tempDir)
-
-			result := loadCoreVex(false)
-
-			if tt.hasError && result != "" {
-				t.Error("Expected empty result for error case")
-				return
-			}
-
-			if !tt.hasError && tt.expected != "" && !strings.Contains(result, tt.expected) {
-				t.Errorf("Expected result to contain: %s\nActual result: %s", tt.expected, result)
-			}
-		})
-	}
-}
 
 func TestGenerateGoMod(t *testing.T) {
 	tests := []struct {
@@ -284,52 +222,7 @@ func TestRunCommandUnit(t *testing.T) {
 	}
 }
 
-func TestLoadCoreVexEdgeCases(t *testing.T) {
-	tests := []struct {
-		name        string
-		setup       func(string) error
-		verbose     bool
-		expectedLen int
-	}{
-		{
-			name: "Large core.vx file",
-			setup: func(dir string) error {
-				content := strings.Repeat("(import \"fmt\")\n", 100)
-				return os.WriteFile(filepath.Join(dir, "core.vx"), []byte(content), 0644)
-			},
-			verbose:     true,
-			expectedLen: 500, // Should be substantial
-		},
-		{
-			name: "Verbose mode",
-			setup: func(dir string) error {
-				return os.WriteFile(filepath.Join(dir, "core.vx"), []byte("(import \"fmt\")"), 0644)
-			},
-			verbose:     true,
-			expectedLen: 10,
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tempDir := t.TempDir()
-			
-			if err := tt.setup(tempDir); err != nil {
-				t.Fatalf("Setup failed: %v", err)
-			}
-
-			oldWd, _ := os.Getwd()
-			defer os.Chdir(oldWd)
-			os.Chdir(tempDir)
-
-			result := loadCoreVex(tt.verbose)
-
-			if len(result) < tt.expectedLen {
-				t.Errorf("Expected result length >= %d, got %d", tt.expectedLen, len(result))
-			}
-		})
-	}
-}
 
 func TestGenerateGoModEdgeCases(t *testing.T) {
 	tests := []struct {
@@ -571,20 +464,12 @@ func TestRunCommandDirect(t *testing.T) {
 func TestBuildCommandDirect(t *testing.T) {
 	tempDir := t.TempDir()
 	
-	// Create core.vx file for build command
-	coreFile := filepath.Join(tempDir, "core.vx")
-	coreContent := `(import "fmt")`
-	err := os.WriteFile(coreFile, []byte(coreContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create core.vx: %v", err)
-	}
-
 	// Create test Vex file
 	inputFile := filepath.Join(tempDir, "build-test.vx")
 	vexContent := `(import "fmt")
 (fmt/Println "Hello from build test")`
 	
-	err = os.WriteFile(inputFile, []byte(vexContent), 0644)
+	err := os.WriteFile(inputFile, []byte(vexContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create input file: %v", err)
 	}
@@ -636,12 +521,6 @@ func TestBuildCommandDirect(t *testing.T) {
 				tr, err := transpiler.NewTranspilerWithConfig(config)
 				if err != nil {
 					return err
-				}
-				
-				// Load core (this tests loadCoreVex)
-				coreCode := loadCoreVex(tt.verbose)
-				if coreCode == "" && tt.verbose {
-					t.Logf("No core.vx found (expected in some test scenarios)")
 				}
 				
 				// Test transpilation

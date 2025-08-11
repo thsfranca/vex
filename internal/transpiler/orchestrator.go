@@ -72,14 +72,13 @@ func (b *TranspilerBuilder) Build() (*VexTranspiler, error) {
 	if b.config.EnableMacros {
 		macroConfig := macro.Config{
 			CoreMacroPath:    b.config.CoreMacroPath,
+			StdlibPath:       b.config.StdlibPath,
 			EnableValidation: true,
 		}
 		registry := macro.NewRegistry(macroConfig)
 		
-		// Load core macros
-		if err := registry.LoadCoreMacros(); err != nil {
-			return nil, fmt.Errorf("failed to load core macros: %v", err)
-		}
+		// Core macros are now loaded only via explicit imports
+		// Auto-loading removed to enforce explicit stdlib imports
 		
 		macroSystem = NewMacroExpanderAdapter(macro.NewMacroExpander(registry))
 	}
@@ -116,6 +115,13 @@ func (vt *VexTranspiler) TranspileFromInput(input string) (string, error) {
 	// Detect third-party modules from imports
 	vt.detectThirdPartyModules(input)
 	
+	// Phase 0: Extract and load stdlib imports before macro expansion
+	if vt.config.EnableMacros && vt.macroSystem != nil {
+		if err := vt.loadStdlibImports(input); err != nil {
+			return "", fmt.Errorf("stdlib import error: %v", err)
+		}
+	}
+	
 	// Phase 1: Parse
 	ast, err := vt.parser.Parse(input)
 	if err != nil {
@@ -143,6 +149,40 @@ func (vt *VexTranspiler) TranspileFromInput(input string) (string, error) {
 	}
 
 	return code, nil
+}
+
+// loadStdlibImports extracts import statements from source and loads required stdlib modules
+func (vt *VexTranspiler) loadStdlibImports(input string) error {
+	// Parse import statements from the source using a simple regex approach
+	// This is a lightweight pre-processing step before full parsing
+	lines := strings.Split(input, "\n")
+	
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		
+		// Look for import statements: (import vex.module) or (import "vex.module")
+		if strings.HasPrefix(line, "(import ") && strings.HasSuffix(line, ")") {
+			// Extract module name between "import " and ")"
+			importContent := strings.TrimSpace(line[8 : len(line)-1]) // Remove "(import " and ")"
+			
+			// Remove quotes if present
+			moduleName := strings.Trim(importContent, "\"")
+			
+			// Only handle stdlib modules (starting with "vex.")
+			if strings.HasPrefix(moduleName, "vex.") {
+				if err := vt.macroSystem.LoadStdlibModule(moduleName); err != nil {
+					return fmt.Errorf("failed to load stdlib module '%s': %v", moduleName, err)
+				}
+				// Add to IgnoreImports so it doesn't get output as a Go import
+				if vt.config.IgnoreImports == nil {
+					vt.config.IgnoreImports = make(map[string]bool)
+				}
+				vt.config.IgnoreImports[moduleName] = true
+			}
+		}
+	}
+	
+	return nil
 }
 
 // TranspileFromFile transpiles a Vex file to Go

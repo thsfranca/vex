@@ -274,22 +274,22 @@ func TestTranspiler_LambdaExpressions(t *testing.T) {
 	}{
 		{
 			name:     "Simple lambda expression",
-			input:    `(def f (fn [x] x))`,
+			input:    `(def f (fn [x: int] -> int x))`,
 			expected: `func(x interface{}) interface{} { return x }`,
 		},
 		{
 			name:     "Lambda with multiple parameters",
-			input:    `(def add (fn [x y] (+ x y)))`,
+			input:    `(def add (fn [x: int y: int] -> int (+ x y)))`,
 			expected: `func(x interface{}, y interface{}) interface{} { return (x + y) }`,
 		},
 		{
 			name:     "Lambda with no parameters",
-			input:    `(def greet (fn [] "hello"))`,
+			input:    `(def greet (fn [] -> string "hello"))`,
 			expected: `func() interface{} { return "hello" }`,
 		},
 		{
 			name:     "Lambda with complex body",
-			input:    `(def calc (fn [x] (+ (* x 2) 1)))`,
+			input:    `(def calc (fn [x: int] -> int (+ (* x 2) 1)))`,
 			expected: `func(x interface{}) interface{} { return ((x * 2) + 1) }`,
 		},
 	}

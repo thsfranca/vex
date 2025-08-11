@@ -1,0 +1,7 @@
+;; Test explicit stdlib imports
+(import "vex.core")
+
+;; Use a macro from vex.core
+(defn add [x: int y: int] -> int (+ x y))
+
+(def result (add 10 20))

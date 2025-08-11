@@ -1,0 +1,92 @@
+{
+  "timestamp": "2025-08-11T23:25:22Z",
+  "overall_coverage": 100,
+  "total_files": 7,
+  "tested_files": 7,
+  "packages": [
+    {
+      "package": "stdlib/vex/collections",
+      "coverage": 100,
+      "source_files": [
+        "stdlib/vex/collections/collections.vx"
+      ],
+      "test_files": [
+        "stdlib/vex/collections/collections_test.vx"
+      ],
+      "file_count": 1,
+      "test_count": 1
+    },
+    {
+      "package": "stdlib/vex/conditions",
+      "coverage": 100,
+      "source_files": [
+        "stdlib/vex/conditions/conditions.vx"
+      ],
+      "test_files": [
+        "stdlib/vex/conditions/conditions_test.vx"
+      ],
+      "file_count": 1,
+      "test_count": 1
+    },
+    {
+      "package": "stdlib/vex/core",
+      "coverage": 100,
+      "source_files": [
+        "stdlib/vex/core/core.vx"
+      ],
+      "test_files": [
+        "stdlib/vex/core/core_test.vx"
+      ],
+      "file_count": 1,
+      "test_count": 1
+    },
+    {
+      "package": "stdlib/vex/threading",
+      "coverage": 100,
+      "source_files": [
+        "stdlib/vex/threading/threading.vx"
+      ],
+      "test_files": [
+        "stdlib/vex/threading/threading_test.vx"
+      ],
+      "file_count": 1,
+      "test_count": 1
+    },
+    {
+      "package": "stdlib/vex/test",
+      "coverage": 100,
+      "source_files": [
+        "stdlib/vex/test/test.vx"
+      ],
+      "test_files": [
+        "stdlib/vex/test/test_test.vx"
+      ],
+      "file_count": 1,
+      "test_count": 1
+    },
+    {
+      "package": "stdlib/vex/flow",
+      "coverage": 100,
+      "source_files": [
+        "stdlib/vex/flow/flow.vx"
+      ],
+      "test_files": [
+        "stdlib/vex/flow/flow_test.vx"
+      ],
+      "file_count": 1,
+      "test_count": 1
+    },
+    {
+      "package": "stdlib/vex/bindings",
+      "coverage": 100,
+      "source_files": [
+        "stdlib/vex/bindings/bindings.vx"
+      ],
+      "test_files": [
+        "stdlib/vex/bindings/bindings_test.vx"
+      ],
+      "file_count": 1,
+      "test_count": 1
+    }
+  ]
+}

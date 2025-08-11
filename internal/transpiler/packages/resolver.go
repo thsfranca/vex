@@ -9,7 +9,6 @@ import (
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/thsfranca/vex/internal/transpiler/analysis"
-	"github.com/thsfranca/vex/internal/transpiler/macro"
 	"github.com/thsfranca/vex/internal/transpiler/parser"
 )
 
@@ -80,7 +79,7 @@ func (r *Resolver) BuildProgramFromEntry(entryFile string) (*Result, error) {
         if temp[node] {
             // cycle detected; build chain from stack
             cycle := buildCycle(stack, node)
-            return fmt.Errorf(formatCycleError(cycle, r.edgeLoc))
+            return fmt.Errorf("[PACKAGE-CYCLE]: %s", formatCycleError(cycle, r.edgeLoc))
         }
         temp[node] = true
         stack = append(stack, node)
@@ -342,25 +341,8 @@ func (r *Resolver) collectPackageSchemes(importPath string, exported map[string]
     prog := p.Program()
     if prog == nil { return map[string]*analysis.TypeScheme{}, nil }
 
-    // Expand macros (load core macros) so defn and user macros are resolved before analysis
-    // Prefer core macros from module root if available for robust CI/test behavior
-    corePath := filepath.Join(r.moduleRoot, "core", "core.vx")
-    if _, statErr := os.Stat(corePath); statErr != nil {
-        corePath = "" // fall back to registry default search
-    }
-    reg := macro.NewRegistry(macro.Config{CoreMacroPath: corePath, EnableValidation: true})
-    if err := reg.LoadCoreMacros(); err == nil {
-        expander := macro.NewMacroExpander(reg)
-        expandedAST, errExp := expander.ExpandMacros(macro.NewVexAST(prog))
-        if errExp == nil && expandedAST != nil {
-            if root := expandedAST.Root(); root != nil {
-                // Prefer expanded root if available
-                if pr, ok := root.(*parser.ProgramContext); ok {
-                    prog = pr
-                }
-            }
-        }
-    }
+    // Macro expansion removed from type discovery to enforce explicit imports
+    // Type discovery should work on raw AST without automatic macro loading
 
     // Run analyzer to compute schemes
     a := analysis.NewAnalyzer()

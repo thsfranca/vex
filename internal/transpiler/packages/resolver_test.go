@@ -85,5 +85,24 @@ func TestResolver_ImportArraysAndAliases_ParsingOnly(t *testing.T) {
     }
 }
 
+func TestResolver_PkgSchemes_CrossPackageIntegration(t *testing.T) {
+    dir := t.TempDir()
+    // Package a exports id function and constant n
+    writeFile(t, filepath.Join(dir, "a", "a.vx"), "(export [id n])\n(defn id [x] x)\n(def n 42)\n")
+    // Entry imports a and calls a/id at two types
+    entry := filepath.Join(dir, "main.vx")
+    writeFile(t, entry, "(import [\"a\"])\n(def main (do (a/id 1) (a/id \"s\")))\n")
+
+    r := NewResolver(dir)
+    res, err := r.BuildProgramFromEntry(entry)
+    if err != nil { t.Fatalf("resolve error: %v", err) }
+    if res.PkgSchemes == nil || len(res.PkgSchemes["a"]) == 0 {
+        t.Fatalf("expected package schemes for 'a', got %#v", res.PkgSchemes)
+    }
+    if _, ok := res.PkgSchemes["a"]["id"]; !ok {
+        t.Fatalf("expected scheme for a/id to be collected")
+    }
+}
+
 
 

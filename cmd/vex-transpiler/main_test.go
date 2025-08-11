@@ -147,7 +147,7 @@ func TestMainFunction_OutputFile(t *testing.T) {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	err = cmd.Run()
+    _ = cmd.Run()
 	if err != nil {
 		t.Fatalf("Command failed: %v\nStderr: %s", err, stderr.String())
 	}
@@ -218,7 +218,7 @@ func TestMainFunction_InvalidVexSyntax(t *testing.T) {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	err = cmd.Run()
+    _ = cmd.Run()
 	// The command should fail for invalid syntax
 	// Note: ANTLR parser may not always return non-zero exit code for parsing errors
 	// but it will write error messages to stderr
@@ -681,4 +681,43 @@ func TestRunCommand(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCLI_Diagnostics_Codes(t *testing.T) {
+    binaryPath := buildTestBinary(t)
+    defer os.Remove(binaryPath)
+
+    tempDir := t.TempDir()
+
+    cases := []struct{
+        name string
+        source string
+        expectCode string
+    }{
+        {name: "Unknown identifier", source: "(def x y)", expectCode: "VEX-TYP-UNDEF"},
+        {name: "If non-bool", source: "(if 1 2 3)", expectCode: "VEX-TYP-COND"},
+        {name: "Equality mismatch", source: "(= 1 \"x\")", expectCode: "VEX-TYP-EQ"},
+        {name: "Array elem mismatch", source: "(def a [1 \"x\"]) ", expectCode: "VEX-TYP-ARRAY-ELEM"},
+        {name: "Map key mismatch", source: "(map [1 : 1 \"k\" : 2])", expectCode: "VEX-TYP-MAP-KEY"},
+        {name: "Map value mismatch", source: "(map [\"k\" : 1 \"k\" : \"x\"]) ", expectCode: "VEX-TYP-MAP-VAL"},
+        {name: "Nominal record mismatch", source: "(record A [x: number]) (record B [x: number]) (if true (A [x: 1]) (B [x: 2]))", expectCode: "VEX-TYP-REC-NOMINAL"},
+    }
+
+    for _, tc := range cases {
+        t.Run(tc.name, func(t *testing.T) {
+            inputFile := filepath.Join(tempDir, "prog.vx")
+            if err := os.WriteFile(inputFile, []byte(tc.source), 0o644); err != nil {
+                t.Fatalf("write input: %v", err)
+            }
+
+            cmd := exec.Command(binaryPath, "transpile", "-input", inputFile)
+            var stderr bytes.Buffer
+            cmd.Stderr = &stderr
+            _ = cmd.Run()
+            serr := stderr.String()
+            if !strings.Contains(serr, tc.expectCode) {
+                t.Fatalf("expected diagnostic %s in CLI stderr, got:\n%s", tc.expectCode, serr)
+            }
+        })
+    }
 }

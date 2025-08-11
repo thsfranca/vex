@@ -10,6 +10,7 @@ import (
 )
 
 // GoCodeGenerator generates Go code from AST
+// GoCodeGenerator traverses Vex AST and emits idiomatic Go source code.
 type GoCodeGenerator struct {
 	output      strings.Builder
     imports     map[string]string
@@ -19,6 +20,7 @@ type GoCodeGenerator struct {
 }
 
 // Config holds code generation configuration
+// Config tunes code generation output (package, comments, indentation, imports/exports).
 type Config struct {
 	PackageName      string
 	GenerateComments bool
@@ -28,6 +30,7 @@ type Config struct {
 }
 
 // NewGoCodeGenerator creates a new Go code generator
+// NewGoCodeGenerator creates a generator using the provided configuration.
 func NewGoCodeGenerator(config Config) *GoCodeGenerator {
 	return &GoCodeGenerator{
         imports:     make(map[string]string),
@@ -218,7 +221,9 @@ func (g *GoCodeGenerator) VisitList(ctx *parser.ListContext) (Value, error) {
 	case "get", "slice", "len", "append":
 		return g.generatePrimitiveOp(funcName, args)
 	default:
-		return g.generateFunctionCall(funcName, args)
+        // Optional specialization: if the call is a pure comparison, emit bool directly
+        // Otherwise fallback
+        return g.generateFunctionCall(funcName, args)
 	}
 }
 

@@ -741,20 +741,20 @@ func TestTranspilerMissingCoverage(t *testing.T) {
 		input    string
 		expected string
 	}{
+        {
+            name:     "Test visitList with complex nesting (unknown symbol should error)",
+            input:    `((+ 1 2) (- 3 4) (* 5 6))`,
+            expected: ``,
+        },
 		{
-			name:     "Test visitList with complex nesting",
-			input:    `((+ 1 2) (- 3 4) (* 5 6))`,
-			expected: `_ = (1 + 2)((3 - 4), (5 * 6))`, // Function call with arithmetic expressions
-		},
-		{
-			name:     "Test visitNode with all node types",
-			input:    `(def test [1 "string" symbol])`,
-			expected: `[]interface{}{1, "string", symbol}`,
+		name:     "Test visitNode with all node types (homogeneous array required)",
+		input:    `(def test [1 2 3])`,
+		expected: `[]interface{}{1, 2, 3}`,
 		},
 		{
 			name:     "Test handleFunctionCall edge cases",
-			input:    `(unknown-function 1 2 3)`,
-			expected: `unknown-function(1, 2, 3)`,
+		input:    `(unknown-function 1 2 3)`,
+		expected: ``, // now should error: unknown function
 		},
 		{
 			name:     "Test handleCollectionOp all variants",
@@ -771,11 +771,11 @@ func TestTranspilerMissingCoverage(t *testing.T) {
 			input:    `(if (and true false) "yes" "no")`,
 			expected: `if and(true, false) {`,
 		},
-		{
-			name:     "Test deeply nested expressions",
-			input:    `(def result (+ (if true 1 0) (count [1 2 3])))`,
-			expected: `func() interface{} { if true { return 1 } else { return 0 } }()`,
-		},
+        {
+            name:     "Test deeply nested expressions",
+            input:    `(def result (+ (if true 1 0) (count [1 2 3])))`,
+            expected: `func() interface{} { if true { return 1 } else { return 0 } }()`,
+        },
 	}
 
 	for _, tt := range tests {
@@ -783,6 +783,12 @@ func TestTranspilerMissingCoverage(t *testing.T) {
 			tr := transpiler.New()
 			result, err := tr.TranspileFromInput(tt.input)
 			
+            if strings.Contains(tt.input, "unknown-function") || strings.Contains(tt.name, "unknown symbol") {
+				if err == nil {
+					t.Fatalf("Expected error for unknown function, got success: %s", result)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}

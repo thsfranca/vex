@@ -5,6 +5,10 @@ import (
 	"sort"
 )
 
+// Adapter to accept structured diagnostics without breaking existing API
+// We avoid importing diagnostics in the type definitions to keep analysis decoupled.
+// A thin shim function is provided to map a pre-rendered body into the reporter.
+
 // ErrorType represents the type of error
 type ErrorType int
 
@@ -88,6 +92,13 @@ func (er *ErrorReporterImpl) ReportTypedError(line, column int, message string, 
 		Type:    errorType,
 	}
 	er.errors = append(er.errors, error)
+}
+
+// ReportDiagnosticBody reports a diagnostic by taking the already-rendered body
+// e.g., "[VEX-TYP-IF-MISMATCH]: branch types differ\nExpected: ...\nGot: ..."
+// Callers should pass appropriate error type and position.
+func (er *ErrorReporterImpl) ReportDiagnosticBody(line, column int, body string, errorType ErrorType) {
+    er.ReportTypedError(line, column, body, errorType)
 }
 
 // HasErrors returns true if any errors have been reported

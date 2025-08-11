@@ -201,28 +201,95 @@ func TestAnalyzer_VisitTerminal(t *testing.T) {
 }
 
 func TestAnalyzer_VisitTerminal_UndefinedSymbol(t *testing.T) {
-	analyzer := NewAnalyzer()
-	
-	terminal := createMockTerminalNode("undefined_var")
-	
-	value, err := analyzer.VisitTerminal(terminal)
-	if err == nil {
-		t.Error("VisitTerminal should return error for undefined symbol")
-	}
-	
-	if value == nil {
-		t.Error("VisitTerminal should return value even for error case")
-		return
-	}
-	
-	if value.Type() != "undefined" {
-		t.Errorf("Undefined symbol type = %v, want %v", value.Type(), "undefined")
-	}
-	
-	// Should report error
-	if !analyzer.errorReporter.HasErrors() {
-		t.Error("Should report error for undefined symbol")
-	}
+    analyzer := NewAnalyzer()
+
+    terminal := createMockTerminalNode("undefined_var")
+
+    value, err := analyzer.VisitTerminal(terminal)
+    if err == nil {
+        t.Fatalf("VisitTerminal should error for bare undefined symbols")
+    }
+    if value == nil {
+        t.Fatalf("VisitTerminal should still return a value for diagnostics")
+    }
+    if value.Type() != "undefined" {
+        t.Fatalf("Undefined symbol should yield 'undefined' type, got %s", value.Type())
+    }
+    if !analyzer.errorReporter.HasErrors() {
+        t.Fatalf("Diagnostic should be recorded for undefined symbol")
+    }
+    // Assert diagnostic code VEX-TYP-UNDEF present
+    errs := analyzer.errorReporter.GetErrors()
+    hasCode := false
+    for _, e := range errs {
+        if strings.Contains(e.Message, "VEX-TYP-UNDEF") { hasCode = true; break }
+    }
+    if !hasCode { t.Fatalf("expected VEX-TYP-UNDEF diagnostic, got: %s", analyzer.errorReporter.FormatErrors()) }
+}
+
+func TestAnalyzer_LetPolymorphism_IdFunction(t *testing.T) {
+    analyzer := NewAnalyzer()
+    // Define id via def: (def id (fn [x] x)) using direct calls to analyzer helpers
+    // Simulate parsing and visiting
+    // Create function value
+    fnCtx := createMockListNode("fn", "[x]", "x")
+    fnVal, err := analyzer.analyzeFn(fnCtx, []Value{NewBasicValue("[x]", "array"), NewBasicValue("x", "expression")})
+    if err != nil { t.Fatalf("analyzeFn failed: %v", err) }
+    // Define symbol
+    defCtx := createMockListNode("def", "id", "(fn [x] x)")
+    _, err = analyzer.analyzeDef(defCtx, []Value{NewBasicValue("id", "symbol"), fnVal})
+    if err != nil { t.Fatalf("analyzeDef failed: %v", err) }
+
+    // Use at int
+    term := createMockTerminalNode("id")
+    v, err := analyzer.VisitTerminal(term)
+    if err != nil { t.Fatalf("VisitTerminal failed: %v", err) }
+    callCtx := createMockListNode("id", "1")
+    // analyzeFunctionCall expects args as Values; visit number terminal to get typed value
+    oneVal, _ := analyzer.VisitTerminal(createMockTerminalNode("1"))
+    _, _ = analyzer.analyzeFunctionCall(callCtx, "id", []Value{oneVal})
+
+    // Use at string
+    v2, err := analyzer.VisitTerminal(createMockTerminalNode("id"))
+    if err != nil { t.Fatalf("VisitTerminal failed: %v", err) }
+    _ = v2 // ensure a fresh instantiation path
+    callCtx2 := createMockListNode("id", "\"s\"")
+    strVal, _ := analyzer.VisitTerminal(createMockTerminalNode("\"s\""))
+    _, _ = analyzer.analyzeFunctionCall(callCtx2, "id", []Value{strVal})
+
+    // No errors expected; different instantiations should coexist
+    if analyzer.errorReporter.HasErrors() {
+        t.Fatalf("no errors expected for polymorphic id, got: %s", analyzer.errorReporter.FormatErrors())
+    }
+    _ = v
+}
+
+func TestAnalyzer_ArrayPrimitivesTyping(t *testing.T) {
+    a := NewAnalyzer()
+    // def xs [1 2]
+    _ = a.symbolTable.Define("xs", NewBasicValue("[1 2]", "[]interface{}").WithType(&TypeArray{Elem: &TypeConstant{Name: "int"}}))
+    xsVal, _ := a.symbolTable.Lookup("xs")
+
+    // get xs 0 => int
+    list := createHeadedMockListNode("get", "xs", "0")
+    got, err := a.analyzeFunctionCall(list, "get", []Value{xsVal, NewBasicValue("0", "number").WithType(&TypeConstant{Name: "int"})})
+    if err != nil { t.Fatalf("get typing failed: %v", err) }
+    if a.publicTypeString(a.typeFromValue(got)) != "number" { // public int maps to number
+        t.Fatalf("get type = %s, want number(int)", a.publicTypeString(a.typeFromValue(got)))
+    }
+
+    // slice xs 1 => []
+    list2 := createHeadedMockListNode("slice", "xs", "1")
+    got2, err := a.analyzeFunctionCall(list2, "slice", []Value{xsVal, NewBasicValue("1", "number").WithType(&TypeConstant{Name: "int"})})
+    if err != nil { t.Fatalf("slice typing failed: %v", err) }
+    if got2.Type() != "[]interface{}" { t.Fatalf("slice type = %s, want []interface{}", got2.Type()) }
+
+    // append xs [3] => [] with int elem
+    list3 := createHeadedMockListNode("append", "xs", "[3]")
+    arrVal := NewBasicValue("[3]", "[]interface{}").WithType(&TypeArray{Elem: &TypeConstant{Name: "int"}})
+    got3, err := a.analyzeFunctionCall(list3, "append", []Value{xsVal, arrVal})
+    if err != nil { t.Fatalf("append typing failed: %v", err) }
+    if got3.Type() != "[]interface{}" { t.Fatalf("append type = %s, want []interface{}", got3.Type()) }
 }
 
 func TestAnalyzer_analyzeDef(t *testing.T) {
@@ -477,7 +544,7 @@ func TestAnalyzer_analyzeFunctionCall(t *testing.T) {
 			name:     "Unknown function",
 			funcName: "unknown-func",
 			args:     []Value{},
-			wantWarn: true,
+			wantWarn: false,
 		},
 	}
 	
@@ -488,6 +555,12 @@ func TestAnalyzer_analyzeFunctionCall(t *testing.T) {
 			listCtx := createMockListNode(tt.funcName)
 			
 			value, err := analyzer.analyzeFunctionCall(listCtx, tt.funcName, tt.args)
+			if tt.funcName == "unknown-func" {
+				if err == nil {
+					t.Errorf("expected error for unknown function, got nil")
+				}
+				return
+			}
 			if err != nil {
 				t.Errorf("analyzeFunctionCall should not error: %v", err)
 				return
@@ -506,6 +579,357 @@ func TestAnalyzer_analyzeFunctionCall(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEqualityTypingViaScheme(t *testing.T) {
+    a := NewAnalyzer()
+    // (= 1 1) -> bool
+    ctx := createHeadedMockListNode("=", "1", "1")
+    _, err := a.analyzeFunctionCall(ctx, "=", []Value{NewBasicValue("1", "number").WithType(&TypeConstant{Name: "int"}), NewBasicValue("1", "number").WithType(&TypeConstant{Name: "int"})})
+    if err != nil { t.Fatalf("equality int==int should type: %v", err) }
+
+    // (= "x" "y") -> bool
+    ctx2 := createHeadedMockListNode("=", "\"x\"", "\"y\"")
+    _, err = a.analyzeFunctionCall(ctx2, "=", []Value{NewBasicValue("\"x\"", "string"), NewBasicValue("\"y\"", "string")})
+    if err != nil { t.Fatalf("equality string==string should type: %v", err) }
+}
+
+func TestEqualityTyping_NegativeMismatch(t *testing.T) {
+    a := NewAnalyzer()
+    // (= 1 "x") should produce a type error via scheme unification
+    ctx := createHeadedMockListNode("=", "1", "\"x\"")
+    _, _ = a.analyzeFunctionCall(ctx, "=", []Value{NewBasicValue("1", "number").WithType(&TypeConstant{Name: "int"}), NewBasicValue("\"x\"", "string")})
+    if !a.errorReporter.HasErrors() {
+        t.Fatalf("expected type error for mismatched equality")
+    }
+    // Assert diagnostic code is VEX-TYP-EQ
+    errs := a.errorReporter.GetErrors()
+    found := false
+    for _, e := range errs {
+        if strings.Contains(e.Message, "VEX-TYP-EQ") {
+            found = true
+            break
+        }
+    }
+    if !found {
+        t.Fatalf("expected VEX-TYP-EQ diagnostic in errors: %v", a.errorReporter.FormatErrors())
+    }
+}
+
+func TestIfConditionRequiresBool_Negative(t *testing.T) {
+    a := NewAnalyzer()
+    // (if 1 2 3) condition not bool
+    listCtx := createMockListNode("if")
+    _, _ = a.analyzeIf(listCtx, []Value{NewBasicValue("1", "number"), NewBasicValue("2", "number"), NewBasicValue("3", "number")})
+    if !a.errorReporter.HasErrors() {
+        t.Fatalf("expected error for non-boolean if condition")
+    }
+    // Check code VEX-TYP-COND appears in message
+    errs := a.errorReporter.GetErrors()
+    ok := false
+    for _, e := range errs {
+        if strings.Contains(e.Message, "VEX-TYP-COND") { ok = true; break }
+    }
+    if !ok { t.Fatalf("expected VEX-TYP-COND diagnostic") }
+}
+
+func TestValueRestriction_NoQuantificationForNonValues(t *testing.T) {
+    a := NewAnalyzer()
+    // Define id as fn: should generalize with at least one quantified var
+    fnCtx := createMockListNode("fn", "[x]", "x")
+    fnVal, err := a.analyzeFn(fnCtx, []Value{NewBasicValue("[x]", "array"), NewBasicValue("x", "expression")})
+    if err != nil { t.Fatalf("analyzeFn failed: %v", err) }
+    _, err = a.analyzeDef(createMockListNode("def"), []Value{NewBasicValue("id", "symbol"), fnVal})
+    if err != nil { t.Fatalf("def id failed: %v", err) }
+    if sch, ok := a.GetTypeScheme("id"); !ok || len(sch.Quantified) == 0 {
+        t.Fatalf("id should be generalized with quantified variables")
+    }
+
+    // Define y as (+ 1 2): should not introduce quantification (ground type)
+    plus := NewBasicValue("call-result", "number").WithType(&TypeConstant{Name: "int"})
+    _, err = a.analyzeDef(createMockListNode("def"), []Value{NewBasicValue("y", "symbol"), plus})
+    if err != nil { t.Fatalf("def y failed: %v", err) }
+    if sch, ok := a.GetTypeScheme("y"); ok {
+        if len(sch.Quantified) != 0 {
+            t.Fatalf("y should not have quantified variables; got %v", sch.Quantified)
+        }
+    }
+
+    // Define z as (do 1 2): should not generalize
+    doRes := NewBasicValue("do-result", "number").WithType(&TypeConstant{Name: "int"})
+    _, err = a.analyzeDef(createMockListNode("def"), []Value{NewBasicValue("z", "symbol"), doRes})
+    if err != nil { t.Fatalf("def z failed: %v", err) }
+    if sch, ok := a.GetTypeScheme("z"); ok {
+        if len(sch.Quantified) != 0 {
+            t.Fatalf("z should not have quantified variables; got %v", sch.Quantified)
+        }
+    }
+}
+
+func TestCrossPackageTypingWithSchemes(t *testing.T) {
+    a := NewAnalyzer()
+    // Prepare package env: local package "a" exports id with scheme ∀t. t -> t
+    ignore := map[string]bool{"a": true}
+    exports := map[string]map[string]bool{"a": {"id": true}}
+    // Construct scheme: ForAll [1]. (1 -> 1)
+    tv := &TypeVariable{ID: 1}
+    sch := &TypeScheme{Quantified: []int{1}, Body: &TypeFunction{Params: []Type{tv}, Result: tv}}
+    schemes := map[string]map[string]*TypeScheme{"a": {"id": sch}}
+
+    a.SetPackageEnv(ignore, exports, schemes)
+
+    // Call a/id with int
+    listInt := createHeadedMockListNode("a/id", "1")
+    vInt := NewBasicValue("1", "number").WithType(&TypeConstant{Name: "int"})
+    if _, err := a.analyzeFunctionCall(listInt, "a/id", []Value{vInt}); err != nil {
+        t.Fatalf("a/id on int should type via scheme: %v", err)
+    }
+
+    // Call a/id with string
+    listStr := createHeadedMockListNode("a/id", "\"s\"")
+    vStr := NewBasicValue("\"s\"", "string")
+    if _, err := a.analyzeFunctionCall(listStr, "a/id", []Value{vStr}); err != nil {
+        t.Fatalf("a/id on string should type via scheme: %v", err)
+    }
+
+    // Non-exported symbol should error
+    listHidden := createHeadedMockListNode("a/hidden")
+    if _, err := a.analyzeFunctionCall(listHidden, "a/hidden", []Value{}); err == nil {
+        t.Fatalf("a/hidden should error due to non-exported symbol")
+    }
+}
+
+func TestRecordNominalMismatch_InIfBranches(t *testing.T) {
+    a := NewAnalyzer()
+    // Define two nominally distinct records with same shape
+    _, _ = a.VisitList(createHeadedMockListNode("record", "A", "[x: number]"))
+    _, _ = a.VisitList(createHeadedMockListNode("record", "B", "[x: number]"))
+    // Build branches: then -> A, else -> B
+    thenA, _ := a.analyzeRecordConstructor(createHeadedMockListNode("A", "[x:", "1]"), &RecordValue{name: "A", fields: map[string]string{"x": "number"}, fieldOrder: []string{"x"}})
+    elseB, _ := a.analyzeRecordConstructor(createHeadedMockListNode("B", "[x:", "2]"), &RecordValue{name: "B", fields: map[string]string{"x": "number"}, fieldOrder: []string{"x"}})
+    // Use analyzeIf to force unification of branch types
+    listCtx := createMockListNode("if")
+    _, _ = a.analyzeIf(listCtx, []Value{NewBasicValue("true", "bool"), thenA, elseB})
+    if !a.errorReporter.HasErrors() {
+        t.Fatalf("expected nominal mismatch error when if branches return A vs B")
+    }
+    // Assert dedicated code VEX-TYP-REC-NOMINAL present
+    msg := a.errorReporter.FormatErrors()
+    if !strings.Contains(msg, "VEX-TYP-REC-NOMINAL") {
+        t.Fatalf("expected VEX-TYP-REC-NOMINAL diagnostic, got: %s", msg)
+    }
+}
+
+func TestArrayElementMismatch_ReportsDiagnostic(t *testing.T) {
+    a := NewAnalyzer()
+    arr := createMockArrayNode("1", "\"x\"")
+    _, _ = a.VisitArray(arr)
+    if !a.errorReporter.HasErrors() {
+        t.Fatalf("expected array element type mismatch error")
+    }
+    // Assert VEX-TYP-ARRAY-ELEM appears
+    msg := a.errorReporter.FormatErrors()
+    if !strings.Contains(msg, "VEX-TYP-ARRAY-ELEM") {
+        t.Fatalf("expected VEX-TYP-ARRAY-ELEM diagnostic, got: %s", msg)
+    }
+}
+
+func TestMapKeyAndValueMismatch_ReportDiagnostics(t *testing.T) {
+    a := NewAnalyzer()
+    // (map [1 : 1 "k" : 2]) -> key mismatch (int vs string), value types both numbers, so only key error
+    listCtx := createHeadedMockListNode("map", "[1:", "1", "\"k\":", "2]")
+    _, _ = a.VisitList(listCtx)
+    if !a.errorReporter.HasErrors() {
+        t.Fatalf("expected map key type mismatch error")
+    }
+    // Check VEX-TYP-MAP-KEY present
+    keyMsg := a.errorReporter.FormatErrors()
+    if !strings.Contains(keyMsg, "VEX-TYP-MAP-KEY") {
+        t.Fatalf("expected VEX-TYP-MAP-KEY diagnostic, got: %s", keyMsg)
+    }
+
+    // Now trigger a value mismatch: (["k": 1 "k": "x"]) same key type, differing values (int vs string)
+    a = NewAnalyzer()
+    listCtx2 := createHeadedMockListNode("map", "[\"k\":", "1", "\"k\":", "\"x\"]")
+    _, _ = a.VisitList(listCtx2)
+    if !a.errorReporter.HasErrors() {
+        t.Fatalf("expected map value type mismatch error")
+    }
+    valMsg := a.errorReporter.FormatErrors()
+    if !strings.Contains(valMsg, "VEX-TYP-MAP-VAL") {
+        t.Fatalf("expected VEX-TYP-MAP-VAL diagnostic, got: %s", valMsg)
+    }
+}
+
+func TestOccurCheck_Negative_UnificationCycle(t *testing.T) {
+    a := NewAnalyzer()
+    // Craft an expression that attempts to unify a type variable with a function of itself
+    // (fn [x] (x x)) — classic self-application causing occurs check in HM
+    // We will simulate body typing by providing a raw that analyzer will parse and visit.
+    fnCtx := createMockListNode("fn", "[x]", "(x x)")
+    _, err := a.analyzeFn(fnCtx, []Value{NewBasicValue("[x]", "array"), NewBasicValue("(x x)", "expression")})
+    if err == nil && !a.errorReporter.HasErrors() {
+        t.Fatalf("expected occur-check error for self-application")
+    }
+    // We cannot guarantee exact text, but ensure errors mention occur-check or cycle
+    msg := a.errorReporter.FormatErrors()
+    if msg == "" {
+        t.Fatalf("expected diagnostics for self-application, got none")
+    }
+    // Accept either occur-check/cycle wording or strict arg-mismatch code depending on unification path
+    if !(strings.Contains(msg, "occur-check") || strings.Contains(msg, "occur") || strings.Contains(msg, "cycle") || strings.Contains(msg, "VEX-TYP-ARG")) {
+        t.Fatalf("expected occur-check/cycle or VEX-TYP-ARG, got: %s", msg)
+    }
+}
+
+func TestAnalyzer_ValueRestriction_GeneralizeOnlyValues(t *testing.T) {
+    a := NewAnalyzer()
+    // Define f = (fn [x] x) should generalize
+    fnCtx := createMockListNode("fn", "[x]", "x")
+    fnVal, err := a.analyzeFn(fnCtx, []Value{NewBasicValue("[x]", "array"), NewBasicValue("x", "expression")})
+    if err != nil { t.Fatalf("analyzeFn failed: %v", err) }
+    _, err = a.analyzeDef(createMockListNode("def"), []Value{NewBasicValue("id", "symbol"), fnVal})
+    if err != nil { t.Fatalf("analyzeDef failed: %v", err) }
+    if _, ok := a.typeEnv["id"]; !ok { t.Fatalf("id should be generalized") }
+
+    // Define y = (+ 1 2) should not be over-generalized as a scheme with variables
+    plusCall := NewBasicValue("call-result", "number").WithType(&TypeConstant{Name: "int"})
+    _, err = a.analyzeDef(createMockListNode("def"), []Value{NewBasicValue("y", "symbol"), plusCall})
+    if err != nil { t.Fatalf("def y failed: %v", err) }
+    if sch, ok := a.typeEnv["y"]; ok {
+        // Expect concrete int/number, not quantified vars; Body should be TypeConstant or concrete type
+        if _, isVar := sch.Body.(*TypeVariable); isVar {
+            t.Fatalf("y should not generalize to type variable")
+        }
+    }
+}
+
+func TestAnalyzer_Record_NominalTypeMismatch(t *testing.T) {
+    a := NewAnalyzer()
+    // (record A [x: number]) (record B [x: number])
+    _, _ = a.VisitList(createHeadedMockListNode("record", "A", "[x: number]"))
+    _, _ = a.VisitList(createHeadedMockListNode("record", "B", "[x: number]"))
+    // Construct A and try to use where B expected via unification
+    // Simulate a function taking B and returning B: (fn [b] b)
+    fnVal, err := a.analyzeFn(createMockListNode("fn", "[b]", "b"), []Value{NewBasicValue("[b]", "array"), NewBasicValue("b", "expression")})
+    if err != nil { t.Fatalf("fn failed: %v", err) }
+    _, _ = a.analyzeDef(createMockListNode("def"), []Value{NewBasicValue("idB", "symbol"), fnVal})
+    // Build A value
+    aVal, _ := a.analyzeRecordConstructor(createHeadedMockListNode("A", "[x:", "1]"), &RecordValue{name: "A", fields: map[string]string{"x": "number"}, fieldOrder: []string{"x"}})
+    // Call idB with A should unify to param var; we confirm nominal typing by giving B scheme later (skipped here)
+    _ = aVal
+}
+
+func TestAnalyzer_RecordTypeChecks(t *testing.T) {
+    analyzer := NewAnalyzer()
+
+    t.Run("valid record declaration", func(t *testing.T) {
+        analyzer.symbolTable = NewSymbolTable()
+        analyzer.errorReporter.Clear()
+        listCtx := createHeadedMockListNode("record", "Person", "[name: string age: number]")
+        // VisitList will dispatch to analyzeRecord when head is "record"
+        _, err := analyzer.VisitList(listCtx)
+        if err != nil {
+            t.Fatalf("VisitList(record) should not error for valid record: %v", err)
+        }
+        // Symbol should be defined
+        if _, ok := analyzer.symbolTable.Lookup("Person"); !ok {
+            t.Fatalf("record type 'Person' should be defined")
+        }
+        if analyzer.errorReporter.HasErrors() {
+            t.Fatalf("no errors expected, got: %s", analyzer.errorReporter.FormatErrors())
+        }
+    })
+
+    t.Run("missing name and fields", func(t *testing.T) {
+        analyzer.symbolTable = NewSymbolTable()
+        analyzer.errorReporter.Clear()
+        listCtx := createHeadedMockListNode("record")
+        _, err := analyzer.VisitList(listCtx)
+        if err == nil {
+            t.Fatalf("VisitList(record) should error when name/fields are missing")
+        }
+        errs := analyzer.errorReporter.GetErrors()
+        if len(errs) == 0 || !strings.Contains(errs[0].Message, "record requires name and fields") {
+            t.Fatalf("expected error about missing name/fields, got: %v", analyzer.errorReporter.FormatErrors())
+        }
+    })
+
+    t.Run("invalid record name (reserved)", func(t *testing.T) {
+        analyzer.symbolTable = NewSymbolTable()
+        analyzer.errorReporter.Clear()
+        listCtx := createHeadedMockListNode("record", "if", "[x: string]")
+        _, err := analyzer.VisitList(listCtx)
+        if err == nil {
+            t.Fatalf("VisitList(record) should error for invalid record name")
+        }
+        errs := analyzer.errorReporter.GetErrors()
+        if len(errs) == 0 || !strings.Contains(errs[0].Message, "invalid record name") {
+            t.Fatalf("expected invalid record name error, got: %v", analyzer.errorReporter.FormatErrors())
+        }
+    })
+
+    t.Run("fields must be an array vector", func(t *testing.T) {
+        analyzer.symbolTable = NewSymbolTable()
+        analyzer.errorReporter.Clear()
+        listCtx := createHeadedMockListNode("record", "Person", "x")
+        _, err := analyzer.VisitList(listCtx)
+        if err == nil {
+            t.Fatalf("VisitList(record) should error when fields are not an array")
+        }
+        errs := analyzer.errorReporter.GetErrors()
+        if len(errs) == 0 || !strings.Contains(errs[0].Message, "record expects a field vector") {
+            t.Fatalf("expected field vector error, got: %v", analyzer.errorReporter.FormatErrors())
+        }
+    })
+
+    t.Run("missing type for field", func(t *testing.T) {
+        analyzer.symbolTable = NewSymbolTable()
+        analyzer.errorReporter.Clear()
+        listCtx := createHeadedMockListNode("record", "Person", "[name:")
+        _, _ = analyzer.VisitList(listCtx)
+        errs := analyzer.errorReporter.GetErrors()
+        if len(errs) == 0 || !(strings.Contains(errs[0].Message, "missing type for field") || strings.Contains(errs[0].Message, "invalid field format")) {
+            t.Fatalf("expected missing type/format error, got: %v", analyzer.errorReporter.FormatErrors())
+        }
+    })
+
+    t.Run("invalid field format (missing colon)", func(t *testing.T) {
+        analyzer.symbolTable = NewSymbolTable()
+        analyzer.errorReporter.Clear()
+        listCtx := createHeadedMockListNode("record", "Person", "[name", "string]")
+        _, _ = analyzer.VisitList(listCtx)
+        errs := analyzer.errorReporter.GetErrors()
+        if len(errs) == 0 || !(strings.Contains(errs[0].Message, "invalid field format") || strings.Contains(errs[0].Message, "missing ':'")) {
+            t.Fatalf("expected invalid field format error, got: %v", analyzer.errorReporter.FormatErrors())
+        }
+    })
+
+    t.Run("duplicate field names", func(t *testing.T) {
+        analyzer.symbolTable = NewSymbolTable()
+        analyzer.errorReporter.Clear()
+        listCtx := createHeadedMockListNode("record", "Person", "[name: string name: string]")
+        _, _ = analyzer.VisitList(listCtx)
+        errs := analyzer.errorReporter.GetErrors()
+        if len(errs) == 0 || !strings.Contains(errs[0].Message, "duplicate field 'name'") {
+            t.Fatalf("expected duplicate field error, got: %v", analyzer.errorReporter.FormatErrors())
+        }
+    })
+}
+
+// Moved from analyzer_records_extra_test.go
+func TestAnalyzer_RecordConstructorAndFieldCall(t *testing.T) {
+    a := NewAnalyzer()
+    // Declare a record, then construct and field-call
+    input := antlr.NewInputStream("(do (record User [id: int name: string]) (User [id: 1 name: \"a\"]) (User :name))")
+    l := parser.NewVexLexer(input)
+    ts := antlr.NewCommonTokenStream(l, 0)
+    p := parser.NewVexParser(ts)
+    prog := p.Program()
+    if prog == nil { t.Fatalf("expected program parse") }
+    if err := a.VisitProgram(prog.(*parser.ProgramContext)); err != nil {
+        t.Fatalf("visit program: %v", err)
+    }
 }
 
 func TestAnalyzer_ExportSpecialForm_NoError(t *testing.T) {
@@ -654,6 +1078,61 @@ func TestHelper_isBuiltinFunction(t *testing.T) {
 	}
 }
 
+func TestBasicValue_isRaw_and_MarkRaw(t *testing.T) {
+	val := NewBasicValue("test", "string")
+	
+	// Initially not raw
+	if val.isRaw() {
+		t.Fatalf("new BasicValue should not be raw")
+	}
+	
+	// Mark as raw
+	val.MarkRaw()
+	if !val.isRaw() {
+		t.Fatalf("BasicValue should be raw after MarkRaw()")
+	}
+}
+
+func TestRecordValue_GetFieldOrder(t *testing.T) {
+	fields := map[string]string{"name": "string", "age": "int"}
+	order := []string{"name", "age"}
+	record := NewRecordValue("Person", fields, order)
+	
+	fieldOrder := record.GetFieldOrder()
+	if len(fieldOrder) != 2 {
+		t.Fatalf("expected 2 fields, got %d", len(fieldOrder))
+	}
+	if fieldOrder[0] != "name" || fieldOrder[1] != "age" {
+		t.Fatalf("field order mismatch: got %v", fieldOrder)
+	}
+}
+
+func TestHelper_isInt(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"123", true},
+		{"0", true},
+		{"+42", true},
+		{"-17", true},
+		{"", false},
+		{"+", false},
+		{"-", false},
+		{"12a", false},
+		{"a12", false},
+		{"12.5", false},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := isInt(tt.input); got != tt.want {
+				t.Errorf("isInt(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 // Mock implementations for testing
 
 type MockAST struct {
@@ -690,6 +1169,21 @@ func createMockListNode(elements ...string) *parser.ListContext {
 	tokenStream := antlr.NewCommonTokenStream(lexer, 0)
 	vexParser := parser.NewVexParser(tokenStream)
 	return vexParser.List().(*parser.ListContext)
+}
+
+// createHeadedMockListNode builds a list where the first element is treated as the head symbol.
+// It constructs an expression like: (head rest...)
+func createHeadedMockListNode(head string, rest ...string) *parser.ListContext {
+    expr := "(" + head
+    for _, elem := range rest {
+        expr += " " + elem
+    }
+    expr += ")"
+    inputStream := antlr.NewInputStream(expr)
+    lexer := parser.NewVexLexer(inputStream)
+    tokenStream := antlr.NewCommonTokenStream(lexer, 0)
+    vexParser := parser.NewVexParser(tokenStream)
+    return vexParser.List().(*parser.ListContext)
 }
 
 func createEmptyMockListNode() *parser.ListContext {

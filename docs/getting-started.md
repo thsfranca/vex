@@ -29,7 +29,7 @@ go build -o vex cmd/vex-transpiler/main.go
 ./vex --help
 ```
 
-You should see the available commands: `transpile`, `run`, and `build`.
+You should see the available commands: `transpile`, `run`, `build`, and `test`.
 
 The Vex transpiler includes:
 - **Macro system** with core macros (including `defn`) loaded from `core/core.vx` (auto-detected)
@@ -230,6 +230,23 @@ Run with: `./vex run -input calculator.vx`
 (debug x)
 ```
 
+### 5. Experimental: Records (Analyzer validation)
+```vex
+;; records.vx
+(import "fmt")
+
+;; Declare a record schema (analyzer validates fields and types)
+(record Person [name: string age: number])
+
+;; Constructing and using records is evolving; analyzer validates shapes.
+;; Code generation for construction/access is WIP. The following will parse and
+;; pass analyzer checks but may not yet generate full Go code:
+;; (def user (Person [name: "Ada" age: 36]))
+;; (fmt/Println (Person :name))
+
+;; For now, prefer plain maps/arrays for data until record codegen lands.
+```
+
 ## Available Commands
 
 ### `vex run`
@@ -260,6 +277,16 @@ Notes:
 - Discovers and includes local packages
 - Generates a temporary `go.mod` and runs `go mod tidy` when external Go modules are detected
 - Enforces exports when calling across local packages
+
+### `vex test`
+Discover and run Vex tests:
+```bash
+./vex test -dir .
+```
+
+- Recursively finds `*_test.vx`
+- Uses stdlib test macros `assert-eq` and `deftest`
+- Exits non-zero if any test fails
 
 ## Development Workflow
 
@@ -323,6 +350,23 @@ vim my-program.vx
 3. **AI Integration**: Check `docs/ai-quick-reference.md` for AI code generation
 4. **Go Integration**: See `examples/go-usage/` for parser usage
 5. **Development**: Read `docs/development-guide.md` (if contributing)
+
+## HM Typing Diagnostics (Quick Reference)
+Vex uses Hindley–Milner (HM) type inference with clear, code-based diagnostics:
+
+- `VEX-TYP-UNDEF`: Unknown identifier (define or import it)
+- `VEX-TYP-COND`: If-condition must be `bool`
+- `VEX-TYP-EQ`: Equality arguments have different types
+- `VEX-TYP-ARRAY-ELEM`: Array elements have inconsistent types
+- `VEX-TYP-MAP-KEY` / `VEX-TYP-MAP-VAL`: Map key/value types inconsistent across pairs
+- `VEX-TYP-REC-NOMINAL`: Nominal record mismatch (e.g., `A` used where `B` is required)
+
+Example stderr:
+
+```
+path/to/file.vx:10:5: error: [VEX-TYP-UNDEF]: unknown identifier
+Name: y
+```
 
 ## Getting Help
 

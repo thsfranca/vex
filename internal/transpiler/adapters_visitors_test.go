@@ -146,6 +146,38 @@ func TestMacroVisitorBridge_Methods(t *testing.T) {
     if v, _ := br.VisitTerminal(term); v == nil || v.Type() != "symbol" { t.Fatalf("VisitTerminal Type(): %v", v) }
 }
 
+// extra: consolidated from adapters_visitors_extra2_test.go
+type stubMacroVisitor2 struct{}
+func (s *stubMacroVisitor2) VisitProgram(ctx *parser.ProgramContext) error { return nil }
+func (s *stubMacroVisitor2) VisitList(ctx *parser.ListContext) (macro.Value, error)   { return a.NewBasicValue("ML", "list"), nil }
+func (s *stubMacroVisitor2) VisitArray(ctx *parser.ArrayContext) (macro.Value, error) { return a.NewBasicValue("MA", "array"), nil }
+func (s *stubMacroVisitor2) VisitTerminal(node antlr.TerminalNode) (macro.Value, error) { return a.NewBasicValue(node.GetText(), "symbol"), nil }
+
+type stubCGVisitor2 struct{}
+func (s *stubCGVisitor2) VisitProgram(ctx *parser.ProgramContext) error { return nil }
+func (s *stubCGVisitor2) VisitList(ctx *parser.ListContext) (cg.Value, error)      { return a.NewBasicValue("L", "list"), nil }
+func (s *stubCGVisitor2) VisitArray(ctx *parser.ArrayContext) (cg.Value, error)    { return a.NewBasicValue("A", "array"), nil }
+func (s *stubCGVisitor2) VisitTerminal(node antlr.TerminalNode) (cg.Value, error)  { return a.NewBasicValue(node.GetText(), "symbol"), nil }
+
+func TestMacroAndCodegenValueAdapter_TypeAccessors(t *testing.T) {
+    // Build list
+    l := parser.NewVexLexer(antlr.NewInputStream("(+ 1 2)"))
+    ts := antlr.NewCommonTokenStream(l, 0)
+    p := parser.NewVexParser(ts)
+    list := p.List()
+    if list == nil { t.Fatalf("expected list parse") }
+
+    // Macro visitor bridge should return MacroValueAdapter with proper Type()
+    mbr := &MacroVisitorBridge{visitor: &stubMacroVisitor2{}}
+    mv, err := mbr.VisitList(list.(*parser.ListContext))
+    if err != nil || mv == nil || mv.Type() != "list" { t.Fatalf("macro Type mismatch: %v %#v", err, mv) }
+
+    // Codegen visitor bridge should return CodegenValueAdapter with proper Type()
+    cbr := &CodegenVisitorBridge{visitor: &stubCGVisitor2{}}
+    cv, err := cbr.VisitArray(parser.NewVexParser(antlr.NewCommonTokenStream(parser.NewVexLexer(antlr.NewInputStream("[1 2]")), 0)).Array().(*parser.ArrayContext))
+    if err != nil || cv == nil || cv.Type() != "array" { t.Fatalf("codegen Type mismatch: %v %#v", err, cv) }
+}
+
 func TestMacroASTAdapter_Accept(t *testing.T) {
     input := antlr.NewInputStream("(+ 1 2)")
     l := parser.NewVexLexer(input)

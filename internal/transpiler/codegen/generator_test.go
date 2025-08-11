@@ -21,6 +21,33 @@ func parseProgram(t *testing.T, src string) *parser.ProgramContext {
 	return prog.(*parser.ProgramContext)
 }
 
+// extra: TestGenerator_extractImportPair_ListAndArray moved from generator_extra_test.go
+func TestGenerator_extractImportPair_ListAndArray(t *testing.T) {
+    cfg := Config{PackageName: "main", IndentSize: 2}
+    g := NewGoCodeGenerator(cfg)
+    // List form: ("fmt" alias)
+    list := parser.NewVexParser(antlr.NewCommonTokenStream(parser.NewVexLexer(antlr.NewInputStream("( \"fmt\" alias )")), 0)).List()
+    p, a := g.extractImportPair(list)
+    if p != "fmt" || a != "alias" { t.Fatalf("list pair mismatch: %q %q", p, a) }
+    // Array form: ["os" a]
+    arr := parser.NewVexParser(antlr.NewCommonTokenStream(parser.NewVexLexer(antlr.NewInputStream("[ \"os\" a ]")), 0)).Array()
+    p2, a2 := g.extractImportPair(arr)
+    if p2 != "os" || a2 != "a" { t.Fatalf("array pair mismatch: %q %q", p2, a2) }
+}
+
+// extra: TestGenerator_visitNode_DefaultAndNodeToString moved from generator_extra_test.go
+func TestGenerator_visitNode_DefaultAndNodeToString(t *testing.T) {
+    cfg := Config{PackageName: "main", IndentSize: 2}
+    g := NewGoCodeGenerator(cfg)
+    // Unknown node returns default value
+    type unknownTree struct{ antlr.Tree }
+    v, err := g.visitNode(&unknownTree{})
+    if err != nil || v == nil || v.String() == "" { t.Fatalf("visitNode default failed: %v %#v", err, v) }
+    // nodeToString on rule node should use GetText
+    list := parser.NewVexParser(antlr.NewCommonTokenStream(parser.NewVexLexer(antlr.NewInputStream("(+ 1 2)")), 0)).List()
+    if s := g.nodeToString(list); s == "" { t.Fatalf("nodeToString empty for rule node") }
+}
+
 func TestGenerator_DefAndImplicitReturn(t *testing.T) {
 	prog := parseProgram(t, "(def x 42)")
 	g := NewGoCodeGenerator(Config{PackageName: "main"})

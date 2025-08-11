@@ -85,3 +85,11 @@ func (d *dummySymTable) Define(name string, value Value) error { return nil }
 func (d *dummySymTable) Lookup(name string) (Value, bool)      { return nil, false }
 func (d *dummySymTable) EnterScope()                            {}
 func (d *dummySymTable) ExitScope()                             {}
+
+// extra: consolidated from adapters_values_extra_test.go
+func TestAnalysisValueAdapter_StringAndType(t *testing.T) {
+    ava := &AnalysisValueAdapter{value: &simpleValue{val: "v", typ: "K"}}
+    if ava.String() != "v" || ava.Type() != "K" {
+        t.Fatalf("unexpected outputs: %s %s", ava.String(), ava.Type())
+    }
+}

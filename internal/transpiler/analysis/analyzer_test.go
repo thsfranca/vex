@@ -917,6 +917,21 @@ func TestAnalyzer_RecordTypeChecks(t *testing.T) {
     })
 }
 
+// Moved from analyzer_records_extra_test.go
+func TestAnalyzer_RecordConstructorAndFieldCall(t *testing.T) {
+    a := NewAnalyzer()
+    // Declare a record, then construct and field-call
+    input := antlr.NewInputStream("(do (record User [id: int name: string]) (User [id: 1 name: \"a\"]) (User :name))")
+    l := parser.NewVexLexer(input)
+    ts := antlr.NewCommonTokenStream(l, 0)
+    p := parser.NewVexParser(ts)
+    prog := p.Program()
+    if prog == nil { t.Fatalf("expected program parse") }
+    if err := a.VisitProgram(prog.(*parser.ProgramContext)); err != nil {
+        t.Fatalf("visit program: %v", err)
+    }
+}
+
 func TestAnalyzer_ExportSpecialForm_NoError(t *testing.T) {
     analyzer := NewAnalyzer()
     listCtx := createMockListNode("export")

@@ -2,6 +2,7 @@ package analysis
 
 import "testing"
 
+// Moved from typesys_extra_test.go
 func TestTypeMap_ApplyAndFreeVars(t *testing.T) {
     tvK := &TypeVariable{ID: 10}
     tvV := &TypeVariable{ID: 20}

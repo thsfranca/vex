@@ -173,12 +173,12 @@ func TestTranspiler_DefnMacroErrorHandling(t *testing.T) {
 			expectedError: true,
 			errorMessage:  "defn requires function body",
 		},
-		{
-			name:          "defn with invalid parameter list",
-			input:         `(defn square "not-a-list" (* x x))`,
-			expectedError: false, // Transpiler succeeds, but generates invalid Go that fails compilation
-			errorMessage:  "",
-		},
+        {
+            name:          "defn with invalid parameter list",
+            input:         `(defn square "not-a-list" (* x x))`,
+            expectedError: true,
+            errorMessage:  "defn requires parameter list",
+        },
 	}
 
 	for _, tt := range tests {

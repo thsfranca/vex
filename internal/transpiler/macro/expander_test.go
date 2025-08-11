@@ -18,6 +18,13 @@ func TestNewExpander(t *testing.T) {
 	}
 }
 
+// extra: from expander_extra_test.go
+func TestExpander_SetParent_NoPanic(t *testing.T) {
+    // Ensure substitutedTerminal.SetParent is called without panicking
+    st := &substitutedTerminal{text: "x"}
+    st.SetParent(nil)
+}
+
 func TestExpander_ExpandMacro(t *testing.T) {
 	registry := NewRegistry(Config{EnableValidation: false})
 	

@@ -8,7 +8,7 @@ Status in current branch:
 - Import parsing: strings, arrays, and alias pairs: implemented
 - `vex.pkg` module root detection: implemented
 - Circular dependency detection: implemented (build fails with clear cycle chain)
-- Exports: parsed and partially enforced in code generation for local packages; full analyzer enforcement planned
+- Exports: parsed; analyzer enforces exports for namespaced calls via package schemes; codegen double-checks in `transpile`/`run`
 
 ### Imports
 - Basic form (string): `(import "fmt")`
@@ -96,4 +96,10 @@ Run:
 - One package per directory
 - Local packages are discovered recursively starting from the entry file
 - Go imports and local packages can be mixed in the same `(import [...])` list
+
+### Package Schemes
+Resolver computes type schemes (`PkgSchemes`) for exported symbols of local packages by expanding macros (loading core macros) and running the analyzer per package. Analyzer uses these schemes across package boundaries to type namespaced calls and enforce exports.
+
+### Standard Library Macros
+The transpiler loads core macros; in CI/tests it prefers `core/core.vx` under the module root. Built-in stdlib packages under `stdlib/vex/` can provide additional macros (e.g., `conditions`, `collections`).
 

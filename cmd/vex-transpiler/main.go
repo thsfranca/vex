@@ -21,13 +21,15 @@ func main() {
 	}
 
 	command := os.Args[1]
-	switch command {
+    switch command {
 	case "transpile":
 		transpileCommand(os.Args[2:])
 	case "run":
 		runCommand(os.Args[2:])
 	case "build":
 		buildCommand(os.Args[2:])
+    case "test":
+        testCommand(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", command)
 		printUsage()
@@ -40,11 +42,13 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage:\n")
 	fmt.Fprintf(os.Stderr, "  vex transpile -input <file.vex> [-output <file.go>] [-verbose]\n")
 	fmt.Fprintf(os.Stderr, "  vex run -input <file.vex> [-verbose]\n")
-	fmt.Fprintf(os.Stderr, "  vex build -input <file.vex> [-output <binary>] [-verbose]\n\n")
-	fmt.Fprintf(os.Stderr, "Commands:\n")
-	fmt.Fprintf(os.Stderr, "  transpile  Transpile Vex source code to Go\n")
-	fmt.Fprintf(os.Stderr, "  run        Compile and execute Vex source code\n")
-	fmt.Fprintf(os.Stderr, "  build      Build Vex source code to binary executable\n\n")
+    fmt.Fprintf(os.Stderr, "  vex build -input <file.vex> [-output <binary>] [-verbose]\n")
+    fmt.Fprintf(os.Stderr, "  vex test [-dir <path>] [-verbose]\n\n")
+    fmt.Fprintf(os.Stderr, "Commands:\n")
+    fmt.Fprintf(os.Stderr, "  transpile  Transpile Vex source code to Go\n")
+    fmt.Fprintf(os.Stderr, "  run        Compile and execute Vex source code\n")
+    fmt.Fprintf(os.Stderr, "  build      Build Vex source code to binary executable\n")
+    fmt.Fprintf(os.Stderr, "  test       Discover and run Vex tests\n\n")
 	fmt.Fprintf(os.Stderr, "Examples:\n")
 	fmt.Fprintf(os.Stderr, "  vex transpile -input example.vex -output example.go\n")
 	fmt.Fprintf(os.Stderr, "  vex run -input example.vex\n")
@@ -97,6 +101,7 @@ func transpileCommand(args []string) {
         GenerateComments: true,
         IgnoreImports:    res.IgnoreImports,
         Exports:          res.Exports,
+        PkgSchemes:       res.PkgSchemes,
     }
     tImpl, err := transpiler.NewTranspilerWithConfig(tCfg)
     if err != nil {
@@ -374,6 +379,120 @@ func buildCommand(args []string) {
 	} else {
 		fmt.Printf("Binary built: %s\n", outputBinary)
 	}
+}
+
+// testCommand discovers and runs *.vx tests using the stdlib test macros
+func testCommand(args []string) {
+    testFlags := flag.NewFlagSet("test", flag.ExitOnError)
+    var (
+        dir     = testFlags.String("dir", ".", "Directory to search for *_test.vx files")
+        verbose = testFlags.Bool("verbose", false, "Enable verbose output")
+    )
+    testFlags.Parse(args)
+
+    if *verbose {
+        fmt.Fprintf(os.Stderr, "🧪 Running Vex tests in %s\n", *dir)
+    }
+
+    // Discover *_test.vx files
+    var testFiles []string
+    filepath.WalkDir(*dir, func(path string, d os.DirEntry, err error) error {
+        if err != nil { return nil }
+        if d.IsDir() {
+            // skip hidden directories and vendor-like folders if needed
+            base := filepath.Base(path)
+            if strings.HasPrefix(base, ".") || base == "node_modules" || base == "bin" || base == "gen" {
+                return nil
+            }
+            return nil
+        }
+        if strings.HasSuffix(d.Name(), "_test.vx") || strings.HasSuffix(d.Name(), "_test.vex") {
+            testFiles = append(testFiles, path)
+        }
+        return nil
+    })
+
+    if len(testFiles) == 0 {
+        if *verbose { fmt.Fprintf(os.Stderr, "No tests found.\n") }
+        return
+    }
+
+    // For each test file: resolve packages, prepend stdlib test macros, transpile, build and run
+    failures := 0
+    for _, tf := range testFiles {
+        if *verbose { fmt.Fprintf(os.Stderr, "▶ %s\n", tf) }
+
+        // Load test stdlib macros implicitly by prepending imports
+        // Tests can also import them directly; we provide a minimal bootstrap here
+        bootstrap := "(import \"fmt\")\n(import \"os\")\n"
+
+        // Package resolution
+        moduleRoot, _ := filepath.Abs(".")
+        resolver := packages.NewResolver(moduleRoot)
+        res, err := resolver.BuildProgramFromEntry(tf)
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "❌ Package resolution error in %s: %v\n", tf, err)
+            failures++
+            continue
+        }
+
+        fullProgram := bootstrap + "\n" + res.CombinedSource
+
+        cfg := transpiler.TranspilerConfig{
+            EnableMacros:     true,
+            CoreMacroPath:    "",
+            PackageName:      "main",
+            GenerateComments: false,
+            IgnoreImports:    res.IgnoreImports,
+            Exports:          res.Exports,
+            PkgSchemes:       res.PkgSchemes,
+        }
+        tr, err := transpiler.NewTranspilerWithConfig(cfg)
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "❌ Transpiler init error in %s: %v\n", tf, err)
+            failures++
+            continue
+        }
+
+        goCode, err := tr.TranspileFromInput(fullProgram)
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "❌ Transpilation error in %s: %v\n", tf, err)
+            failures++
+            continue
+        }
+
+        // Build and run
+        tmpDir := os.TempDir()
+        exe := filepath.Join(tmpDir, strings.TrimSuffix(filepath.Base(tf), filepath.Ext(tf))+"_test_bin")
+        src := exe + ".go"
+        if err := os.WriteFile(src, []byte(goCode), 0o644); err != nil {
+            fmt.Fprintf(os.Stderr, "❌ Write error for %s: %v\n", tf, err)
+            failures++
+            continue
+        }
+        build := exec.Command("go", "build", "-o", exe, src)
+        bout, berr := build.CombinedOutput()
+        if berr != nil {
+            fmt.Fprintf(os.Stderr, "❌ Build error for %s: %v\n%s", tf, berr, string(bout))
+            failures++
+            continue
+        }
+        run := exec.Command(exe)
+        run.Stdout = os.Stdout
+        run.Stderr = os.Stderr
+        if err := run.Run(); err != nil {
+            fmt.Fprintf(os.Stderr, "❌ Test failed: %s (%v)\n", tf, err)
+            failures++
+        } else if *verbose {
+            fmt.Fprintf(os.Stderr, "✅ OK: %s\n", tf)
+        }
+        _ = os.Remove(src)
+        _ = os.Remove(exe)
+    }
+
+    if failures > 0 {
+        os.Exit(1)
+    }
 }
 
 func loadCoreVex(verbose bool) string {

@@ -5,6 +5,25 @@ import (
 	"testing"
 )
 
+// Moved from errors_extra_test.go
+func TestErrorReporter_StringersAndCounts(t *testing.T) {
+    er := NewErrorReporter()
+    if er.HasErrors() { t.Fatalf("expected no errors initially") }
+    er.ReportWarning(2, 3, "be careful")
+    er.ReportTypedError(1, 2, "boom", TypeError)
+    if !er.HasErrors() || er.GetErrorCount() != 1 || er.GetWarningCount() != 1 {
+        t.Fatalf("counts mismatch: errors=%d warnings=%d", er.GetErrorCount(), er.GetWarningCount())
+    }
+    if er.FormatErrors() == "" || er.FormatWarnings() == "" {
+        t.Fatalf("expected formatted outputs")
+    }
+    er.Clear()
+    if er.HasErrors() || er.GetErrorCount() != 0 || er.GetWarningCount() != 0 {
+        t.Fatalf("clear failed")
+    }
+}
+
+
 func TestErrorType_String(t *testing.T) {
 	tests := []struct {
 		errorType ErrorType
@@ -40,6 +59,22 @@ func TestCompilerError_String(t *testing.T) {
 	
 	if got != expected {
 		t.Errorf("CompilerError.String() = %v, want %v", got, expected)
+	}
+	
+	// Test with file
+	errWithFile := CompilerError{
+		File:    "test.vx",
+		Line:    5,
+		Column:  2,
+		Message: "file error",
+		Type:    TypeError,
+	}
+	
+	expectedWithFile := "test.vx:5:2: error: file error"
+	gotWithFile := errWithFile.String()
+	
+	if gotWithFile != expectedWithFile {
+		t.Errorf("CompilerError.String() with file = %v, want %v", gotWithFile, expectedWithFile)
 	}
 }
 

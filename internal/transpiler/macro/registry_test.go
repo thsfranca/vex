@@ -1,6 +1,8 @@
 package macro
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -398,4 +400,48 @@ func TestRegistry_validateMacro(t *testing.T) {
 			}
 		})
 	}
+}
+
+// extra: moved from registry_extra_test.go
+func TestRegistry_LoadFromFileAndDirectory_Invalids(t *testing.T) {
+    // Invalid file extension
+    r := NewRegistry(Config{EnableValidation: true})
+    if err := r.loadFromFile("/tmp/not-a-vex.txt"); err == nil {
+        t.Fatalf("expected error for non-vex file")
+    }
+
+    // Directory without vex files should return fs.ErrNotExist
+    dir := t.TempDir()
+    if err := r.loadFromDirectory(dir); err == nil {
+        t.Fatalf("expected error for empty directory")
+    }
+
+    // Directory with a vex file should load
+    good := filepath.Join(dir, "m.vx")
+    if err := os.WriteFile(good, []byte("(macro inc [x] (+ x 1))"), 0644); err != nil {
+        t.Fatalf("write: %v", err)
+    }
+    if err := r.loadFromDirectory(dir); err != nil {
+        t.Fatalf("loadFromDirectory failed: %v", err)
+    }
+    if !r.HasMacro("inc") { t.Fatalf("macro not loaded from directory") }
+}
+
+func TestRegistry_LoadFromPath_FileAndDir(t *testing.T) {
+    // Create a temporary .vx file with a simple macro
+    dir := t.TempDir()
+    file := filepath.Join(dir, "m.vx")
+    if err := os.WriteFile(file, []byte("(macro inc [x] (+ x 1))\n"), 0644); err != nil {
+        t.Fatalf("write: %v", err)
+    }
+
+    // Load by file path
+    reg := NewRegistry(Config{EnableValidation: true, CoreMacroPath: file})
+    if err := reg.LoadCoreMacros(); err != nil { t.Fatalf("LoadCoreMacros(file): %v", err) }
+    if !reg.HasMacro("inc") { t.Fatalf("expected macro 'inc' after file load") }
+
+    // Load by directory path
+    reg2 := NewRegistry(Config{EnableValidation: true, CoreMacroPath: dir})
+    if err := reg2.LoadCoreMacros(); err != nil { t.Fatalf("LoadCoreMacros(dir): %v", err) }
+    if !reg2.HasMacro("inc") { t.Fatalf("expected macro 'inc' after dir load") }
 }

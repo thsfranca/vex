@@ -9,12 +9,14 @@ import (
 )
 
 // MacroExpanderImpl implements the MacroExpander interface
+// MacroExpanderImpl is a concrete MacroExpander that walks and rewrites Vex AST.
 type MacroExpanderImpl struct {
 	*Expander
 	registry *Registry
 }
 
 // NewMacroExpander creates a new macro expander that implements the interface
+// NewMacroExpander constructs a MacroExpanderImpl backed by a Registry.
 func NewMacroExpander(registry *Registry) *MacroExpanderImpl {
 	return &MacroExpanderImpl{
 		Expander: NewExpander(registry),

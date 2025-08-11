@@ -256,6 +256,9 @@ func TestMacroExpanderImpl_parseExpandedCode(t *testing.T) {
 	}
 }
 
+// extra: moved from interface_impl_extra_test.go
+// Note: simple values are accepted by parseExpandedCode to support terminal reconstruction tests
+
 func TestMacroExpanderImpl_nodeToString(t *testing.T) {
 	registry := NewRegistry(Config{EnableValidation: false})
 	expander := NewMacroExpander(registry)

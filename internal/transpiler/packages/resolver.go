@@ -8,11 +8,14 @@ import (
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
+	"github.com/thsfranca/vex/internal/transpiler/analysis"
+	"github.com/thsfranca/vex/internal/transpiler/macro"
 	"github.com/thsfranca/vex/internal/transpiler/parser"
 )
 
 // Resolver builds a combined Vex program from an entry file by discovering local packages,
 // resolving dependencies, ordering them, and detecting circular dependencies.
+// Resolver discovers local Vex packages, validates dependencies, and orders compilation.
 type Resolver struct {
     moduleRoot string
     edgeLoc    map[string]map[string]string // fromPkg -> toPkg -> file path where import declared (first seen)
@@ -24,10 +27,12 @@ func NewResolver(moduleRoot string) *Resolver {
 }
 
 // Result of resolution
+// Result carries the combined program and metadata for code generation.
 type Result struct {
     CombinedSource string
     IgnoreImports  map[string]bool // import paths that should not be emitted as Go imports (local Vex packages)
     Exports        map[string]map[string]bool // package path -> set of exported symbols
+    PkgSchemes     map[string]map[string]*analysis.TypeScheme // package path -> symbol -> scheme
 }
 
 // BuildProgramFromEntry resolves dependencies starting from entryFile and returns combined source in topo order.
@@ -157,7 +162,17 @@ func (r *Resolver) BuildProgramFromEntry(entryFile string) (*Result, error) {
         combined.WriteString("\n")
     }
 
-    return &Result{CombinedSource: combined.String(), IgnoreImports: ignoreImports, Exports: exports}, nil
+    // Compute type schemes for exported symbols in each discovered local package
+    pkgSchemes := make(map[string]map[string]*analysis.TypeScheme)
+    for _, pkgPath := range order {
+        if ex, ok := exports[pkgPath]; ok && len(ex) > 0 {
+            if sch, err := r.collectPackageSchemes(pkgPath, ex); err == nil && len(sch) > 0 {
+                pkgSchemes[pkgPath] = sch
+            }
+        }
+    }
+
+    return &Result{CombinedSource: combined.String(), IgnoreImports: ignoreImports, Exports: exports, PkgSchemes: pkgSchemes}, nil
 }
 
 // isLocalPackage determines if an import path refers to a local directory with .vx files under module root.
@@ -302,6 +317,76 @@ func (r *Resolver) collectImports(source string) []string {
     }
 
     return imports
+}
+
+// collectPackageSchemes analyzes a local package and returns type schemes for its exported symbols.
+func (r *Resolver) collectPackageSchemes(importPath string, exported map[string]bool) (map[string]*analysis.TypeScheme, error) {
+    dir := filepath.Join(r.moduleRoot, filepath.FromSlash(importPath))
+    files, err := r.findVexFiles(dir)
+    if err != nil { return nil, err }
+    if len(files) == 0 { return map[string]*analysis.TypeScheme{}, nil }
+
+    // Concatenate all files in package to a single source
+    var b strings.Builder
+    for _, f := range files {
+        data, readErr := os.ReadFile(f)
+        if readErr != nil { return nil, readErr }
+        b.WriteString(string(data))
+        if !strings.HasSuffix(string(data), "\n") { b.WriteString("\n") }
+    }
+
+    input := antlr.NewInputStream(b.String())
+    lexer := parser.NewVexLexer(input)
+    tokens := antlr.NewCommonTokenStream(lexer, 0)
+    p := parser.NewVexParser(tokens)
+    prog := p.Program()
+    if prog == nil { return map[string]*analysis.TypeScheme{}, nil }
+
+    // Expand macros (load core macros) so defn and user macros are resolved before analysis
+    // Prefer core macros from module root if available for robust CI/test behavior
+    corePath := filepath.Join(r.moduleRoot, "core", "core.vx")
+    if _, statErr := os.Stat(corePath); statErr != nil {
+        corePath = "" // fall back to registry default search
+    }
+    reg := macro.NewRegistry(macro.Config{CoreMacroPath: corePath, EnableValidation: true})
+    if err := reg.LoadCoreMacros(); err == nil {
+        expander := macro.NewMacroExpander(reg)
+        expandedAST, errExp := expander.ExpandMacros(macro.NewVexAST(prog))
+        if errExp == nil && expandedAST != nil {
+            if root := expandedAST.Root(); root != nil {
+                // Prefer expanded root if available
+                if pr, ok := root.(*parser.ProgramContext); ok {
+                    prog = pr
+                }
+            }
+        }
+    }
+
+    // Run analyzer to compute schemes
+    a := analysis.NewAnalyzer()
+    ast := &resolverAnalysisAST{root: prog}
+    if _, err := a.Analyze(ast); err != nil {
+        // Return empty on analysis error; caller may ignore
+        return map[string]*analysis.TypeScheme{}, nil
+    }
+
+    out := make(map[string]*analysis.TypeScheme)
+    for sym := range exported {
+        if sch, ok := a.GetTypeScheme(sym); ok {
+            out[sym] = sch
+        }
+    }
+    return out, nil
+}
+
+// resolverAnalysisAST adapts a parser.ProgramContext to the analysis.AST interface.
+type resolverAnalysisAST struct { root antlr.Tree }
+
+func (a *resolverAnalysisAST) Accept(visitor analysis.ASTVisitor) error {
+    if prog, ok := a.root.(*parser.ProgramContext); ok {
+        return visitor.VisitProgram(prog)
+    }
+    return fmt.Errorf("invalid AST root type for analysis")
 }
 
 // collectPackageExports scans all .vx files in a package directory to find export declarations.

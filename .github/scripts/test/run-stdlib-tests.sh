@@ -84,8 +84,8 @@ while IFS= read -r test_file; do
         echo "🧪 Running: $test_file"
         echo "Running: $test_file" >> $TEST_LOG
         
-        # Run the test with coverage output
-        if timeout 30s ./bin/vex test -dir "$TEST_DIR" -coverage -coverage-out "${TEST_DIR}-coverage.json" -verbose >> $TEST_LOG 2>&1; then
+        # Run the test with enhanced coverage output
+        if timeout 30s ./bin/vex test -dir "$TEST_DIR" -enhanced-coverage -coverage-out "${TEST_DIR}-coverage.json" -verbose >> $TEST_LOG 2>&1; then
             echo "✅ PASSED: $test_file"
             echo "PASSED: $test_file" >> $TEST_LOG
             PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -106,24 +106,79 @@ echo ""
 echo "📊 Combining coverage reports..."
 
 # Merge all individual coverage files into one
-COMBINED_COVERAGE_DATA='{"timestamp":"'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'","overall_coverage":0,"total_files":0,"tested_files":0,"packages":[]}'
+COMBINED_COVERAGE_DATA='{"timestamp":"'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'","overall_coverage":{"file_coverage":0,"function_coverage":0,"tested_files":0,"total_files":0,"tested_functions":0,"total_functions":0},"packages":[],"summary":{"precision_improvement":"Enhanced function-level coverage analysis","untested_functions":[],"top_coverage_packages":[],"needs_attention_packages":[]}}'
 
 if command -v jq >/dev/null 2>&1; then
     echo "$COMBINED_COVERAGE_DATA" > $COVERAGE_FILE
     
-    # Merge coverage data from all test runs
+    # Merge enhanced coverage data from all test runs
+    TOTAL_FILES=0
+    TESTED_FILES=0
+    TOTAL_FUNCTIONS=0
+    TESTED_FUNCTIONS=0
+    
     for coverage_file in $(find $STDLIB_DIR -name "*-coverage.json" 2>/dev/null || true); do
         if [ -f "$coverage_file" ]; then
-            # Merge package data
-            jq --slurpfile new "$coverage_file" '.packages += $new[0].packages | .total_files += $new[0].total_files | .tested_files += $new[0].tested_files' $COVERAGE_FILE > temp_coverage.json && mv temp_coverage.json $COVERAGE_FILE
+            # Check if this is enhanced coverage format
+            if jq -e '.overall_coverage.function_coverage' "$coverage_file" >/dev/null 2>&1; then
+                # Enhanced coverage format - merge package data and accumulate metrics
+                jq --slurpfile new "$coverage_file" '.packages += $new[0].packages' $COVERAGE_FILE > temp_coverage.json && mv temp_coverage.json $COVERAGE_FILE
+                
+                # Accumulate totals
+                TOTAL_FILES=$((TOTAL_FILES + $(jq -r '.overall_coverage.total_files // 0' "$coverage_file")))
+                TESTED_FILES=$((TESTED_FILES + $(jq -r '.overall_coverage.tested_files // 0' "$coverage_file")))
+                TOTAL_FUNCTIONS=$((TOTAL_FUNCTIONS + $(jq -r '.overall_coverage.total_functions // 0' "$coverage_file")))
+                TESTED_FUNCTIONS=$((TESTED_FUNCTIONS + $(jq -r '.overall_coverage.tested_functions // 0' "$coverage_file")))
+            else
+                # Legacy format - convert to enhanced format
+                jq --slurpfile new "$coverage_file" '.packages += $new[0].packages' $COVERAGE_FILE > temp_coverage.json && mv temp_coverage.json $COVERAGE_FILE
+                TOTAL_FILES=$((TOTAL_FILES + $(jq -r '.total_files // 0' "$coverage_file")))
+                TESTED_FILES=$((TESTED_FILES + $(jq -r '.tested_files // 0' "$coverage_file")))
+            fi
         fi
     done
     
-    # Calculate overall coverage
-    OVERALL_COVERAGE=$(jq -r 'if .total_files > 0 then ((.tested_files / .total_files) * 100 | floor) else 0 end' $COVERAGE_FILE)
-    jq --arg cov "$OVERALL_COVERAGE" '.overall_coverage = ($cov | tonumber)' $COVERAGE_FILE > temp_coverage.json && mv temp_coverage.json $COVERAGE_FILE
+    # Calculate overall coverage metrics
+    FILE_COVERAGE=0
+    FUNCTION_COVERAGE=0
+    if [ $TOTAL_FILES -gt 0 ]; then
+        # Use awk for floating point arithmetic if bc is not available
+        if command -v bc >/dev/null 2>&1; then
+            FILE_COVERAGE=$(echo "scale=1; $TESTED_FILES * 100 / $TOTAL_FILES" | bc -l)
+        else
+            FILE_COVERAGE=$(awk "BEGIN {printf \"%.1f\", $TESTED_FILES * 100 / $TOTAL_FILES}")
+        fi
+    fi
+    if [ $TOTAL_FUNCTIONS -gt 0 ]; then
+        # Use awk for floating point arithmetic if bc is not available
+        if command -v bc >/dev/null 2>&1; then
+            FUNCTION_COVERAGE=$(echo "scale=1; $TESTED_FUNCTIONS * 100 / $TOTAL_FUNCTIONS" | bc -l)
+        else
+            FUNCTION_COVERAGE=$(awk "BEGIN {printf \"%.1f\", $TESTED_FUNCTIONS * 100 / $TOTAL_FUNCTIONS}")
+        fi
+    fi
     
-    echo "📈 Combined coverage: ${OVERALL_COVERAGE}%"
+    # Use function coverage as the primary metric, fall back to file coverage
+    OVERALL_COVERAGE=${FUNCTION_COVERAGE:-$FILE_COVERAGE}
+    OVERALL_COVERAGE=$(echo "$OVERALL_COVERAGE" | cut -d. -f1)  # Convert to integer
+    
+    # Update the combined coverage file with calculated metrics
+    jq --argjson file_cov "$FILE_COVERAGE" \
+       --argjson func_cov "$FUNCTION_COVERAGE" \
+       --argjson total_files "$TOTAL_FILES" \
+       --argjson tested_files "$TESTED_FILES" \
+       --argjson total_funcs "$TOTAL_FUNCTIONS" \
+       --argjson tested_funcs "$TESTED_FUNCTIONS" \
+       '.overall_coverage = {
+         "file_coverage": $file_cov,
+         "function_coverage": $func_cov, 
+         "tested_files": $tested_files,
+         "total_files": $total_files,
+         "tested_functions": $tested_funcs,
+         "total_functions": $total_funcs
+       }' $COVERAGE_FILE > temp_coverage.json && mv temp_coverage.json $COVERAGE_FILE
+    
+    echo "📈 Combined coverage - File: ${FILE_COVERAGE}%, Function: ${FUNCTION_COVERAGE}% (Primary: ${OVERALL_COVERAGE}%)"
 else
     echo "⚠️  jq not available, using basic coverage calculation"
     OVERALL_COVERAGE=0

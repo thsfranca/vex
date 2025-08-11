@@ -39,7 +39,7 @@ jobs:
           has-changes:
             - '**'
 
-  # Validate stdlib tests
+  # Validate stdlib tests with enhanced function-level coverage analysis
   stdlib-tests:
     runs-on: ubuntu-latest
     needs: [detect-stdlib-changes]
@@ -99,13 +99,13 @@ jobs:
     - name: Build Vex transpiler
       run: .github/scripts/build/build-project.sh
 
-    - name: Run stdlib tests
+    - name: Run stdlib tests with enhanced coverage analysis
       id: stdlib-tests
       run: .github/scripts/test/run-stdlib-tests.sh
       env:
         STDLIB_COVERAGE_THRESHOLD: ${{ env.STDLIB_COVERAGE_THRESHOLD }}
         
-    - name: Validate stdlib coverage
+    - name: Validate enhanced stdlib coverage metrics
       id: stdlib-coverage
       run: .github/scripts/test/validate-stdlib-coverage.sh
       env:
@@ -134,7 +134,7 @@ jobs:
         echo "❌ Build failed due to insufficient stdlib test coverage"
         echo "Current coverage: ${{ steps.stdlib-coverage.outputs.coverage }}%"
         echo "Required threshold: 98%"
-        echo "Please add tests to improve stdlib coverage before merging"
+        echo "Please add more tests to improve function-level coverage before merging"
         exit 1
 
     - name: Upload stdlib coverage artifacts

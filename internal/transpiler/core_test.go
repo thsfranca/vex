@@ -447,13 +447,14 @@ func TestTranspiler_VisitNodeComprehensive(t *testing.T) {
 				"num := 42",
 			},
 		},
-		{
-			name:  "Symbol handling",
-			input: "(def x y)",
-			expected: []string{
-				"x := y",
-			},
-		},
+        {
+            name:  "Symbol handling (defined symbol)",
+            input: "(def y 1) (def x y)",
+            expected: []string{
+                "y := 1",
+                "x := y",
+            },
+        },
 	}
 
 	for _, tt := range tests {

@@ -699,7 +699,7 @@ func TestCLI_Diagnostics_Codes(t *testing.T) {
         {name: "Equality mismatch", source: "(= 1 \"x\")", expectCode: "VEX-TYP-EQ"},
         {name: "Array elem mismatch", source: "(def a [1 \"x\"]) ", expectCode: "VEX-TYP-ARRAY-ELEM"},
         {name: "Map key mismatch", source: "(map [1 : 1 \"k\" : 2])", expectCode: "VEX-TYP-MAP-KEY"},
-        {name: "Map value mismatch", source: "(map [\"k\" : 1 2 : \"x\"]) ", expectCode: "VEX-TYP-MAP-VAL"},
+        {name: "Map value mismatch", source: "(map [\"k\" : 1 \"k\" : \"x\"]) ", expectCode: "VEX-TYP-MAP-VAL"},
         {name: "Nominal record mismatch", source: "(record A [x: number]) (record B [x: number]) (if true (A [x: 1]) (B [x: 2]))", expectCode: "VEX-TYP-REC-NOMINAL"},
     }
 

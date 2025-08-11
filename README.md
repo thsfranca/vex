@@ -38,59 +38,55 @@ Vex is designed with two primary goals:
 ## Project Structure
 
 ```
-vex/
+fugo/
 ├── cmd/                            # Command-line tools
-│   └── vex-transpiler/             # Main transpiler CLI application
+│   └── vex-transpiler/             # Main transpiler CLI application with all 4 commands
 ├── internal/                       # Core implementation packages
-│   └── transpiler/                 # Vex to Go transpiler engine
-│       ├── analysis/               # Semantic analysis (symbol table, errors)
-│       ├── ast/                    # AST wrapper for parser tree
-│       ├── codegen/                # Go code generation
-│       ├── macro/                  # Macro registry and expander
-│       ├── diagnostics/            # Structured diagnostics (codes, renderer)
-│       ├── parser/                 # Generated ANTLR parser files
-│       ├── adapters.go             # Adapters bridging subsystems
-│       ├── interfaces.go           # Core interfaces (Parser, Analyzer, etc.)
-│       ├── orchestrator.go         # Builder and multi-stage pipeline
-│       └── core.go                 # Public transpiler entrypoints
-├── core/                           # Core macros (legacy compatibility)
-│   └── core.vx                     # Core macro definitions (defn, etc.)
-├── stdlib/
-│   └── vex/                        # Standard library macro packages (optional)
-│       ├── core/                   # Core language forms (defn, etc.)
-│       ├── conditions/             # when/unless macros
-│       ├── collections/            # first/rest/count/cons/empty?
-│       └── test/                   # test macros
-├── docs/                           # Comprehensive documentation
-│   ├── getting-started.md          # Quick start tutorial
+│   └── transpiler/                 # Advanced Vex to Go transpiler engine
+│       ├── analysis/               # HM type system with Algorithm W, unification, diagnostics
+│       ├── ast/                    # AST wrapper for parser tree integration
+│       ├── codegen/                # Go code generation with type-aware output
+│       ├── macro/                  # Advanced macro registry and expansion system
+│       ├── packages/               # Package discovery, dependency resolution, export enforcement
+│       ├── diagnostics/            # Structured diagnostics with stable error codes
+│       ├── parser/                 # Generated ANTLR parser files (excluded from coverage)
+│       ├── adapters.go             # Adapters bridging different subsystems
+│       ├── interfaces.go           # Core interfaces (Parser, Analyzer, CodeGenerator, etc.)
+│       ├── orchestrator.go         # Multi-stage compilation pipeline orchestrator
+│       └── core.go                 # Public transpiler entrypoints and configuration
+├── core/                           # Core macro bootstrap
+│   └── core.vx                     # Core macro definitions (defn, etc.) auto-loaded by CLI
+├── stdlib/                         # Standard library packages (planned expansion)
+├── docs/                           # Comprehensive technical documentation
+│   ├── getting-started.md          # Quick start tutorial with current features
 │   ├── ai-quick-reference.md       # AI-optimized language reference
 │   ├── cli-reference.md            # Complete CLI tool documentation
 │   ├── grammar-reference.md        # Language grammar documentation
+│   ├── package-system.md           # Package discovery and module system docs
+│   ├── error-messages.md           # Structured diagnostic code reference
+│   ├── architecture-decisions.md   # ADR log for key design decisions
 │   ├── troubleshooting.md          # Common issues and solutions
 │   ├── known-bugs.md               # Bug tracking and workarounds
 │   ├── vex-implementation-requirements.md # Development roadmap
 │   └── release-process.md          # Release automation documentation
-├── examples/                       # Example Vex programs
-│   ├── valid/                      # Valid syntax examples for testing
+├── examples/                       # Example Vex programs and test cases
+│   ├── valid/                      # Valid syntax examples demonstrating features
 │   ├── invalid/                    # Invalid syntax for parser validation
-│   ├── stdlib/                     # Standard library examples
-│   └── go-usage/                   # Go integration examples
+│   ├── go-usage/                   # Go integration examples
+│   └── coverage-reports/           # Coverage reporting examples
 ├── tools/                          # Development and build tools
 │   ├── grammar/                    # ANTLR4 grammar definition (Vex.g4)
-│   ├── grammar-validator/          # Grammar validation with Go parser
-│   ├── coverage-updater/           # Test coverage automation
+│   ├── grammar-validator/          # Grammar validation with comprehensive testing
+│   ├── coverage-updater/           # Automated test coverage updates
 │   ├── release-manager/            # Automated release management
-│   ├── change-detector/            # CI change detection
+│   ├── change-detector/            # CI change detection for selective testing
 │   ├── debug-helper/               # Development debugging utilities
-│   ├── extension-tester/           # VSCode extension testing
-│   └── gen/                        # Generated parser files
-├── .github/                        # CI/CD infrastructure
-│   ├── workflows/                  # GitHub Actions workflows
-│   └── scripts/                    # Extracted workflow scripts
-├── assets/                         # Project assets (logo, etc.)
+│   ├── extension-tester/           # VSCode extension testing automation
+│   └── gen/                        # Generated parser files workspace
+├── assets/                         # Project assets (logo, branding)
 ├── scripts/                        # Build and utility scripts
-├── coverage/                       # Test coverage reports
-└── vscode-extension/               # VSCode language support
+├── coverage/                       # Test coverage reports (85%+ target)
+└── vscode-extension/               # VSCode language support with syntax highlighting
 ```
 
 ## Language Vision
@@ -132,112 +128,149 @@ The uniform S-expression structure + functional design means AI models can:
 - **Scale automatically**: Every program handles thousands of concurrent requests
 - **Focus on logic**: No syntax complexity, no concurrency complexity
 
-### Current Status: HM Typing and Package Schemes ✅
+### Current Status: Advanced Type System and Package Discovery ✅
 
 The project currently includes:
-- **ANTLR4 grammar** for S-expressions, arrays, symbols, and strings
-- **Basic transpiler** that converts core Vex constructs to Go with HM typing
-- **CLI tool** (`vex`) with `transpile`, `run`, and `build` commands
+- **ANTLR4 grammar** for S-expressions, arrays, symbols, strings, and records
+- **Advanced transpiler** with multi-stage compilation pipeline (parse → macro expansion → semantic analysis → code generation)
+- **Hindley-Milner type system** with Algorithm W, type inference, generalization/instantiation, and strict type checking
+- **Package discovery system** with directory-based packages, import resolution, circular dependency detection, and export enforcement
+- **CLI tool** (`vex`) with `transpile`, `run`, `build`, and `test` commands
 - **Structured diagnostics** with stable error codes and AI-friendly formatting (VEX-TYP-UNDEF, VEX-TYP-COND, VEX-TYP-EQ, VEX-TYP-ARRAY-ELEM, VEX-TYP-MAP-KEY/VAL, VEX-TYP-REC-NOMINAL)
 - **Core language features**:
   - Variable definitions: `(def x 10)` → `x := 10`
-  - Arithmetic expressions: `(+ 1 2)` → `1 + 2`
-  - Import system: `(import "fmt")` → `import "fmt"`
+  - Arithmetic expressions: `(+ 1 2)` → `1 + 2` with type checking
+  - Import system: `(import "fmt")` → `import "fmt"` with module detection
   - Go function calls: `(fmt/Println "Hello")` → `fmt.Println("Hello")`
-  - Basic arrays: `[1 2 3]` → `[]interface{}{1, 2, 3}`
-  - Conditional expressions: `(if condition then else)` → Go if statements
+  - Basic arrays: `[1 2 3]` → `[]interface{}{1, 2, 3}` with element type unification
+  - Conditional expressions: `(if condition then else)` → Go if statements with boolean condition enforcement
   - Sequential execution: `(do expr1 expr2)` → Multiple Go statements
-  - Basic macro system: `(macro name [params] body)` → Macro registration and expansion
-  - Function definitions: `(defn name [params] body)` → Via built-in defn macro
-- **Comprehensive CI/CD pipeline** with automated quality checks
-- **Automated release process** with PR label-based version management  
-- **Grammar validation system** testing both valid and invalid syntax
-- **VSCode extension** with syntax highlighting and language support
-- **Example programs** demonstrating working features
+  - Advanced macro system: `(macro name [params] body)` → Full macro registration and expansion
+  - Record declarations: `(record Person [name: string age: number])` → Nominal type validation (analyzer complete, codegen in progress)
+  - Package system: Directory-based packages with automatic discovery and export enforcement
+- **Quality infrastructure**:
+  - Comprehensive CI/CD pipeline with automated quality checks  
+  - Automated release process with PR label-based version management
+  - Grammar validation system testing both valid and invalid syntax
+  - VSCode extension with syntax highlighting and language support
+  - Extensive test coverage (85%+ target) with benchmarking
 
 ### Working Today 🚀
 
-You can transpile, run, and build Vex programs:
+You can transpile, run, build, and test Vex programs:
 
 ```bash
 # Build the transpiler
 go build -o vex cmd/vex-transpiler/main.go
 
 # Transpile to Go
-echo '(def x (+ 5 3))' > example.vex
-./vex transpile -input example.vex -output example.go
+echo '(def x (+ 5 3))' > example.vx
+./vex transpile -input example.vx -output example.go
 
 # Compile and execute everything
-./vex run -input example.vex
+./vex run -input example.vx
 
 # Build a binary executable
-./vex build -input example.vex -output hello-world
+./vex build -input example.vx -output hello-world
+
+# Run tests
+./vex test -dir .
 ```
 
-Outputs valid Go code:
+Outputs valid, type-checked Go code:
 ```go
 package main
 
+import "fmt"
+
 func main() {
+    // Generated by Vex transpiler
     x := 5 + 3
+    _ = x // Return last defined value
 }
 ```
 
 **Command Overview:**
 - **`transpile`** - Convert Vex source code to Go (for inspection or integration)
-- **`run`** - Compile and execute Vex programs directly (includes core.vx if available)
-- **`build`** - Create standalone binary executables from Vex programs
+- **`run`** - Compile and execute Vex programs directly (includes package discovery and core macros)
+- **`build`** - Create standalone binary executables with dependency management
+- **`test`** - Discover and run `*_test.vx` files with test macros
 
-Current features working:
+**Current Features Working:**
 ```vex
-;; Import Go packages
+;; Import Go packages (with module detection)
 (import "fmt")
+(import ["fmt" "os"])  ; Multiple imports
+(import [["net/http" http]])  ; Aliased imports
 
-;; Define variables with complex expressions
-(def result (+ (* 10 5) (- 20 5)))
+;; Variables with type inference
+(def message "Hello from Vex!")
+(def count 42)
+(def result (+ (* 10 5) (- 20 5)))  ; Type-checked arithmetic
 
-;; Call Go functions
-(fmt/Println "Hello from Vex!")
+;; Go function calls with proper typing
+(fmt/Println message)
+(fmt/Printf "Count: %d\n" count)
 
-;; Basic arrays
+;; Arrays with element type unification
 (def numbers [1 2 3 4])
+(def names ["Alice" "Bob" "Charlie"])
 
-;; Conditional expressions
-(if true (fmt/Println "condition works") (fmt/Println "else"))
+;; Conditional expressions with boolean enforcement
+(if (> count 0) 
+    (fmt/Println "positive") 
+    (fmt/Println "non-positive"))
 
 ;; Sequential execution
 (do
   (def x 10)
-  (fmt/Println x))
+  (def y 20)
+  (fmt/Println (+ x y)))
 
-;; Macro definitions
-(macro greet [name] (fmt/Println "Hello" name))
+;; Macro definitions with full expansion
+(macro greet [name] (fmt/Printf "Hello, %s!\n" name))
+(greet "World")
 
-;; Function definitions using defn macro
-(defn add [x y] (+ x y))
-
-;; Record declarations (nominal typing; analyzer support)
+;; Record declarations with nominal typing
 (record Person [name: string age: number])
-;; Record usage (shape/type checks in analyzer; codegen WIP)
-;; (Person [name: "Ada" age: 36])
+(record Point [x: number y: number])
+;; Record construction and access (analyzer validates, codegen in progress)
+
+;; Package system with exports
+;; In package file:
+(export [add multiply])
+(def add (fn [x y] (+ x y)))
+;; In main file:
+(import ["mypackage"])
+(def result (mypackage/add 5 3))
 ```
 
 ### Next Phase 🚧
 
-- **Record construction/access codegen** based on analyzer schemas
-- **AI-friendly HTTP patterns** with semantic annotations for endpoints
-- **HTTP server framework** that AI can generate from simple descriptions
-- **JWT authentication patterns** as the most market-valuable auth method
-- **Immutable data structures** with structural sharing
-- **Standard library** for common operations
+**Phase 4.5: Transpiler Performance Optimization (High Priority)**
+- Transpiler instance reuse to avoid repeated initialization overhead
+- Core macro caching to eliminate repeated `core/core.vx` parsing
+- Parser/analyzer pooling using `sync.Pool` for allocation efficiency
+- AST-level macro expansion without full re-parsing cycles
+- String building optimization using `strings.Builder`
+- Resolver graph caching for stable package trees
 
-#### In Progress: Package Discovery System (MVP)
+**Phase 5: Enhanced Language Features**
+- **Function definition codegen improvements** - Fix `defn` macro code generation for proper Go function output
+- **Record construction/access codegen** - Complete implementation based on analyzer schemas
+- **Standard library expansion** - Core functions for collections, strings, math, and I/O
+- **Advanced control flow** - `when`, `unless`, `cond`, and pattern matching constructs
 
-- Directory-based packages: one package per directory; package name inferred from directory name
-- Import resolution: resolve local Vex packages by directory path first; fall back to Go imports if not found
-- Automatic package scanning: build a dependency graph starting from the entry file and topologically sort
-- Circular dependency prevention: cycles are detected and reported as compile-time errors; the build fails
-- CLI UX unchanged: `vex run` and `vex build` automatically include discovered packages
+**Phase 6: Concurrency and Web Services**
+- **Goroutine primitives** - Native concurrent execution with `(go expr)` syntax
+- **Channel operations** - Type-safe message passing with `send`, `receive`, and `select`
+- **HTTP server framework** - AI-friendly web service patterns with automatic scaling
+- **JWT authentication patterns** - Built-in auth handling for scalable APIs
+
+**Phase 7: Advanced Type Features**
+- **Immutable data structures** with structural sharing for automatic thread safety
+- **Advanced type annotations** for complex function signatures and constraints
+- **Type-aware optimization** leveraging HM inference for performance improvements
 
 ## Usage
 
@@ -377,9 +410,9 @@ For AI models and automated code generation, see [docs/ai-quick-reference.md](do
 
 ## Project Status
 
-**Current Phase**: Basic Transpiler Foundation + Macro System Complete (✅ Phase 1-2, 4 Complete)  
-**Next Phase**: Advanced Language Features (Phase 3: Type System & Semantic Analysis, Phase 5: Enhanced Functions, Phase 6A: Concurrency Primitives — Goroutines & Channels)  
-**Active Work**: Package Discovery System MVP (directory packages, import resolution, cycle detection; `vex.pkg` module root detection implemented)
+**Current Phase**: Advanced Type System + Package Discovery Complete (✅ Phase 1-3 Complete, Phase 4 Enhanced)  
+**Next Phase**: Performance Optimization (Phase 4.5: Transpiler Performance), Enhanced Language Features (Phase 5: Function Codegen, Records, Standard Library)  
+**Active Work**: Multi-stage compilation pipeline with HM type inference, package system with exports, structured diagnostics
 **Timeline**: Personal study project for learning compiler concepts, developed for fun in spare time
 
 ### Infrastructure Achievements

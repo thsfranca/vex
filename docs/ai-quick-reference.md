@@ -1,8 +1,7 @@
 ---
 title: "Vex Language - AI Quick Reference"
-version: "0.3.0"
+version: "0.4.0"
 compatibility: "Go 1.21+"
-last-updated: "2025-08-11"
 ai-model-compatibility: "GPT-4, Claude-3+, and similar models"
 purpose: "Machine-readable reference for AI code generation"
 ---
@@ -11,13 +10,15 @@ purpose: "Machine-readable reference for AI code generation"
 
 ## Core Language Model
 
-**Execution Pipeline**: Parse S-expressions → AST → Macro expansion → Semantic analysis → Go transpilation → Compile & execute  
+**Execution Pipeline**: Parse S-expressions → AST → Macro expansion → HM type inference → Semantic analysis → Go code generation → Compile & execute  
 **Syntax Pattern**: `(operation arg1 arg2 ...)`  
-**Output Target**: Go source code  
-**Type System**: HM-style inference (Algorithm W) with strict checks for primitives, arrays, maps, records; package-boundary schemes; equality via scheme  
-**Concurrency**: Automatic via Go goroutines  
-**Macro System**: Comprehensive user-defined macros with defn support  
-**Project Status**: Grammar, transpiler, macros complete; structured diagnostics in place; HM inference baseline implemented and expanding  
+**Output Target**: Type-checked Go source code with proper imports and main function  
+**Type System**: Complete Hindley-Milner Algorithm W with unification, generalization/instantiation, value restriction, and strict type checking  
+**Package System**: Directory-based packages with automatic discovery, dependency resolution, circular dependency detection, and export enforcement  
+**Concurrency**: Automatic via Go goroutines (HTTP requests scale naturally)  
+**Macro System**: Advanced user-defined macros with template expansion, parameter validation, and core macro bootstrapping  
+**Diagnostics**: Structured error codes (VEX-TYP-*) with AI-friendly formatting and suggestions  
+**Project Status**: Multi-stage compilation pipeline complete; HM type system implemented; package discovery operational; CLI commands fully functional  
 
 ## Language Specification
 
@@ -36,12 +37,14 @@ comment     ::= ';' .* '\n'
 ### Data Types
 | Type | Status | Vex Syntax | Go Output | Notes |
 |------|--------|------------|-----------|-------|
-| Integer | ✅ | `42` | `42` | 64-bit signed |
-| String | ✅ | `"hello"` | `"hello"` | UTF-8 |
-| Symbol | ✅ | `variable-name` | `variableName` | Identifiers |
-| Array | ✅ | `[1 2 3]` | `[]interface{}{1, 2, 3}` | Generic arrays |
-| Record | ⏳ | `(record Name [field: Type ...])` | Analyzer-enforced (codegen WIP) | Schema and typing in analyzer |
-| Boolean | ✅ | `true false` | `true false` | Go booleans |
+| Integer | ✅ | `42` | `42` | 64-bit signed with type inference |
+| String | ✅ | `"hello"` | `"hello"` | UTF-8 with type checking |
+| Boolean | ✅ | `true false` | `true false` | Go booleans with strict typing |
+| Symbol | ✅ | `variable-name` | `variableName` | Identifiers with scope resolution |
+| Array | ✅ | `[1 2 3]` | `[]interface{}{1, 2, 3}` | Element type unification |
+| Map | ✅ | `{:key value}` | Go map literals | Key/value type unification |
+| Record | ✅ | `(record Name [field: Type ...])` | Nominal type validation | Analyzer complete, codegen in progress |
+| Function | ⏳ | `(fn [params] body)` | Go function types | Type inference from body |
 
 ## Core Operations Reference
 
@@ -107,16 +110,26 @@ Purpose: Code generation and metaprogramming
 ```
 Syntax: (defn name [params] body)
 Example: (defn add [x y] (+ x y))
-Status: ✅ IMPLEMENTED (via defn macro)
-### Record Declarations (Nominal; analyzer-enforced)
+Status: ⏳ MACRO IMPLEMENTED (codegen improvements needed)
+Purpose: Define reusable functions with type inference
+```
+
+### Record Declarations
 ```
 Syntax: (record Name [field: Type ...])
 Example: (record Person [name: string age: number])
-Status: ✅ Analyzer support (nominal typing, mismatch diagnostic); codegen WIP
-Purpose: Define structured data with named fields
+Status: ✅ ANALYZER COMPLETE (nominal typing, validation)
+Purpose: Define structured data with named fields and nominal typing
 ```
 
-Purpose: Define reusable functions
+### Package System
+```
+Syntax: (import ["local-package" "fmt"])
+        (export [function-name other-symbol])
+Example: (import ["utils" ["net/http" http]])
+         (export [add multiply])
+Status: ✅ IMPLEMENTED (discovery, resolution, exports)
+Purpose: Modular code organization with dependency management
 ```
 
 ## AI Code Generation Patterns

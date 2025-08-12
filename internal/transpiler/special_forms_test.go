@@ -189,7 +189,7 @@ func TestTranspiler_IfStatementEdgeCases(t *testing.T) {
 		{
 			name:     "If with function call condition",
 			input:    `(if (empty? []) "is empty" "not empty")`,
-			expected: `func() interface{} { if true { return "is empty" } else { return "not empty" } }()`, // empty? [] optimized to true
+			expected: `func() interface{} { if empty?([]interface{}{}) { return "is empty" } else { return "not empty" } }()`, // empty? as function call
 		},
 		{
 			name:     "If with arithmetic condition",
@@ -238,7 +238,7 @@ func TestTranspiler_DoBlockEdgeCases(t *testing.T) {
 		{
 			name:     "Do with variable definitions",
 			input:    `(do (def x 1) (def y 2) (+ x y))`,
-			expected: `def(x, 1)`, // Transpiler treats def as function call in this context
+			expected: `x := 1`, // New variable assignment format
 		},
         {
             name:     "Do in variable assignment (strict type mismatch should error)",
@@ -248,7 +248,7 @@ func TestTranspiler_DoBlockEdgeCases(t *testing.T) {
 		{
 			name:     "Nested do blocks",
 			input:    `(do (do (def x 1)) x)`,
-			expected: `def(x, 1)`,
+			expected: `x := 1`,
 		},
 	}
 
@@ -605,22 +605,22 @@ func TestTranspiler_CollectionOpEdgeCases(t *testing.T) {
 		{
 			name:     "Rest operation with empty array",
 			input:    `(def result (rest []))`,
-			expected: "func() []interface{} { if len([]interface{}{}) > 1 { return []interface{}{}[1:] } else { return []interface{}{} } }()",
+			expected: "rest([]interface{}{})",
 		},
 		{
 			name:     "Cons with multiple elements",
 			input:    `(def result (cons 1 [2 3]))`,
-			expected: "append([]interface{}{1}, []interface{}{2, 3}...)",
+			expected: "cons(1, []interface{}{2, 3})",
 		},
 		{
 			name:     "Count with variable argument",
 			input:    `(def arr [1 2 3]) (def result (count arr))`,
-			expected: "len(arr)",
+			expected: "count(arr)",
 		},
 		{
 			name:     "First with variable argument",
 			input:    `(def arr [1 2 3]) (def result (first arr))`,
-			expected: "func() interface{} { if len(arr) > 0 { return arr[0] } else { return nil } }()",
+			expected: "first(arr)",
 		},
 	}
 

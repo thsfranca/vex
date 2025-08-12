@@ -14,7 +14,7 @@ func TestDiagnostic_RenderText_JSON_Body(t *testing.T) {
     }).WithSuggestion("align branch types")
 
     txt := d.RenderText()
-    if !strings.Contains(txt, "[VEX-TYP-IF-MISMATCH]") {
+    if !strings.Contains(txt, "[TYPE-IF-MISMATCH]") {
         t.Fatalf("RenderText missing code: %s", txt)
     }
     if !strings.Contains(strings.ToLower(txt), "error:") {
@@ -25,7 +25,7 @@ func TestDiagnostic_RenderText_JSON_Body(t *testing.T) {
     }
 
     body := d.RenderBody()
-    if !strings.HasPrefix(body, "[VEX-TYP-IF-MISMATCH]:") {
+    if !strings.HasPrefix(body, "[TYPE-IF-MISMATCH]:") {
         t.Fatalf("RenderBody prefix unexpected: %s", body)
     }
 

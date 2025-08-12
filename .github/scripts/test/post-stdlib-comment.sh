@@ -39,6 +39,19 @@ fi
 echo "📄 Reading coverage report..."
 COMMENT_BODY=$(cat stdlib-coverage-report.md)
 
+# Append assertion density section if available
+if [ -f "assertion-density-section.md" ]; then
+    echo "📊 Adding assertion density analysis to comment..."
+    cat stdlib-coverage-report.md > combined-test-report.md
+    echo "" >> combined-test-report.md
+    cat assertion-density-section.md >> combined-test-report.md
+    echo "" >> combined-test-report.md
+    echo "*Combined coverage and assertion density analysis ensures comprehensive test quality.*" >> combined-test-report.md
+    COMMENT_BODY=$(cat combined-test-report.md)
+else
+    echo "⚠️ No assertion density data found - using coverage report only"
+fi
+
 # Create the comment using GitHub API
 COMMENT_JSON=$(jq -n --arg body "$COMMENT_BODY" '{body: $body}')
 
@@ -69,6 +82,6 @@ else
 fi
 
 # Clean up
-rm -f response.json
+rm -f response.json combined-test-report.md
 
 echo "🏁 PR comment completed!"

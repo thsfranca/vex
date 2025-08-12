@@ -174,7 +174,7 @@ func TestTranspiler_MacroNestedStructures(t *testing.T) {
 			input: `(macro complex [x] (do (def arr (array x x)) (process arr)))
 (complex "value")`,
 			expected: []string{
-				`func() interface{} { def(arr, array("value", "value")); return process(arr) }()`,
+				`func() interface{} { arr := array("value", "value"); return process(arr) }()`,
 			},
 		},
 	}

@@ -109,7 +109,7 @@ func writeFileOrch(t *testing.T, path, content string) {
 func TestEndToEnd_CrossPackageSchemes_Transpile(t *testing.T) {
     dir := t.TempDir()
     // Package a exporting id function
-    writeFileOrch(t, filepath.Join(dir, "a", "a.vx"), "(export [id])\n(defn id [x] x)\n")
+    writeFileOrch(t, filepath.Join(dir, "a", "a.vx"), "(import \"vex.core\")\n(export [id])\n(defn id [x: interface{}] -> interface{} x)\n")
     // Entry that calls a/id with int and string
     entry := filepath.Join(dir, "main.vx")
     writeFileOrch(t, entry, "(import [\"a\"])\n(def main (do (a/id 1) (a/id \"s\")))\n")

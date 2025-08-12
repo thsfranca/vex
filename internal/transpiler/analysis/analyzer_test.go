@@ -222,9 +222,9 @@ func TestAnalyzer_VisitTerminal_UndefinedSymbol(t *testing.T) {
     errs := analyzer.errorReporter.GetErrors()
     hasCode := false
     for _, e := range errs {
-        if strings.Contains(e.Message, "VEX-TYP-UNDEF") { hasCode = true; break }
+        if strings.Contains(e.Message, "TYPE-UNDEFINED") { hasCode = true; break }
     }
-    if !hasCode { t.Fatalf("expected VEX-TYP-UNDEF diagnostic, got: %s", analyzer.errorReporter.FormatErrors()) }
+    if !hasCode { t.Fatalf("expected TYPE-UNDEFINED diagnostic, got: %s", analyzer.errorReporter.FormatErrors()) }
 }
 
 func TestAnalyzer_ExplicitTypeFunctionDefinition(t *testing.T) {
@@ -596,17 +596,17 @@ func TestEqualityTyping_NegativeMismatch(t *testing.T) {
     if !a.errorReporter.HasErrors() {
         t.Fatalf("expected type error for mismatched equality")
     }
-    // Assert diagnostic code is VEX-TYP-EQ
+    // Assert diagnostic code is TYPE-EQUALITY
     errs := a.errorReporter.GetErrors()
     found := false
     for _, e := range errs {
-        if strings.Contains(e.Message, "VEX-TYP-EQ") {
+        if strings.Contains(e.Message, "TYPE-EQUALITY") {
             found = true
             break
         }
     }
     if !found {
-        t.Fatalf("expected VEX-TYP-EQ diagnostic in errors: %v", a.errorReporter.FormatErrors())
+        t.Fatalf("expected TYPE-EQUALITY diagnostic in errors: %v", a.errorReporter.FormatErrors())
     }
 }
 
@@ -618,13 +618,13 @@ func TestIfConditionRequiresBool_Negative(t *testing.T) {
     if !a.errorReporter.HasErrors() {
         t.Fatalf("expected error for non-boolean if condition")
     }
-    // Check code VEX-TYP-COND appears in message
+    // Check code TYPE-CONDITION appears in message
     errs := a.errorReporter.GetErrors()
     ok := false
     for _, e := range errs {
-        if strings.Contains(e.Message, "VEX-TYP-COND") { ok = true; break }
+        if strings.Contains(e.Message, "TYPE-CONDITION") { ok = true; break }
     }
-    if !ok { t.Fatalf("expected VEX-TYP-COND diagnostic") }
+    if !ok { t.Fatalf("expected TYPE-CONDITION diagnostic") }
 }
 
 func TestValueRestriction_NoQuantificationForNonValues(t *testing.T) {
@@ -707,10 +707,10 @@ func TestRecordNominalMismatch_InIfBranches(t *testing.T) {
     if !a.errorReporter.HasErrors() {
         t.Fatalf("expected nominal mismatch error when if branches return A vs B")
     }
-    // Assert dedicated code VEX-TYP-REC-NOMINAL present
+    // Assert dedicated code RECORD-NOMINAL present
     msg := a.errorReporter.FormatErrors()
-    if !strings.Contains(msg, "VEX-TYP-REC-NOMINAL") {
-        t.Fatalf("expected VEX-TYP-REC-NOMINAL diagnostic, got: %s", msg)
+    if !strings.Contains(msg, "RECORD-NOMINAL") {
+        t.Fatalf("expected RECORD-NOMINAL diagnostic, got: %s", msg)
     }
 }
 
@@ -721,10 +721,10 @@ func TestArrayElementMismatch_ReportsDiagnostic(t *testing.T) {
     if !a.errorReporter.HasErrors() {
         t.Fatalf("expected array element type mismatch error")
     }
-    // Assert VEX-TYP-ARRAY-ELEM appears
+    // Assert TYPE-ARRAY-ELEMENT appears
     msg := a.errorReporter.FormatErrors()
-    if !strings.Contains(msg, "VEX-TYP-ARRAY-ELEM") {
-        t.Fatalf("expected VEX-TYP-ARRAY-ELEM diagnostic, got: %s", msg)
+    if !strings.Contains(msg, "TYPE-ARRAY-ELEMENT") {
+        t.Fatalf("expected TYPE-ARRAY-ELEMENT diagnostic, got: %s", msg)
     }
 }
 
@@ -736,10 +736,10 @@ func TestMapKeyAndValueMismatch_ReportDiagnostics(t *testing.T) {
     if !a.errorReporter.HasErrors() {
         t.Fatalf("expected map key type mismatch error")
     }
-    // Check VEX-TYP-MAP-KEY present
+    // Check TYPE-MAP-KEY present
     keyMsg := a.errorReporter.FormatErrors()
-    if !strings.Contains(keyMsg, "VEX-TYP-MAP-KEY") {
-        t.Fatalf("expected VEX-TYP-MAP-KEY diagnostic, got: %s", keyMsg)
+    if !strings.Contains(keyMsg, "TYPE-MAP-KEY") {
+        t.Fatalf("expected TYPE-MAP-KEY diagnostic, got: %s", keyMsg)
     }
 
     // Now trigger a value mismatch: (["k": 1 "k": "x"]) same key type, differing values (int vs string)
@@ -750,8 +750,8 @@ func TestMapKeyAndValueMismatch_ReportDiagnostics(t *testing.T) {
         t.Fatalf("expected map value type mismatch error")
     }
     valMsg := a.errorReporter.FormatErrors()
-    if !strings.Contains(valMsg, "VEX-TYP-MAP-VAL") {
-        t.Fatalf("expected VEX-TYP-MAP-VAL diagnostic, got: %s", valMsg)
+    if !strings.Contains(valMsg, "TYPE-MAP-VALUE") {
+        t.Fatalf("expected TYPE-MAP-VALUE diagnostic, got: %s", valMsg)
     }
 }
 

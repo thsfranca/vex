@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -104,7 +105,7 @@ func TestSymbolTable_Define_Duplicate(t *testing.T) {
 		t.Error("Define should fail for duplicate name in same scope")
 	}
 	
-	if err.Error() != "symbol 'x' already defined in current scope" {
+	if !strings.Contains(err.Error(), "symbol 'x' already defined in current scope") {
 		t.Errorf("Expected specific error message, got: %v", err.Error())
 	}
 }

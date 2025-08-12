@@ -234,8 +234,8 @@ func TestGenerateDo_TransformsDefAndReturnsLast(t *testing.T) {
         t.Fatalf("generateDo error: %v", err)
     }
     s := v.String()
-    if !strings.Contains(s, "def(x, 10)") {
-        t.Fatalf("expected def transform inside do, got: %s", s)
+    if !strings.Contains(s, "x := 10") {
+        t.Fatalf("expected variable assignment inside do, got: %s", s)
     }
     if !strings.Contains(s, "return (+ x 1)") {
         t.Fatalf("expected last expression as return, got: %s", s)

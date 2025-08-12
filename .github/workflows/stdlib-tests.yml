@@ -14,9 +14,12 @@ env:
   GO_VERSION: '1.21'
   ANTLR_VERSION: '4.13.1'
   STDLIB_COVERAGE_THRESHOLD: 98
+  ASSERTION_DENSITY_THRESHOLD: 1.5
+  TEST_QUALITY_THRESHOLD: 60
 
 jobs:
-  # Detect changes in stdlib files
+  # Detect changes in stdlib files and related testing infrastructure
+  # This workflow only runs when stdlib-specific files change, not on every commit
   detect-stdlib-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -26,7 +29,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Detect stdlib file changes
+    - name: Detect stdlib and testing infrastructure changes
       uses: dorny/paths-filter@v3
       id: changes
       with:
@@ -34,8 +37,12 @@ jobs:
           stdlib-files:
             - 'stdlib/**/*.vx'
             - 'stdlib/**/*.vex'
-            - 'cmd/vex-transpiler/main.go'
-            - 'internal/transpiler/**/*.go'
+            - 'stdlib/**/*.md'
+            - '.github/scripts/test/run-stdlib-tests.sh'
+            - '.github/scripts/test/validate-stdlib-coverage.sh'
+            - '.github/scripts/test/validate-assertion-density.sh'
+            - '.github/scripts/test/post-stdlib-comment.sh'
+            - '.github/workflows/stdlib-tests.yml'
           has-changes:
             - '**'
 
@@ -111,7 +118,15 @@ jobs:
       env:
         STDLIB_COVERAGE_THRESHOLD: ${{ env.STDLIB_COVERAGE_THRESHOLD }}
         
-    - name: Comment stdlib test results on PR
+    - name: Validate assertion density and test quality
+      id: assertion-density
+      run: .github/scripts/test/validate-assertion-density.sh
+      env:
+        ASSERTION_DENSITY_THRESHOLD: ${{ env.ASSERTION_DENSITY_THRESHOLD }}
+        TEST_QUALITY_THRESHOLD: ${{ env.TEST_QUALITY_THRESHOLD }}
+        COVERAGE_FILE: "stdlib-coverage.json"
+        
+    - name: Comment comprehensive test results on PR
       if: always() && github.event_name == 'pull_request'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -136,6 +151,24 @@ jobs:
         echo "Required threshold: 98%"
         echo "Please add more tests to improve function-level coverage before merging"
         exit 1
+        
+    - name: Fail build if assertion density below threshold
+      if: steps.assertion-density.outputs.density-status == 'failed'
+      run: |
+        echo "❌ Build failed due to insufficient assertion density"
+        echo "Current assertion density: ${{ steps.assertion-density.outputs.assertion-density }}/test"
+        echo "Required threshold: ${{ env.ASSERTION_DENSITY_THRESHOLD }}/test"
+        echo "Please add more assertions to verify function behavior before merging"
+        exit 1
+        
+    - name: Fail build if test quality below threshold
+      if: steps.assertion-density.outputs.quality-status == 'failed'
+      run: |
+        echo "❌ Build failed due to low test quality score"
+        echo "Current quality score: ${{ steps.assertion-density.outputs.quality-score }}/100"
+        echo "Required threshold: ${{ env.TEST_QUALITY_THRESHOLD }}/100"
+        echo "Please improve test quality (assertions, edge cases, naming) before merging"
+        exit 1
 
     - name: Upload stdlib coverage artifacts
       if: always()
@@ -146,6 +179,8 @@ jobs:
           stdlib-coverage.json
           stdlib-coverage-report.md
           stdlib-test-results.log
+          assertion-density-section.md
+          combined-test-report.md
         retention-days: 30
 
   # Skip job when no stdlib changes
@@ -156,5 +191,13 @@ jobs:
     steps:
     - name: Skip stdlib tests
       run: |
-        echo "⏭️ Skipping stdlib tests - no stdlib file changes detected"
-        echo "Changes detected: ${{ needs.detect-stdlib-changes.outputs.has-changes }}"
+        echo "⏭️ Skipping stdlib tests - no relevant changes detected"
+        echo "📁 Monitored paths:"
+        echo "   - stdlib/**/*.vx (stdlib source files)"
+        echo "   - stdlib/**/*.vex (stdlib source files)"
+        echo "   - stdlib/**/*.md (stdlib documentation)"
+        echo "   - .github/scripts/test/*stdlib* (testing scripts)"
+        echo "   - .github/workflows/stdlib-tests.yml (this workflow)"
+        echo ""
+        echo "💡 Stdlib tests will run when any of these files change"
+        echo "🔄 Overall changes detected: ${{ needs.detect-stdlib-changes.outputs.has-changes }}"

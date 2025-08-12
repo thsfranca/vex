@@ -8,9 +8,9 @@ import (
 // Test the enhanced defn macro functionality
 func TestTranspiler_DefnMacro(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected []string
+		name        string
+		input       string
+		expected    []string
 		notExpected []string
 	}{
 		{
@@ -79,18 +79,18 @@ func TestTranspiler_DefnMacro(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			// Check expected content
 			for _, expected := range tt.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", expected, result)
 				}
 			}
-			
+
 			// Check that unwanted content is not present
 			for _, notExpected := range tt.notExpected {
 				if strings.Contains(result, notExpected) {
@@ -108,21 +108,21 @@ func TestTranspiler_DefnMacroTypeInference(t *testing.T) {
 		expected []string
 	}{
 		{
-			name: "Integer arithmetic function",
+			name:  "Integer arithmetic function",
 			input: `(defn calculate [a: int b: int] -> int (+ (* a 2) b))`,
 			expected: []string{
 				"calculate := func(a interface{}, b interface{}) interface{} { return ((a * 2) + b) }",
 			},
 		},
 		{
-			name: "String manipulation function",
+			name:  "String manipulation function",
 			input: `(defn concat [s1: string s2: string] -> string (+ s1 s2))`,
 			expected: []string{
 				"concat := func(s1 interface{}, s2 interface{}) interface{} { return (s1 + s2) }",
 			},
 		},
 		{
-			name: "Boolean function",
+			name:  "Boolean function",
 			input: `(defn is-positive [x: int] -> bool (> x 0))`,
 			expected: []string{
 				"is_positive := func(x interface{}) interface{} { return (x > 0) }",
@@ -134,11 +134,11 @@ func TestTranspiler_DefnMacroTypeInference(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			for _, expected := range tt.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", expected, result)
@@ -173,30 +173,30 @@ func TestTranspiler_DefnMacroErrorHandling(t *testing.T) {
 			expectedError: true,
 			errorMessage:  "defn requires function body",
 		},
-        {
-            name:          "defn with invalid parameter list",
-            input:         `(defn square "not-a-list" (* x x))`,
-            expectedError: true,
-            errorMessage:  "defn requires parameter list",
-        },
-        {
-            name:          "defn with snake_case function name",
-            input:         `(defn my_function [x: int] -> int (* x 2))`,
-            expectedError: true,
-            errorMessage:  "function names must use kebab-case",
-        },
-        {
-            name:          "defn with valid kebab-case function name",
-            input:         `(defn my-function [x: int] -> int (* x 2))`,
-            expectedError: false,
-        },
+		{
+			name:          "defn with invalid parameter list",
+			input:         `(defn square "not-a-list" (* x x))`,
+			expectedError: true,
+			errorMessage:  "defn requires parameter list",
+		},
+		{
+			name:          "defn with snake_case function name",
+			input:         `(defn my_function [x: int] -> int (* x 2))`,
+			expectedError: true,
+			errorMessage:  "function names must use kebab-case",
+		},
+		{
+			name:          "defn with valid kebab-case function name",
+			input:         `(defn my-function [x: int] -> int (* x 2))`,
+			expectedError: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if tt.expectedError {
 				// Check if error occurred or error message appears in output
 				if err == nil && !strings.Contains(result, tt.errorMessage) {
@@ -218,21 +218,21 @@ func TestTranspiler_DefnMacroComplexBodies(t *testing.T) {
 		expected []string
 	}{
 		{
-			name: "Function with conditional body",
+			name:  "Function with conditional body",
 			input: `(defn abs [x: int] -> int (if (< x 0) (- x) x))`,
 			expected: []string{
 				"abs := func(x interface{}) interface{} { return func() interface{} { if (x < 0) { return 0 } else { return x } }() }",
 			},
 		},
 		{
-			name: "Function with nested operations",
+			name:  "Function with nested operations",
 			input: `(defn complex [a: int b: int c: int] -> int (+ (* a b) (/ c 2)))`,
 			expected: []string{
 				"complex := func(a interface{}, b interface{}, c interface{}) interface{} { return ((a * b) + (c / 2)) }",
 			},
 		},
 		{
-			name: "Function with array operations",
+			name:  "Function with array operations",
 			input: `(defn get-first [arr: [int]] -> int (get arr 0))`,
 			expected: []string{
 				"get_first := func(arr interface{}) interface{} { return func() interface{} { if len(arr) > 0 { return arr[0] } else",
@@ -244,11 +244,11 @@ func TestTranspiler_DefnMacroComplexBodies(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			for _, expected := range tt.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", expected, result)

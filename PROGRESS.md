@@ -230,45 +230,57 @@ Optimize transpiler performance for faster CLI operations and improved developer
 ### Goal
 Implement progressive Go code reduction strategy aligned with Minimal Go Implementation design principle. Reduce Go codebase from ~20,719 lines through systematic self-hosting in Vex.
 
-### Implementation Ready - Foundation Complete:
-- ✅ **Coverage Infrastructure** - Complete coverage system with enhanced reporting capability
-- ✅ **Function Discovery Foundation** - Basic framework exists in `internal/transpiler/coverage/`
-- ✅ **Test Correlation System** - Initial test-to-function mapping capability implemented
-- ✅ **JSON Export Framework** - Coverage data export system ready for enhancement
+### Phase 4.6.1: Self-Hosted Development Tools (6-8 weeks)
+**Target: 23% Go code reduction (~1,155 lines)**
 
 ### What to build:
-- [ ] **Enhanced Function Discovery Engine** - Parse Vex source files to identify all `defn`, `defmacro`, and `def` declarations
-- [ ] **Advanced Test-to-Function Mapping** - Heuristic matching to link test cases to covered functions  
-- [ ] **Enhanced Coverage Reports** - Show function-level coverage alongside existing file-level metrics
-- [ ] **Uncovered Function Detection** - List specific functions that lack test coverage
-- [ ] **Verbose Coverage Mode** - Display detailed function coverage in `vex test -verbose -coverage`
-- [ ] **Enhanced JSON Coverage Export** - Include function-level data in `-coverage-out` reports for CI/CD
+- [ ] **Coverage analysis migration** - Move `internal/transpiler/coverage/` to `stdlib/vex/coverage/`
+- [ ] **Build automation in Vex** - Replace `tools/release-manager/`, `tools/change-detector/` with Vex scripts
+- [ ] **File processing utilities** - Migrate `tools/extension-tester/`, `tools/debug-helper/` to Vex
+- [ ] **Grammar validation in Vex** - Replace `tools/grammar-validator/` with Vex test integration
+- [ ] **Enhanced Vex stdlib** - String processing, file operations, JSON handling
+
+### Implementation Started:
+- ✅ **Coverage foundation** - `stdlib/vex/coverage/analysis.vx` and `coverage.vx` exist
+- ✅ **Function discovery patterns** - Basic Vex implementation patterns established
+- ✅ **Go interop examples** - Working patterns for Vex calling Go libraries
 
 ### What will be learned:
-- **AST Analysis** - Parsing Vex source for function extraction
-- **Test Correlation** - Strategies for linking tests to source functions  
-- **Coverage Metrics Design** - Balancing precision with implementation complexity
-- **CI/CD Integration** - Structured coverage data for automated quality gates
+- **Self-hosting techniques** - Implementing development tools in the target language
+- **Go interop patterns** - Effective Vex/Go integration strategies
+- **Performance optimization** - Maintaining tool performance in transpiled code
+- **Migration strategies** - Systematic approaches to language component migration
 
 ### Success Criteria:
-- **Precision Improvement**: Coverage accuracy increases from ~40% (file-based) to ~70% (function-based)
-- **Actionable Reports**: Clear identification of untested functions with file/line references
-- **Performance**: Function analysis adds <100ms overhead to existing coverage generation
-- **Backward Compatibility**: Existing file-based coverage reports remain unchanged
-- **CI Integration**: JSON output includes function-level coverage for build pipeline consumption
+- **Measurable reduction**: 1,155+ lines of Go code removed
+- **Functional equivalence**: All tools maintain existing functionality
+- **Performance acceptable**: <10% overhead for tool operations
+- **AI-friendly patterns**: Uniform S-expression syntax throughout tools
+- **Foundation established**: Patterns for Phase 4.6.2 and 4.6.3
 
-### Example Enhanced Output:
+### Example Self-Hosted Implementation:
+```vex
+;; Coverage analysis in Vex (building on stdlib/vex/coverage/)
+(import ["os" "encoding/json" "fmt"])
+
+(defn analyze-package-coverage [package-dir: string] -> interface{}
+  (-> package-dir
+      (discover-functions)
+      (correlate-with-tests)
+      (calculate-metrics)))
+
+(defn generate-enhanced-report [coverage-data: interface{}] -> string
+  (-> coverage-data
+      (format-function-coverage)
+      (add-visual-indicators)
+      (create-actionable-suggestions)))
 ```
-📊 Enhanced Coverage Report
-─────────────────────────
-✅ stdlib/vex/core: 83% (5/6 functions), 100% (1/1 files)
-   Functions: add✅, multiply✅, divide✅, parse-int✅, format✅, unused-helper❌
-✅ stdlib/vex/collections: 67% (4/6 functions), 100% (1/1 files)  
-   Functions: filter✅, map✅, reduce✅, first✅, empty?❌, last❌
-─────────────────────────
-📊 Overall: 75% (9/12 functions), 100% (2/2 files)
-💡 Untested functions: unused-helper, empty?, last
-```
+
+### Phase 4.6.2: Analysis Components (Future)
+**Target: Additional 15-20% reduction (macro system, symbol management)**
+
+### Phase 4.6.3: Code Generation Evaluation (Future)
+**Target: Potential 20-25% more reduction (Go code templates, AST traversal)**
 
 ---
 

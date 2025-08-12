@@ -21,11 +21,11 @@ func TestTranspiler_ExpressionEvaluation(t *testing.T) {
 			input:    `(def result (+ (* 2 3) (/ 8 4)))`,
 			expected: `result := ((2 * 3) + (8 / 4))`,
 		},
-        {
-            name:     "Function call in assignment",
-            input:    `(def result (calculate 5 10))`,
-            expected: `result := calculate(5, 10)`,
-        },
+		{
+			name:     "Function call in assignment",
+			input:    `(def result (calculate 5 10))`,
+			expected: `result := calculate(5, 10)`,
+		},
 		{
 			name:     "If expression in assignment",
 			input:    `(def result (if true "yes" "no"))`,
@@ -36,11 +36,11 @@ func TestTranspiler_ExpressionEvaluation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
-            result, err := tr.TranspileFromInput(tt.input)
-            if err != nil {
-                t.Fatalf("Unexpected error: %v", err)
-            }
-			
+			result, err := tr.TranspileFromInput(tt.input)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -54,11 +54,11 @@ func TestTranspiler_NestedExpressions(t *testing.T) {
 		input    string
 		expected string
 	}{
-        {
-            name:     "Nested function calls",
-            input:    `(def result (print (add 1 (multiply 2 3))))`,
-            expected: `result := print(add(1, multiply(2, 3)))`,
-        },
+		{
+			name:     "Nested function calls",
+			input:    `(def result (print (add 1 (multiply 2 3))))`,
+			expected: `result := print(add(1, multiply(2, 3)))`,
+		},
 		{
 			name:     "Nested arithmetic",
 			input:    `(def result (+ (- (* 5 6) (/ 8 2)) (+ 1 2)))`,
@@ -74,11 +74,11 @@ func TestTranspiler_NestedExpressions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
-            result, err := tr.TranspileFromInput(tt.input)
-            if err != nil {
-                t.Fatalf("Unexpected error: %v", err)
-            }
-			
+			result, err := tr.TranspileFromInput(tt.input)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -122,11 +122,11 @@ func TestTranspiler_ArithmeticExpressions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
-            result, err := tr.TranspileFromInput(tt.input)
-            if err != nil {
-                t.Fatalf("Unexpected error: %v", err)
-            }
-			
+			result, err := tr.TranspileFromInput(tt.input)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -166,11 +166,11 @@ func TestTranspiler_FunctionCallExpressions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -210,11 +210,11 @@ func TestTranspiler_ConditionalExpressions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -236,7 +236,7 @@ func TestTranspiler_DoBlockExpressions(t *testing.T) {
 		{
 			name:     "Do with multiple expressions",
 			input:    `(def result (do (print "computing") 42))`,
-            expected: ``,
+			expected: ``,
 		},
 		{
 			name:     "Do with arithmetic",
@@ -248,17 +248,17 @@ func TestTranspiler_DoBlockExpressions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
-            result, err := tr.TranspileFromInput(tt.input)
-            if strings.Contains(tt.name, "Do with multiple expressions") {
-                if err == nil {
-                    t.Fatalf("Expected type error for do-block mismatch, got: %s", result)
-                }
-                return
-            }
-            if err != nil {
-                t.Fatalf("Unexpected error: %v", err)
-            }
-			
+			result, err := tr.TranspileFromInput(tt.input)
+			if strings.Contains(tt.name, "Do with multiple expressions") {
+				if err == nil {
+					t.Fatalf("Expected type error for do-block mismatch, got: %s", result)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -298,11 +298,11 @@ func TestTranspiler_LambdaExpressions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -337,11 +337,11 @@ func TestTranspiler_ExpressionEdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -376,11 +376,11 @@ func TestTranspiler_ComplexNestedExpressions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}

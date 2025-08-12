@@ -84,72 +84,78 @@ type dummySymTable struct{}
 
 func (d *dummySymTable) Define(name string, value Value) error { return nil }
 func (d *dummySymTable) Lookup(name string) (Value, bool)      { return nil, false }
-func (d *dummySymTable) EnterScope()                            {}
-func (d *dummySymTable) ExitScope()                             {}
+func (d *dummySymTable) EnterScope()                           {}
+func (d *dummySymTable) ExitScope()                            {}
 
 // extra: consolidated from adapters_values_extra_test.go
 func TestAnalysisValueAdapter_StringAndType(t *testing.T) {
-    ava := &AnalysisValueAdapter{value: &simpleValue{val: "v", typ: "K"}}
-    if ava.String() != "v" || ava.Type() != "K" {
-        t.Fatalf("unexpected outputs: %s %s", ava.String(), ava.Type())
-    }
+	ava := &AnalysisValueAdapter{value: &simpleValue{val: "v", typ: "K"}}
+	if ava.String() != "v" || ava.Type() != "K" {
+		t.Fatalf("unexpected outputs: %s %s", ava.String(), ava.Type())
+	}
 }
 
 // Cover CodegenSymbolTable and CodegenValueBridge low-coverage paths
 func TestCodegenSymbolTable_DefineLookupScopeAndBridge(t *testing.T) {
-    // Backing symbol table to observe calls
-    bt := &backingSymTable{m: map[string]Value{}}
-    cst := &CodegenSymbolTable{table: bt}
+	// Backing symbol table to observe calls
+	bt := &backingSymTable{m: map[string]Value{}}
+	cst := &CodegenSymbolTable{table: bt}
 
-    // Define via codegen interface (wraps value)
-    if err := cst.Define("k", &stubCodegenValue{s: "1", t: "int"}); err != nil {
-        t.Fatalf("Define error: %v", err)
-    }
-    // Enter/Exit scope delegate calls
-    cst.EnterScope()
-    cst.ExitScope()
-    // Lookup should return a CodegenValueBridge
-    cv, ok := cst.Lookup("k")
-    if !ok || cv == nil {
-        t.Fatalf("expected lookup to succeed")
-    }
-    // Bridge String/Type should reflect backing value
-    if cv.String() != "1" || cv.Type() != "int" {
-        t.Fatalf("bridge mismatch: %s %s", cv.String(), cv.Type())
-    }
+	// Define via codegen interface (wraps value)
+	if err := cst.Define("k", &stubCodegenValue{s: "1", t: "int"}); err != nil {
+		t.Fatalf("Define error: %v", err)
+	}
+	// Enter/Exit scope delegate calls
+	cst.EnterScope()
+	cst.ExitScope()
+	// Lookup should return a CodegenValueBridge
+	cv, ok := cst.Lookup("k")
+	if !ok || cv == nil {
+		t.Fatalf("expected lookup to succeed")
+	}
+	// Bridge String/Type should reflect backing value
+	if cv.String() != "1" || cv.Type() != "int" {
+		t.Fatalf("bridge mismatch: %s %s", cv.String(), cv.Type())
+	}
 }
 
 type backingSymTable struct{ m map[string]Value }
 
 func (b *backingSymTable) Define(name string, value Value) error { b.m[name] = value; return nil }
 func (b *backingSymTable) Lookup(name string) (Value, bool)      { v, ok := b.m[name]; return v, ok }
-func (b *backingSymTable) EnterScope()                            {}
-func (b *backingSymTable) ExitScope()                             {}
+func (b *backingSymTable) EnterScope()                           {}
+func (b *backingSymTable) ExitScope()                            {}
 
 // Stubs for codegen values
 type stubCodegenValue struct{ s, t string }
+
 func (v *stubCodegenValue) String() string { return v.s }
 func (v *stubCodegenValue) Type() string   { return v.t }
 
 // Also cover the SymbolTableAdapter wrappers with a minimal backing table
 func TestSymbolTableAdapter_Wrappers(t *testing.T) {
-    bt := &backingAnalysisTable{m: map[string]analysis.Value{}}
-    sta := &SymbolTableAdapter{table: bt}
-    if err := sta.Define("z", &simpleValue{val: "2", typ: "int"}); err != nil {
-        t.Fatalf("Define: %v", err)
-    }
-    sta.EnterScope()
-    sta.ExitScope()
-    v, ok := sta.Lookup("z")
-    if !ok || v == nil || v.String() != "2" || v.Type() != "int" {
-        t.Fatalf("Lookup mismatch: ok=%v v=%#v", ok, v)
-    }
+	bt := &backingAnalysisTable{m: map[string]analysis.Value{}}
+	sta := &SymbolTableAdapter{table: bt}
+	if err := sta.Define("z", &simpleValue{val: "2", typ: "int"}); err != nil {
+		t.Fatalf("Define: %v", err)
+	}
+	sta.EnterScope()
+	sta.ExitScope()
+	v, ok := sta.Lookup("z")
+	if !ok || v == nil || v.String() != "2" || v.Type() != "int" {
+		t.Fatalf("Lookup mismatch: ok=%v v=%#v", ok, v)
+	}
 }
 
-
-
 type backingAnalysisTable struct{ m map[string]analysis.Value }
-func (b *backingAnalysisTable) Define(name string, value analysis.Value) error { b.m[name] = value; return nil }
-func (b *backingAnalysisTable) Lookup(name string) (analysis.Value, bool)      { v, ok := b.m[name]; return v, ok }
-func (b *backingAnalysisTable) EnterScope()                                      {}
-func (b *backingAnalysisTable) ExitScope()                                       {}
+
+func (b *backingAnalysisTable) Define(name string, value analysis.Value) error {
+	b.m[name] = value
+	return nil
+}
+func (b *backingAnalysisTable) Lookup(name string) (analysis.Value, bool) {
+	v, ok := b.m[name]
+	return v, ok
+}
+func (b *backingAnalysisTable) EnterScope() {}
+func (b *backingAnalysisTable) ExitScope()  {}

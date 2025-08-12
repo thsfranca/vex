@@ -8,9 +8,9 @@ import (
 // Test the enhanced macro parameter substitution functionality
 func TestTranspiler_SafeParameterSubstitution(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected []string
+		name        string
+		input       string
+		expected    []string
 		notExpected []string // Things that should NOT appear (unsafe replacements)
 	}{
 		{
@@ -81,18 +81,18 @@ func TestTranspiler_SafeParameterSubstitution(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			// Check expected content
 			for _, expected := range tt.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", expected, result)
 				}
 			}
-			
+
 			// Check that unsafe replacements didn't happen
 			for _, notExpected := range tt.notExpected {
 				if strings.Contains(result, notExpected) {
@@ -135,11 +135,11 @@ func TestTranspiler_MacroSymbolBoundaries(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -183,11 +183,11 @@ func TestTranspiler_MacroNestedStructures(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			for _, expected := range tt.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", expected, result)
@@ -203,15 +203,7 @@ func TestTranspiler_MacroEdgeCases(t *testing.T) {
 		input    string
 		expected []string
 	}{
-		// TODO: Empty parameter list has same AST corruption issue as identity macros
-		// {
-		// 	name: "Empty parameter list",
-		// 	input: `(macro constant [] 42)
-		// (constant)`,
-		// 	expected: []string{
-		// 		"_ = 42",
-		// 	},
-		// },
+
 		{
 			name: "Parameter same as built-in function",
 			input: `(macro test [def] (+ def 1))
@@ -234,11 +226,11 @@ func TestTranspiler_MacroEdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			for _, expected := range tt.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", expected, result)

@@ -37,11 +37,11 @@ func TestTranspiler_CollectionOperations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -86,11 +86,11 @@ func TestTranspiler_CollectionOperationsAsExpressions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -165,11 +165,11 @@ func TestTranspiler_HandleCollectionOpComprehensive(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -224,11 +224,11 @@ func TestTranspiler_EvaluateCollectionOpComprehensive(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -279,7 +279,7 @@ func TestTranspiler_EvaluateCollectionOpErrorPaths(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Fatalf("Expected error but got none. Result: %s", result)
@@ -328,11 +328,11 @@ func TestTranspiler_CollectionOperationsWithComplexExpressions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := New()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}

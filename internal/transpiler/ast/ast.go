@@ -93,7 +93,7 @@ func (p *VexParser) ParseFile(filename string) (AST, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %v", filename, err)
 	}
-	
+
 	return p.Parse(string(content))
 }
 

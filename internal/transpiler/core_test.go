@@ -15,10 +15,10 @@ func TestTranspiler_New(t *testing.T) {
 }
 
 func TestTranspiler_NewWithDebug(t *testing.T) {
-    tr := NewWithDebug()
-    if tr == nil {
-        t.Error("Expected NewWithDebug() to return a non-nil transpiler")
-    }
+	tr := NewWithDebug()
+	if tr == nil {
+		t.Error("Expected NewWithDebug() to return a non-nil transpiler")
+	}
 }
 
 func TestTranspiler_SimpleExpressions(t *testing.T) {
@@ -187,10 +187,10 @@ func TestTranspiler_DependencyDetection(t *testing.T) {
 
 func TestTranspiler_GoModulesDetection(t *testing.T) {
 	tests := []struct {
-		name                string
-		input               string
-		expectedThirdParty  bool
-		expectedModuleName  string
+		name               string
+		input              string
+		expectedThirdParty bool
+		expectedModuleName string
 	}{
 		{
 			name:               "Standard library - no third party",
@@ -215,7 +215,7 @@ func TestTranspiler_GoModulesDetection(t *testing.T) {
 			}
 
 			modules := transpiler.GetDetectedModules()
-			
+
 			if tt.expectedThirdParty {
 				if _, exists := modules[tt.expectedModuleName]; !exists {
 					t.Errorf("Expected module %q to be detected as third-party", tt.expectedModuleName)
@@ -447,14 +447,14 @@ func TestTranspiler_VisitNodeComprehensive(t *testing.T) {
 				"num := 42",
 			},
 		},
-        {
-            name:  "Symbol handling (defined symbol)",
-            input: "(def y 1) (def x y)",
-            expected: []string{
-                "y := 1",
-                "x := y",
-            },
-        },
+		{
+			name:  "Symbol handling (defined symbol)",
+			input: "(def y 1) (def x y)",
+			expected: []string{
+				"y := 1",
+				"x := y",
+			},
+		},
 	}
 
 	for _, tt := range tests {

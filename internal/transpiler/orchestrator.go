@@ -32,8 +32,8 @@ func NewBuilder() *TranspilerBuilder {
 			CoreMacroPath:    "", // Will be determined dynamically
 			PackageName:      "main",
 			GenerateComments: true,
-            IgnoreImports:    make(map[string]bool),
-            Exports:          make(map[string]map[string]bool),
+			IgnoreImports:    make(map[string]bool),
+			Exports:          make(map[string]map[string]bool),
 		},
 	}
 }
@@ -76,24 +76,24 @@ func (b *TranspilerBuilder) Build() (*VexTranspiler, error) {
 			EnableValidation: true,
 		}
 		registry := macro.NewRegistry(macroConfig)
-		
+
 		// Core macros are now loaded only via explicit imports
 		// Auto-loading removed to enforce explicit stdlib imports
-		
+
 		macroSystem = NewMacroExpanderAdapter(macro.NewMacroExpander(registry))
 	}
 
-    // Create analyzer
-    analyzer := NewAnalyzerAdapter()
-    // Provide package environment for analyzer (package exports/ignore/schemes)
-    analyzer.SetPackageEnv(b.config.IgnoreImports, b.config.Exports, b.config.PkgSchemes)
+	// Create analyzer
+	analyzer := NewAnalyzerAdapter()
+	// Provide package environment for analyzer (package exports/ignore/schemes)
+	analyzer.SetPackageEnv(b.config.IgnoreImports, b.config.Exports, b.config.PkgSchemes)
 
 	// Create code generator
 	codeGenConfig := codegen.Config{
 		PackageName:      b.config.PackageName,
 		GenerateComments: b.config.GenerateComments,
 		IndentSize:       4,
-        IgnoreImports:    b.config.IgnoreImports,
+		IgnoreImports:    b.config.IgnoreImports,
 	}
 	codeGen := NewCodeGeneratorAdapter(codeGenConfig)
 
@@ -111,17 +111,17 @@ func (b *TranspilerBuilder) Build() (*VexTranspiler, error) {
 func (vt *VexTranspiler) TranspileFromInput(input string) (string, error) {
 	// Reset detected modules for each transpilation
 	vt.detectedModules = make(map[string]string)
-	
+
 	// Detect third-party modules from imports
 	vt.detectThirdPartyModules(input)
-	
+
 	// Phase 0: Extract and load stdlib imports before macro expansion
 	if vt.config.EnableMacros && vt.macroSystem != nil {
 		if err := vt.loadStdlibImports(input); err != nil {
 			return "", fmt.Errorf("stdlib import error: %v", err)
 		}
 	}
-	
+
 	// Phase 1: Parse
 	ast, err := vt.parser.Parse(input)
 	if err != nil {
@@ -156,18 +156,18 @@ func (vt *VexTranspiler) loadStdlibImports(input string) error {
 	// Parse import statements from the source using a simple regex approach
 	// This is a lightweight pre-processing step before full parsing
 	lines := strings.Split(input, "\n")
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		
+
 		// Look for import statements: (import vex.module) or (import "vex.module")
 		if strings.HasPrefix(line, "(import ") && strings.HasSuffix(line, ")") {
 			// Extract module name between "import " and ")"
 			importContent := strings.TrimSpace(line[8 : len(line)-1]) // Remove "(import " and ")"
-			
+
 			// Remove quotes if present
 			moduleName := strings.Trim(importContent, "\"")
-			
+
 			// Only handle stdlib modules (starting with "vex.")
 			if strings.HasPrefix(moduleName, "vex.") {
 				if err := vt.macroSystem.LoadStdlibModule(moduleName); err != nil {
@@ -181,7 +181,7 @@ func (vt *VexTranspiler) loadStdlibImports(input string) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -192,7 +192,7 @@ func (vt *VexTranspiler) TranspileFromFile(filename string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read file %s: %v", filename, err)
 	}
-	
+
 	return vt.TranspileFromInput(string(content))
 }
 

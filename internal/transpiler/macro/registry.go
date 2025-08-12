@@ -21,10 +21,10 @@ type Macro struct {
 // Registry manages macro registration and expansion
 // Registry stores macros and loads core macros from disk.
 type Registry struct {
-	macros         map[string]*Macro
-	coreLoaded     bool
-	loadedModules  map[string]bool // Track which stdlib modules have been loaded
-	config         Config
+	macros        map[string]*Macro
+	coreLoaded    bool
+	loadedModules map[string]bool // Track which stdlib modules have been loaded
+	config        Config
 }
 
 // Config holds macro system configuration
@@ -53,7 +53,7 @@ func (r *Registry) RegisterMacro(name string, macro *Macro) error {
 			return err
 		}
 	}
-	
+
 	r.macros[name] = macro
 	return nil
 }
@@ -76,25 +76,25 @@ func (r *Registry) LoadStdlibModule(moduleName string) error {
 	if r.loadedModules[moduleName] {
 		return nil
 	}
-	
+
 	// Convert module name to path (e.g., "vex.core" -> "vex/core")
 	modulePath := strings.ReplaceAll(moduleName, ".", "/")
-	
+
 	// Try different stdlib locations
 	var stdlibDirs []string
-	
+
 	// If explicit stdlib path is provided, use it first
 	if r.config.StdlibPath != "" {
 		stdlibDirs = append(stdlibDirs, filepath.Join(r.config.StdlibPath, modulePath))
 	}
-	
+
 	// Add relative paths as fallback
 	stdlibDirs = append(stdlibDirs,
 		filepath.Join("stdlib", modulePath),
 		filepath.Join("../../stdlib", modulePath),
 		filepath.Join("../../../stdlib", modulePath),
 	)
-	
+
 	// Try to load from one of the directories
 	for _, dir := range stdlibDirs {
 		if err := r.loadFromDirectory(dir); err == nil {
@@ -102,7 +102,7 @@ func (r *Registry) LoadStdlibModule(moduleName string) error {
 			return nil
 		}
 	}
-	
+
 	return fmt.Errorf("stdlib module '%s' not found in any of the search paths", moduleName)
 }
 
@@ -113,64 +113,64 @@ func (r *Registry) LoadCoreMacros() error {
 	}
 	r.coreLoaded = true
 
-    // 1) Explicit path (file or directory)
-    if r.config.CoreMacroPath != "" {
-        if err := r.loadFromPath(r.config.CoreMacroPath); err == nil {
-            return nil
-        }
-    }
+	// 1) Explicit path (file or directory)
+	if r.config.CoreMacroPath != "" {
+		if err := r.loadFromPath(r.config.CoreMacroPath); err == nil {
+			return nil
+		}
+	}
 
-    // 2) Stdlib package directories (load all that exist)
-    var stdlibDirs []string
-    
-    // If explicit stdlib path is provided, use it first
-    if r.config.StdlibPath != "" {
-        stdlibDirs = append(stdlibDirs,
-            filepath.Join(r.config.StdlibPath, "vex/core"),
-            filepath.Join(r.config.StdlibPath, "vex/conditions"),
-            filepath.Join(r.config.StdlibPath, "vex/collections"),
-            filepath.Join(r.config.StdlibPath, "vex/bindings"),
-            filepath.Join(r.config.StdlibPath, "vex/flow"),
-            filepath.Join(r.config.StdlibPath, "vex/threading"),
-            filepath.Join(r.config.StdlibPath, "vex/test"),
-        )
-    }
-    
-    // Add relative paths as fallback
-    stdlibDirs = append(stdlibDirs,
-        "stdlib/vex/core",
-        "stdlib/vex/conditions",
-        "stdlib/vex/collections",
-        "stdlib/vex/bindings",
-        "stdlib/vex/flow",
-        "stdlib/vex/threading",
-        "stdlib/vex/test",
-        "../../stdlib/vex/core",
-        "../../stdlib/vex/conditions",
-        "../../stdlib/vex/collections",
-        "../../stdlib/vex/bindings",
-        "../../stdlib/vex/flow",
-        "../../stdlib/vex/threading",
-        "../../stdlib/vex/test",
-        "../../../stdlib/vex/core",
-        "../../../stdlib/vex/conditions",
-        "../../../stdlib/vex/collections",
-        "../../../stdlib/vex/bindings",
-        "../../../stdlib/vex/flow",
-        "../../../stdlib/vex/threading",
-        "../../../stdlib/vex/test",
-    )
-    loadedAny := false
-    for _, dir := range stdlibDirs {
-        if err := r.loadFromDirectory(dir); err == nil {
-            loadedAny = true
-        }
-    }
-    if loadedAny {
-        return nil
-    }
+	// 2) Stdlib package directories (load all that exist)
+	var stdlibDirs []string
 
-    return fmt.Errorf("no core macros available - tried stdlib paths")
+	// If explicit stdlib path is provided, use it first
+	if r.config.StdlibPath != "" {
+		stdlibDirs = append(stdlibDirs,
+			filepath.Join(r.config.StdlibPath, "vex/core"),
+			filepath.Join(r.config.StdlibPath, "vex/conditions"),
+			filepath.Join(r.config.StdlibPath, "vex/collections"),
+			filepath.Join(r.config.StdlibPath, "vex/bindings"),
+			filepath.Join(r.config.StdlibPath, "vex/flow"),
+			filepath.Join(r.config.StdlibPath, "vex/threading"),
+			filepath.Join(r.config.StdlibPath, "vex/test"),
+		)
+	}
+
+	// Add relative paths as fallback
+	stdlibDirs = append(stdlibDirs,
+		"stdlib/vex/core",
+		"stdlib/vex/conditions",
+		"stdlib/vex/collections",
+		"stdlib/vex/bindings",
+		"stdlib/vex/flow",
+		"stdlib/vex/threading",
+		"stdlib/vex/test",
+		"../../stdlib/vex/core",
+		"../../stdlib/vex/conditions",
+		"../../stdlib/vex/collections",
+		"../../stdlib/vex/bindings",
+		"../../stdlib/vex/flow",
+		"../../stdlib/vex/threading",
+		"../../stdlib/vex/test",
+		"../../../stdlib/vex/core",
+		"../../../stdlib/vex/conditions",
+		"../../../stdlib/vex/collections",
+		"../../../stdlib/vex/bindings",
+		"../../../stdlib/vex/flow",
+		"../../../stdlib/vex/threading",
+		"../../../stdlib/vex/test",
+	)
+	loadedAny := false
+	for _, dir := range stdlibDirs {
+		if err := r.loadFromDirectory(dir); err == nil {
+			loadedAny = true
+		}
+	}
+	if loadedAny {
+		return nil
+	}
+
+	return fmt.Errorf("no core macros available - tried stdlib paths")
 }
 
 // loadMacrosFromContent parses macro definitions from Vex code
@@ -181,7 +181,7 @@ func (r *Registry) loadMacrosFromContent(content string) error {
 	defer func() {
 		r.config.EnableValidation = originalValidation
 	}()
-	
+
 	// Create a minimal parser for macro definitions
 	inputStream := antlr.NewInputStream(content)
 	lexer := parser.NewVexLexer(inputStream)
@@ -198,50 +198,50 @@ func (r *Registry) loadMacrosFromContent(content string) error {
 }
 
 func (r *Registry) loadFromPath(path string) error {
-    info, err := os.Stat(path)
-    if err != nil {
-        return err
-    }
-    if info.IsDir() {
-        return r.loadFromDirectory(path)
-    }
-    return r.loadFromFile(path)
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return r.loadFromDirectory(path)
+	}
+	return r.loadFromFile(path)
 }
 
 func (r *Registry) loadFromFile(path string) error {
-    if !strings.HasSuffix(path, ".vx") && !strings.HasSuffix(path, ".vex") {
-        return fmt.Errorf("not a vex file: %s", path)
-    }
-    content, err := os.ReadFile(path)
-    if err != nil {
-        return err
-    }
-    return r.loadMacrosFromContent(string(content))
+	if !strings.HasSuffix(path, ".vx") && !strings.HasSuffix(path, ".vex") {
+		return fmt.Errorf("not a vex file: %s", path)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return r.loadMacrosFromContent(string(content))
 }
 
 func (r *Registry) loadFromDirectory(dir string) error {
-    entries, err := os.ReadDir(dir)
-    if err != nil {
-        return err
-    }
-    had := false
-    for _, e := range entries {
-        if e.IsDir() {
-            continue
-        }
-        name := e.Name()
-        if strings.HasSuffix(name, ".vx") || strings.HasSuffix(name, ".vex") {
-            had = true
-            full := filepath.Join(dir, name)
-            if err := r.loadFromFile(full); err != nil {
-                return err
-            }
-        }
-    }
-    if !had {
-        return fs.ErrNotExist
-    }
-    return nil
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	had := false
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if strings.HasSuffix(name, ".vx") || strings.HasSuffix(name, ".vex") {
+			had = true
+			full := filepath.Join(dir, name)
+			if err := r.loadFromFile(full); err != nil {
+				return err
+			}
+		}
+	}
+	if !had {
+		return fs.ErrNotExist
+	}
+	return nil
 }
 
 // extractMacrosFromAST extracts macro definitions from parsed AST
@@ -264,11 +264,11 @@ func (r *Registry) isMacroDefinition(listCtx *parser.ListContext) bool {
 	if len(children) < 2 {
 		return false
 	}
-	
+
 	if terminal, ok := children[1].(*antlr.TerminalNodeImpl); ok {
 		return terminal.GetText() == "macro"
 	}
-	
+
 	return false
 }
 
@@ -304,8 +304,6 @@ func (r *Registry) parseMacroDefinition(listCtx *parser.ListContext) error {
 
 	return r.RegisterMacro(name, macro)
 }
-
-
 
 // validateMacro validates a macro definition
 func (r *Registry) validateMacro(name string, macro *Macro) error {
@@ -356,7 +354,7 @@ func (r *Registry) nodeToString(node antlr.Tree) string {
 
 func (r *Registry) parseParameterList(paramList string) ([]string, error) {
 	trimmed := strings.TrimSpace(paramList)
-	
+
 	// Handle both Vex format [x y] and Go format []interface{}{x, y}
 	if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") && !strings.Contains(trimmed, "interface{}") {
 		// Vex format
@@ -382,7 +380,7 @@ func (r *Registry) parseParameterList(paramList string) ([]string, error) {
 			}
 		}
 	}
-	
+
 	return nil, fmt.Errorf("invalid parameter list format: %s", paramList)
 }
 

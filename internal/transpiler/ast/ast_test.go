@@ -107,12 +107,12 @@ func TestVexParser_Parse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ast, err := parser.Parse(tt.input)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("VexParser.Parse() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.validate != nil {
 				tt.validate(t, ast)
 			}
@@ -122,19 +122,19 @@ func TestVexParser_Parse(t *testing.T) {
 
 func TestVexParser_ParseFile(t *testing.T) {
 	parser := NewParser()
-	
+
 	// Test parsing existing example file
 	ast, err := parser.ParseFile("../../../examples/valid/hello-world.vx")
 	if err != nil {
 		t.Errorf("ParseFile should parse hello-world.vx successfully: %v", err)
 		return
 	}
-	
+
 	if ast == nil {
 		t.Error("AST should not be nil")
 		return
 	}
-	
+
 	if ast.Root() == nil {
 		t.Error("AST root should not be nil")
 	}
@@ -142,7 +142,7 @@ func TestVexParser_ParseFile(t *testing.T) {
 
 func TestVexParser_ParseFile_NonExistent(t *testing.T) {
 	parser := NewParser()
-	
+
 	// Test parsing non-existent file
 	_, err := parser.ParseFile("non-existent-file.vx")
 	if err == nil {
@@ -157,12 +157,12 @@ func TestNewVexAST(t *testing.T) {
 	tokenStream := antlr.NewCommonTokenStream(lexer, 0)
 	vexParser := parser.NewVexParser(tokenStream)
 	tree := vexParser.Program()
-	
+
 	ast := NewVexAST(tree)
 	if ast == nil {
 		t.Fatal("NewVexAST should return non-nil AST")
 	}
-	
+
 	if ast.Root() != tree {
 		t.Error("AST root should be the provided tree")
 	}
@@ -175,17 +175,17 @@ func TestVexAST_Accept(t *testing.T) {
 	tokenStream := antlr.NewCommonTokenStream(lexer, 0)
 	vexParser := parser.NewVexParser(tokenStream)
 	tree := vexParser.Program()
-	
+
 	ast := NewVexAST(tree)
-	
+
 	// Create a mock visitor
 	visitor := &MockASTVisitor{}
-	
+
 	err := ast.Accept(visitor)
 	if err != nil {
 		t.Errorf("Accept should not return error: %v", err)
 	}
-	
+
 	if !visitor.visitProgramCalled {
 		t.Error("Visitor's VisitProgram should have been called")
 	}
@@ -194,14 +194,14 @@ func TestVexAST_Accept(t *testing.T) {
 func TestVexAST_Accept_InvalidRoot(t *testing.T) {
 	// Create AST with invalid root type
 	ast := NewVexAST(&mockInvalidTree{})
-	
+
 	visitor := &MockASTVisitor{}
 	err := ast.Accept(visitor)
-	
+
 	if err == nil {
 		t.Error("Accept should return error for invalid root type")
 	}
-	
+
 	if !strings.Contains(err.Error(), "invalid AST root type") {
 		t.Errorf("Error should mention invalid root type, got: %v", err)
 	}
@@ -209,11 +209,11 @@ func TestVexAST_Accept_InvalidRoot(t *testing.T) {
 
 func TestBasicValue(t *testing.T) {
 	value := NewBasicValue("42", "int")
-	
+
 	if value.String() != "42" {
 		t.Errorf("BasicValue.String() = %v, want %v", value.String(), "42")
 	}
-	
+
 	if value.Type() != "int" {
 		t.Errorf("BasicValue.Type() = %v, want %v", value.Type(), "int")
 	}
@@ -221,11 +221,11 @@ func TestBasicValue(t *testing.T) {
 
 func TestBasicValue_StringType(t *testing.T) {
 	value := NewBasicValue("\"hello\"", "string")
-	
+
 	if value.String() != "\"hello\"" {
 		t.Errorf("BasicValue.String() = %v, want %v", value.String(), "\"hello\"")
 	}
-	
+
 	if value.Type() != "string" {
 		t.Errorf("BasicValue.Type() = %v, want %v", value.Type(), "string")
 	}
@@ -239,7 +239,7 @@ func TestBasicValue_BoolType(t *testing.T) {
 		{"true", "true"},
 		{"false", "false"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.value, func(t *testing.T) {
 			basicValue := NewBasicValue(tt.value, "bool")
@@ -256,9 +256,9 @@ func TestBasicValue_BoolType(t *testing.T) {
 // Mock implementations for testing
 
 type MockASTVisitor struct {
-	visitProgramCalled bool
-	visitListCalled    bool
-	visitArrayCalled   bool
+	visitProgramCalled  bool
+	visitListCalled     bool
+	visitArrayCalled    bool
 	visitTerminalCalled bool
 }
 
@@ -284,12 +284,12 @@ func (m *MockASTVisitor) VisitTerminal(node antlr.TerminalNode) (Value, error) {
 
 type mockInvalidTree struct{}
 
-func (m *mockInvalidTree) GetChild(i int) antlr.Tree { return nil }
-func (m *mockInvalidTree) GetChildCount() int { return 0 }
-func (m *mockInvalidTree) GetChildren() []antlr.Tree { return nil }
-func (m *mockInvalidTree) GetParent() antlr.Tree { return nil }
-func (m *mockInvalidTree) GetPayload() interface{} { return nil }
-func (m *mockInvalidTree) GetSourceInterval() antlr.Interval { return antlr.Interval{} }
-func (m *mockInvalidTree) SetParent(parent antlr.Tree) {}
+func (m *mockInvalidTree) GetChild(i int) antlr.Tree                                      { return nil }
+func (m *mockInvalidTree) GetChildCount() int                                             { return 0 }
+func (m *mockInvalidTree) GetChildren() []antlr.Tree                                      { return nil }
+func (m *mockInvalidTree) GetParent() antlr.Tree                                          { return nil }
+func (m *mockInvalidTree) GetPayload() interface{}                                        { return nil }
+func (m *mockInvalidTree) GetSourceInterval() antlr.Interval                              { return antlr.Interval{} }
+func (m *mockInvalidTree) SetParent(parent antlr.Tree)                                    {}
 func (m *mockInvalidTree) ToStringTree(ruleNames []string, recog antlr.Recognizer) string { return "" }
-func (m *mockInvalidTree) Accept(visitor antlr.ParseTreeVisitor) interface{} { return nil }
+func (m *mockInvalidTree) Accept(visitor antlr.ParseTreeVisitor) interface{}              { return nil }

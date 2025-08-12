@@ -269,6 +269,32 @@ Common diagnostic codes to detect and fix:
 - `VEX-TYP-MAP-KEY` / `VEX-TYP-MAP-VAL`: Map key/value types mismatch across pairs
 - `VEX-TYP-REC-NOMINAL`: Nominal record mismatch (A vs B)
 
+## Test Message Standards for AI
+
+### Test Definition Patterns
+```vex
+;; Pattern: "subject-action-expectation" (kebab-case)
+(deftest "user-authentication-validates-credentials" ...)
+(deftest "payment-processing-handles-invalid-cards" ...)
+(deftest "api-endpoint-returns-proper-json-structure" ...)
+
+;; Assertion pattern: "action-context-expectation" (kebab-case)
+(assert-eq (validate-email "user@test.com") true "valid-email-format-passes-validation")
+(assert-eq (calculate-tax 100.00) 8.50 "standard-tax-rate-applies-correctly")
+(assert-eq (status-code response) 200 "get-users-endpoint-returns-success-status")
+```
+
+### Framework Output (Clean Text)
+```
+Running test: user-authentication-validates-credentials
+PASS: valid-email-format-passes-validation
+FAIL: invalid-credentials-fail-authentication
+  Expected: true
+  Actual: false
+```
+
+> **📖 Reference**: See [test-message-standards.md](test-message-standards.md) for complete standards
+
 ## Error Prevention for AI
 
 ### Invalid Syntax (Avoid)

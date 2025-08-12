@@ -654,7 +654,7 @@ func (tf *TestFramework) executeTest(testFile string) TestResult {
             if strings.Contains(trimmed, `"fmt"`) {
                 hasFormatImport = true
             }
-            if strings.Contains(trimmed, `"vex.test"`) {
+            if strings.Contains(trimmed, `"vex.test"`) || strings.Contains(trimmed, `"test"`) {
                 hasTestImport = true
             }
         }
@@ -665,7 +665,7 @@ func (tf *TestFramework) executeTest(testFile string) TestResult {
         bootstrap.WriteString(`(import "fmt")` + "\n")
     }
     if !hasTestImport {
-        bootstrap.WriteString(`(import "vex.test")` + "\n")
+        bootstrap.WriteString(`(import "test")` + "\n")
     }
     
     // Use the resolved combined source (includes imported packages) with bootstrap

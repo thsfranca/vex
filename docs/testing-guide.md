@@ -93,7 +93,7 @@ Compares two values for equality:
 ```
 
 **Output:**
-- Success: `✅ basic arithmetic`
+- Success: `PASS: basic arithmetic`
 - Failure: Test execution stops with error and diagnostic information from HM type system
 
 ### `deftest`
@@ -357,24 +357,38 @@ Based on quality scores and suggestions:
 
 ## Best Practices
 
+> **📖 Reference**: For complete test message standards, see [test-message-standards.md](test-message-standards.md)
+
 ### Test Naming
+
+Follow the **subject-action-expectation** pattern for test names:
 
 - Use descriptive test names that explain what is being tested
 - Group related tests logically
-- Use consistent naming patterns
+- Use kebab-case naming convention
+- Follow the pattern: `"subject-action-expectation"`
 
 ```vex
-;; Good
-(deftest "user-authentication-with-valid-credentials"
-  (assert-eq (authenticate "user" "pass") true "valid login"))
+;; Good - Clear, descriptive names following kebab-case
+(deftest "user-authentication-validates-correct-credentials"
+  (assert-eq (authenticate "user" "pass") true "valid-credentials-authenticate-successfully"))
 
-(deftest "user-authentication-with-invalid-credentials"
-  (assert-eq (authenticate "user" "wrong") false "invalid login"))
+(deftest "user-authentication-rejects-invalid-credentials"
+  (assert-eq (authenticate "user" "wrong") false "invalid-credentials-fail-authentication"))
 
-;; Avoid
+;; Avoid - Vague or unclear names
 (deftest "test1"
   (assert-eq (authenticate "user" "pass") true "test"))
+
+(deftest "user_test"  ; Wrong: uses underscores instead of kebab-case
+  (assert-eq (authenticate "user" "pass") true "check user"))
 ```
+
+**Naming Pattern Examples**:
+- Business Logic: `"payment-processing-handles-invalid-cards"`
+- API Testing: `"get-users-endpoint-returns-success-status"`
+- Edge Cases: `"edge-case-calculation-handles-zero-input"`
+- Error Cases: `"error-case-validation-rejects-malformed-input"`
 
 ### Test Organization
 

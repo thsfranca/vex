@@ -80,7 +80,7 @@ func transpileCommand(args []string) {
 
     // Read input file (sanity check)
     if _, err := os.ReadFile(*inputFile); err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
+        fmt.Fprintf(os.Stderr, " Error reading file %s: %v\n", *inputFile, err)
         os.Exit(1)
     }
 
@@ -89,7 +89,7 @@ func transpileCommand(args []string) {
     resolver := packages.NewResolver(moduleRoot)
     res, err := resolver.BuildProgramFromEntry(*inputFile)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Package resolution error: %v\n", err)
+        fmt.Fprintf(os.Stderr, " Package resolution error: %v\n", err)
         os.Exit(1)
     }
     fullProgram := res.CombinedSource
@@ -107,14 +107,14 @@ func transpileCommand(args []string) {
     }
     tImpl, err := transpiler.NewTranspilerWithConfig(tCfg)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Transpiler init error: %v\n", err)
+        fmt.Fprintf(os.Stderr, " Transpiler init error: %v\n", err)
         os.Exit(1)
     }
 
     // Transpile
     goCode, err := tImpl.TranspileFromInput(fullProgram)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Transpilation error: %v\n", err)
+		fmt.Fprintf(os.Stderr, " Transpilation error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -122,11 +122,11 @@ func transpileCommand(args []string) {
 	if *outputFile != "" {
         err = os.WriteFile(*outputFile, []byte(goCode), 0644)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error writing output file %s: %v\n", *outputFile, err)
+			fmt.Fprintf(os.Stderr, " Error writing output file %s: %v\n", *outputFile, err)
 			os.Exit(1)
 		}
 		if *verbose {
-			fmt.Fprintf(os.Stderr, "✅ Transpilation complete: %s\n", *outputFile)
+			fmt.Fprintf(os.Stderr, " Transpilation complete: %s\n", *outputFile)
 		}
 	} else {
 		// Output to stdout
@@ -155,7 +155,7 @@ func runCommand(args []string) {
 	// Read user input file (kept for future use; resolution does its own reading)
     _, err := os.ReadFile(*inputFile)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
+        fmt.Fprintf(os.Stderr, " Error reading file %s: %v\n", *inputFile, err)
         os.Exit(1)
     }
 
@@ -164,7 +164,7 @@ func runCommand(args []string) {
     resolver := packages.NewResolver(moduleRoot)
     res, err := resolver.BuildProgramFromEntry(*inputFile)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Package resolution error: %v\n", err)
+        fmt.Fprintf(os.Stderr, " Package resolution error: %v\n", err)
         os.Exit(1)
     }
     fullProgram := res.CombinedSource
@@ -181,14 +181,14 @@ func runCommand(args []string) {
     }
     tImpl, err := transpiler.NewTranspilerWithConfig(tCfg)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Transpiler init error: %v\n", err)
+        fmt.Fprintf(os.Stderr, " Transpiler init error: %v\n", err)
         os.Exit(1)
     }
 
 	// Transpile combined program
     goCode, err := tImpl.TranspileFromInput(fullProgram)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Transpilation error: %v\n", err)
+		fmt.Fprintf(os.Stderr, " Transpilation error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -204,14 +204,14 @@ func runCommand(args []string) {
 	// Write Go code to temporary file
     err = os.WriteFile(tmpGoFile, []byte(goCode), 0644)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error writing temporary Go file: %v\n", err)
+		fmt.Fprintf(os.Stderr, " Error writing temporary Go file: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Clean up temporary file when done
 	defer func() {
 		if err := os.Remove(tmpGoFile); err != nil && *verbose {
-			fmt.Fprintf(os.Stderr, "⚠️  Warning: could not remove temporary file %s: %v\n", tmpGoFile, err)
+			fmt.Fprintf(os.Stderr, "  Warning: could not remove temporary file %s: %v\n", tmpGoFile, err)
 		}
 	}()
 
@@ -221,7 +221,7 @@ func runCommand(args []string) {
 	buildOutput, buildErr := cmd.CombinedOutput()
 
 	if buildErr != nil {
-		fmt.Fprintf(os.Stderr, "❌ Build error: %v\n%s", buildErr, string(buildOutput))
+		fmt.Fprintf(os.Stderr, " Build error: %v\n%s", buildErr, string(buildOutput))
 		os.Exit(1)
 	}
 
@@ -235,12 +235,12 @@ func runCommand(args []string) {
 
 	err = runCmd.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Execution error: %v\n", err)
+		fmt.Fprintf(os.Stderr, " Execution error: %v\n", err)
 		os.Exit(1)
 	}
 
 	if *verbose {
-		fmt.Fprintf(os.Stderr, "✅ Execution complete\n")
+		fmt.Fprintf(os.Stderr, " Execution complete\n")
 	}
 }
 
@@ -276,7 +276,7 @@ func buildCommand(args []string) {
 	// Read user input file (kept for future use; resolution does its own reading)
     _, err := os.ReadFile(*inputFile)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Error reading file %s: %v\n", *inputFile, err)
+        fmt.Fprintf(os.Stderr, " Error reading file %s: %v\n", *inputFile, err)
         os.Exit(1)
     }
 
@@ -285,7 +285,7 @@ func buildCommand(args []string) {
     resolver := packages.NewResolver(moduleRoot)
     res, err := resolver.BuildProgramFromEntry(*inputFile)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Package resolution error: %v\n", err)
+        fmt.Fprintf(os.Stderr, " Package resolution error: %v\n", err)
         os.Exit(1)
     }
     fullProgram := res.CombinedSource
@@ -301,14 +301,14 @@ func buildCommand(args []string) {
     }
     tImpl, err := transpiler.NewTranspilerWithConfig(tCfg)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Transpiler init error: %v\n", err)
+        fmt.Fprintf(os.Stderr, " Transpiler init error: %v\n", err)
         os.Exit(1)
     }
 
 	// Transpile combined program
     goCode, err := tImpl.TranspileFromInput(fullProgram)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Transpilation error: %v\n", err)
+		fmt.Fprintf(os.Stderr, " Transpilation error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -320,28 +320,28 @@ func buildCommand(args []string) {
 	tmpDir := os.TempDir()
 	buildDir := filepath.Join(tmpDir, "vex-build-"+strings.ReplaceAll(time.Now().Format("20060102-150405"), ":", ""))
     if err := os.MkdirAll(buildDir, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error creating build directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, " Error creating build directory: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Clean up temporary directory when done
 	defer func() {
 		if err := os.RemoveAll(buildDir); err != nil && *verbose {
-			fmt.Fprintf(os.Stderr, "⚠️  Warning: could not remove temporary build directory %s: %v\n", buildDir, err)
+			fmt.Fprintf(os.Stderr, "  Warning: could not remove temporary build directory %s: %v\n", buildDir, err)
 		}
 	}()
 
 	// Generate go.mod with detected dependencies
     detectedModules := tImpl.GetDetectedModules()
 	if err := generateGoMod(buildDir, detectedModules, *verbose); err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error generating go.mod: %v\n", err)
+		fmt.Fprintf(os.Stderr, " Error generating go.mod: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Write Go code to build directory
 	mainGoFile := filepath.Join(buildDir, "main.go")
     if err := os.WriteFile(mainGoFile, []byte(goCode), 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error writing Go file: %v\n", err)
+		fmt.Fprintf(os.Stderr, " Error writing Go file: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -351,7 +351,7 @@ func buildCommand(args []string) {
 			fmt.Fprintf(os.Stderr, "📦 Downloading dependencies...\n")
 		}
 		if err := downloadDependencies(buildDir, *verbose); err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Error downloading dependencies: %v\n", err)
+			fmt.Fprintf(os.Stderr, " Error downloading dependencies: %v\n", err)
 			os.Exit(1)
 		}
 	}
@@ -359,7 +359,7 @@ func buildCommand(args []string) {
 	// Build binary to final location
 	absOutputPath, err := filepath.Abs(outputBinary)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Error getting absolute output path: %v\n", err)
+		fmt.Fprintf(os.Stderr, " Error getting absolute output path: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -368,12 +368,12 @@ func buildCommand(args []string) {
 	
 	buildOutput, buildErr := cmd.CombinedOutput()
 	if buildErr != nil {
-		fmt.Fprintf(os.Stderr, "❌ Build error: %v\n%s", buildErr, string(buildOutput))
+		fmt.Fprintf(os.Stderr, " Build error: %v\n%s", buildErr, string(buildOutput))
 		os.Exit(1)
 	}
 
 	if *verbose {
-		fmt.Fprintf(os.Stderr, "✅ Binary built successfully: %s\n", absOutputPath)
+		fmt.Fprintf(os.Stderr, " Binary built successfully: %s\n", absOutputPath)
 	} else {
 		fmt.Printf("Binary built: %s\n", outputBinary)
 	}
@@ -481,7 +481,7 @@ func (tf *TestFramework) Run() {
     
     // 1. Test Discovery
     if err := tf.discoverTests(); err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Test discovery failed: %v\n", err)
+        fmt.Fprintf(os.Stderr, "Test discovery failed: %v\n", err)
         os.Exit(1)
     }
     
@@ -515,14 +515,14 @@ func (tf *TestFramework) Run() {
 // printHeader prints the test run header
 func (tf *TestFramework) printHeader() {
     if tf.Verbose {
-        fmt.Fprintf(os.Stderr, "🧪 Running Vex tests in %s\n", tf.Dir)
+        fmt.Fprintf(os.Stderr, "Running Vex tests in %s\n", tf.Dir)
         if tf.Pattern != "" {
-            fmt.Fprintf(os.Stderr, "🔍 Pattern filter: %s\n", tf.Pattern)
+            fmt.Fprintf(os.Stderr, "Pattern filter: %s\n", tf.Pattern)
         }
         if tf.FailFast {
-            fmt.Fprintf(os.Stderr, "⚡ Fail-fast mode enabled\n")
+            fmt.Fprintf(os.Stderr, "Fail-fast mode enabled\n")
         }
-        fmt.Fprintf(os.Stderr, "⏱️  Timeout: %v\n", tf.Timeout)
+        fmt.Fprintf(os.Stderr, "Timeout: %v\n", tf.Timeout)
         fmt.Fprintf(os.Stderr, "\n")
     }
 }
@@ -532,7 +532,7 @@ func (tf *TestFramework) discoverTests() error {
     return filepath.WalkDir(tf.Dir, func(path string, d os.DirEntry, err error) error {
         if err != nil {
             if tf.Verbose {
-                fmt.Fprintf(os.Stderr, "⚠️  Warning: %v\n", err)
+                fmt.Fprintf(os.Stderr, "  Warning: %v\n", err)
             }
             return nil // Continue walking despite errors
         }
@@ -569,9 +569,9 @@ func (tf *TestFramework) discoverTests() error {
 // printNoTestsFound prints message when no tests are discovered
 func (tf *TestFramework) printNoTestsFound() {
     if tf.Verbose {
-        fmt.Fprintf(os.Stderr, "📭 No tests found.\n")
+        fmt.Fprintf(os.Stderr, "No tests found.\n")
         if tf.Pattern != "" {
-            fmt.Fprintf(os.Stderr, "💡 Try removing the pattern filter: %s\n", tf.Pattern)
+            fmt.Fprintf(os.Stderr, "Try removing the pattern filter: %s\n", tf.Pattern)
         }
     }
 }
@@ -609,7 +609,7 @@ func (tf *TestFramework) executeTest(testFile string) TestResult {
     }
     
     if tf.Verbose {
-        fmt.Fprintf(os.Stderr, "▶ %s\n", testFile)
+        fmt.Fprintf(os.Stderr, "Executing: %s\n", testFile)
     }
     
     // Read the test file content for validation (before package resolution)
@@ -701,8 +701,18 @@ func (tf *TestFramework) executeTest(testFile string) TestResult {
     
     // Build and execute
     tmpDir := os.TempDir()
-    exe := filepath.Join(tmpDir, strings.TrimSuffix(filepath.Base(testFile), filepath.Ext(testFile))+"_test_bin")
+    testBaseName := strings.TrimSuffix(filepath.Base(testFile), filepath.Ext(testFile))
+    exe := filepath.Join(tmpDir, testBaseName+"_test_bin")
     src := exe + ".go"
+    coverProfile := ""
+    
+    // If coverage is enabled, set up coverage profile
+    if tf.Coverage || tf.EnhancedCoverage {
+        coverProfile = filepath.Join(tmpDir, testBaseName+"_coverage.out")
+        defer func() {
+            _ = os.Remove(coverProfile)
+        }()
+    }
     
     defer func() {
         _ = os.Remove(src)
@@ -716,8 +726,13 @@ func (tf *TestFramework) executeTest(testFile string) TestResult {
         return result
     }
     
-    // Build
-    build := exec.Command("go", "build", "-o", exe, src)
+    // Build with coverage if enabled
+    var build *exec.Cmd
+    if coverProfile != "" {
+        build = exec.Command("go", "build", "-cover", "-o", exe, src)
+    } else {
+        build = exec.Command("go", "build", "-o", exe, src)
+    }
     bout, berr := build.CombinedOutput()
     if berr != nil {
         result.Status = TestBuildError
@@ -734,6 +749,11 @@ func (tf *TestFramework) executeTest(testFile string) TestResult {
     var stdout, stderr bytes.Buffer
     run.Stdout = &stdout
     run.Stderr = &stderr
+    
+    // Set coverage environment if enabled
+    if coverProfile != "" {
+        run.Env = append(os.Environ(), "GOCOVERDIR="+tmpDir)
+    }
     
     err = run.Run()
     result.Duration = time.Since(startTime)
@@ -752,6 +772,16 @@ func (tf *TestFramework) executeTest(testFile string) TestResult {
     }
     
     result.Status = TestPassed
+    
+    // Parse coverage data if available
+    if coverProfile != "" {
+        // For now, we'll integrate with the static analysis
+        // Future enhancement: parse actual Go coverage profile
+        if tf.Verbose {
+            fmt.Fprintf(os.Stderr, "Coverage data integration ready for: %s\n", coverProfile)
+        }
+    }
+    
     return result
 }
 
@@ -763,7 +793,7 @@ func (tf *TestFramework) printTestResult(result TestResult) {
     switch result.Status {
     case TestPassed:
         if tf.Verbose {
-            fmt.Fprintf(os.Stderr, "✅ %s: %s (%v)\n", status, result.FilePath, duration)
+            fmt.Fprintf(os.Stderr, "%s: %s (%v)\n", status, result.FilePath, duration)
         }
         // Print test output to stdout for passed tests
         if result.Output != "" {
@@ -771,10 +801,10 @@ func (tf *TestFramework) printTestResult(result TestResult) {
         }
     case TestSkipped:
         if tf.Verbose {
-            fmt.Fprintf(os.Stderr, "⏭️  %s: %s (%v)\n", status, result.FilePath, duration)
+            fmt.Fprintf(os.Stderr, "%s: %s (%v)\n", status, result.FilePath, duration)
         }
     default:
-        fmt.Fprintf(os.Stderr, "❌ %s: %s (%v)\n", status, result.FilePath, duration)
+        fmt.Fprintf(os.Stderr, "%s: %s (%v)\n", status, result.FilePath, duration)
         if result.Error != nil {
             fmt.Fprintf(os.Stderr, "   Error: %v\n", result.Error)
         }
@@ -804,7 +834,7 @@ type PackageCoverageInfo struct {
 
 // generateCoverageReport generates and prints coverage analysis
 func (tf *TestFramework) generateCoverageReport() {
-    fmt.Fprintf(os.Stderr, "\n📊 Generating test coverage report...\n")
+    fmt.Fprintf(os.Stderr, "\nGenerating test coverage report...\n")
     
     // Find all source files and group by package
     packageFiles := make(map[string][]string)
@@ -821,6 +851,7 @@ func (tf *TestFramework) generateCoverageReport() {
             if strings.HasSuffix(d.Name(), "_test.vx") || strings.HasSuffix(d.Name(), "_test.vex") {
                 packageTests[pkg] = append(packageTests[pkg], path)
             } else {
+                // Only count non-test files as source files
                 packageFiles[pkg] = append(packageFiles[pkg], path)
             }
         }
@@ -836,15 +867,31 @@ func (tf *TestFramework) generateCoverageReport() {
     fmt.Fprintf(os.Stderr, "─────────────────────────\n")
     
     for pkg, files := range packageFiles {
-        tested := len(packageTests[pkg])
         total := len(files)
+        
+        // Calculate how many source files have corresponding test files
+        testedFiles := 0
+        for _, sourceFile := range files {
+            // Check if there's a corresponding test file
+            baseName := strings.TrimSuffix(sourceFile, filepath.Ext(sourceFile))
+            testFileName := baseName + "_test.vx"
+            
+            // Check if this test file exists in the package
+            for _, testFile := range packageTests[pkg] {
+                if strings.HasSuffix(testFile, filepath.Base(testFileName)) {
+                    testedFiles++
+                    break
+                }
+            }
+        }
+        
         coverage := 0.0
         if total > 0 {
-            coverage = float64(tested) / float64(total) * 100
+            coverage = float64(testedFiles) / float64(total) * 100
         }
         
         totalFiles += total
-        totalTested += tested
+        totalTested += testedFiles
         
         // Store package info for JSON output
         packages = append(packages, PackageCoverageInfo{
@@ -853,12 +900,12 @@ func (tf *TestFramework) generateCoverageReport() {
             SourceFiles: files,
             TestFiles:   packageTests[pkg],
             FileCount:   total,
-            TestCount:   tested,
+            TestCount:   testedFiles,
         })
         
         // Console output
         status := tf.getCoverageStatus(coverage)
-        fmt.Fprintf(os.Stderr, "%s %s: %.1f%% (%d/%d files)\n", status, pkg, coverage, tested, total)
+        fmt.Fprintf(os.Stderr, "%s %s: %.1f%% (%d/%d files have tests)\n", status, pkg, coverage, testedFiles, total)
         
         if tf.Verbose && len(files) > 0 {
             fmt.Fprintf(os.Stderr, "   Source files: %v\n", files)
@@ -874,10 +921,10 @@ func (tf *TestFramework) generateCoverageReport() {
     }
     
     fmt.Fprintf(os.Stderr, "─────────────────────────\n")
-    fmt.Fprintf(os.Stderr, "📊 Overall: %.1f%% (%d/%d packages have tests)\n", overallCoverage, totalTested, totalFiles)
+    fmt.Fprintf(os.Stderr, "Overall: %.1f%% (%d/%d source files have tests)\n", overallCoverage, totalTested, totalFiles)
     
     if overallCoverage < 70 {
-        fmt.Fprintf(os.Stderr, "💡 Consider adding more tests to improve coverage\n")
+        fmt.Fprintf(os.Stderr, "Consider adding more tests to improve coverage\n")
     }
     
     // Write coverage report to file if requested
@@ -898,13 +945,13 @@ func (tf *TestFramework) writeCoverageToFile(packages []PackageCoverageInfo, ove
     
     data, err := json.MarshalIndent(report, "", "  ")
     if err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Error generating coverage JSON: %v\n", err)
+        fmt.Fprintf(os.Stderr, " Error generating coverage JSON: %v\n", err)
         return
     }
     
     err = os.WriteFile(tf.CoverageOut, data, 0644)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Error writing coverage file: %v\n", err)
+        fmt.Fprintf(os.Stderr, " Error writing coverage file: %v\n", err)
         return
     }
     
@@ -914,13 +961,13 @@ func (tf *TestFramework) writeCoverageToFile(packages []PackageCoverageInfo, ove
 // getCoverageStatus returns appropriate emoji for coverage percentage
 func (tf *TestFramework) getCoverageStatus(coverage float64) string {
     if coverage == 0 {
-        return "❌"
+        return "ERROR"
     } else if coverage < 50 {
-        return "⚠️"
+        return "WARNING"
     } else if coverage < 80 {
-        return "📈"
+        return "GOOD"
     } else {
-        return "✅"
+        return "EXCELLENT"
     }
 }
 
@@ -929,28 +976,28 @@ func (tf *TestFramework) printSummary() {
     duration := time.Since(tf.StartTime).Round(time.Millisecond)
     total := tf.Passed + tf.Failed + tf.Skipped
     
-    fmt.Fprintf(os.Stderr, "\n🏁 Test Summary\n")
-    fmt.Fprintf(os.Stderr, "─────────────────────────\n")
-    fmt.Fprintf(os.Stderr, "📁 Total: %d tests\n", total)
-    fmt.Fprintf(os.Stderr, "✅ Passed: %d\n", tf.Passed)
+    fmt.Fprintf(os.Stderr, "\nTest Summary\n")
+    fmt.Fprintf(os.Stderr, "=======================\n")
+    fmt.Fprintf(os.Stderr, "Total: %d tests\n", total)
+    fmt.Fprintf(os.Stderr, "Passed: %d\n", tf.Passed)
     
     if tf.Failed > 0 {
-        fmt.Fprintf(os.Stderr, "❌ Failed: %d\n", tf.Failed)
+        fmt.Fprintf(os.Stderr, "Failed: %d\n", tf.Failed)
     }
     
     if tf.Skipped > 0 {
-        fmt.Fprintf(os.Stderr, "⏭️  Skipped: %d\n", tf.Skipped)
+        fmt.Fprintf(os.Stderr, "Skipped: %d\n", tf.Skipped)
     }
     
-    fmt.Fprintf(os.Stderr, "⏱️  Duration: %v\n", duration)
+    fmt.Fprintf(os.Stderr, "Duration: %v\n", duration)
     
     // Success rate
     if total > 0 {
         successRate := float64(tf.Passed) / float64(total) * 100
         if successRate == 100 {
-            fmt.Fprintf(os.Stderr, "🎉 Success rate: %.1f%%\n", successRate)
+            fmt.Fprintf(os.Stderr, "Success rate: %.1f%%\n", successRate)
         } else {
-            fmt.Fprintf(os.Stderr, "📊 Success rate: %.1f%%\n", successRate)
+            fmt.Fprintf(os.Stderr, "Success rate: %.1f%%\n", successRate)
         }
     }
 }
@@ -1156,7 +1203,7 @@ func (tf *TestFramework) generateEnhancedCoverageReport() {
     reporter := coverage.NewEnhancedCoverageReporter()
     report, err := reporter.GenerateReport(tf.Dir)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "❌ Failed to generate enhanced coverage: %v\n", err)
+        fmt.Fprintf(os.Stderr, " Failed to generate enhanced coverage: %v\n", err)
         return
     }
     
@@ -1172,7 +1219,7 @@ func (tf *TestFramework) generateEnhancedCoverageReport() {
         }
         
         if err := reporter.WriteJSONReport(report, enhancedFilename); err != nil {
-            fmt.Fprintf(os.Stderr, "⚠️  Failed to write enhanced coverage JSON: %v\n", err)
+            fmt.Fprintf(os.Stderr, "  Failed to write enhanced coverage JSON: %v\n", err)
         } else {
             fmt.Fprintf(os.Stderr, "📄 Enhanced coverage report saved: %s\n", enhancedFilename)
         }

@@ -90,9 +90,18 @@ func (tc *TestCorrelation) isBuiltinOrTestUtility(funcName string) bool {
 		"fmt/Println": true, "fmt/Printf": true, "fmt/Print": true,
 	}
 	
-	// Also filter out namespace calls (contain /)
+	// Filter out standard library namespace calls (fmt/, os/, etc)
+	// but allow local package calls to be tracked
 	if strings.Contains(funcName, "/") {
-		return true
+		// Standard library packages to filter out
+		stdLibPackages := []string{"fmt/", "os/", "io/", "net/", "http/", "encoding/", "time/", "strings/", "strconv/"}
+		for _, stdPkg := range stdLibPackages {
+			if strings.HasPrefix(funcName, stdPkg) {
+				return true
+			}
+		}
+		// Local package calls should be tracked (not filtered)
+		return false
 	}
 	
 	return builtins[funcName]

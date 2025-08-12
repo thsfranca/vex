@@ -1,3 +1,38 @@
+## ADR-0017: Codebase AI/Human Friendliness — Code Quality and Developer Experience
+
+- Status: Accepted (Phase 4.6 implementation planned)
+- Decision: Implement comprehensive improvements to make the Go codebase more AI and human-friendly through domain-driven design, simplified interfaces, rich types, and functional patterns.
+- Context: Current codebase has excellent architectural foundations but suffers from patterns that make it challenging for AI systems to understand and generate code, and for human developers to maintain. The transpiler uses deep nesting, multiple adapter layers, generic types, and complex abstractions that obscure the core logic.
+- **Key Improvements:**
+  - **Domain-Driven Package Structure**: Reorganize by domain concerns (`pkg/pipeline/`, `pkg/language/`, `pkg/parsing/`) rather than technical layers
+  - **Simplified Interface Design**: Replace adapter chains with unified interfaces like `Compiler` with `CompileResult` containing all compilation information
+  - **Rich Domain Types**: Use `SourceCode`, `GoCode`, `SymbolName` instead of generic `string` types with semantic validation methods
+  - **Enhanced Error Handling**: Structured errors with stable codes (`VEX-TYP-MISMATCH`), builder patterns, and actionable suggestions
+  - **Functional Programming Patterns**: Immutable AST structures, pure transformation functions, pipeline composition
+  - **Documentation-Driven Development**: Comprehensive examples, usage patterns, and self-documenting APIs
+- **Implementation Phases:**
+  - **4.6.1**: Core type system enhancement and structured errors
+  - **4.6.2**: Interface simplification and builder patterns  
+  - **4.6.3**: Package reorganization by domain
+  - **4.6.4**: Functional pattern adoption
+- **Benefits for AI Systems:**
+  - Clearer patterns for code generation through consistent abstractions
+  - Better semantic understanding via rich, self-documenting types
+  - Easier codebase navigation through domain-focused organization
+  - More predictable API behaviors reducing AI confusion
+- **Benefits for Human Developers:**
+  - Reduced onboarding time through intuitive organization
+  - Better IDE support via rich type information and documentation
+  - Easier debugging through structured, contextual errors
+  - More maintainable code through functional patterns and clear interfaces
+- Consequences:
+  - Significant improvement in codebase approachability for both AI and human developers
+  - Better alignment between Go implementation and Vex's functional philosophy
+  - Reduced technical debt through clearer abstractions
+  - Easier AI-assisted development and maintenance
+  - Gradual implementation allows validation of patterns before full adoption
+- References: Phase 4.6 implementation in vex-implementation-requirements.md
+
 ## ADR-0015: Complete stdlib package organization with comprehensive macro system
 
 - Status: Accepted and Implemented

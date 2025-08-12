@@ -1,6 +1,0 @@
-(import "vex.core")
-(import "vex.test")
-
-;; Simple test that defn macro expands correctly
-(deftest "simple-defn"
-  (fmt/Println "✅ defn macro is available and test framework works"))

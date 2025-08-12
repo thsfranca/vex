@@ -1,6 +1,0 @@
-;; Invalid test file - contains code outside deftest
-(import "fmt")
-
-(fmt/Println "This code outside deftest should cause validation to fail")
-
-(deftest "demo-test" (fmt/Println "Valid deftest but file is invalid"))

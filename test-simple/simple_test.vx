@@ -1,4 +1,0 @@
-(import "fmt")
-
-(deftest "simple-assertion"
-  (fmt/Println "Basic equality test - passed"))

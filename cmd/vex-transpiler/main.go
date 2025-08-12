@@ -612,7 +612,25 @@ func (tf *TestFramework) executeTest(testFile string) TestResult {
         fmt.Fprintf(os.Stderr, "▶ %s\n", testFile)
     }
     
-    // Package resolution
+    // Read the test file content for validation (before package resolution)
+    testFileContent, err := os.ReadFile(testFile)
+    if err != nil {
+        result.Status = TestTranspileError
+        result.Error = fmt.Errorf("error reading test file: %v", err)
+        result.Duration = time.Since(startTime)
+        return result
+    }
+    
+    // Validate and extract deftest blocks from ONLY the test file (not imported packages)
+    validTestCode, err := tf.validateAndExtractTests(string(testFileContent))
+    if err != nil {
+        result.Status = TestTranspileError
+        result.Error = fmt.Errorf("test validation error: %v", err)
+        result.Duration = time.Since(startTime)
+        return result
+    }
+    
+    // Package resolution (for transpilation, after validation)
     moduleRoot, _ := filepath.Abs(".")
     resolver := packages.NewResolver(moduleRoot)
     res, err := resolver.BuildProgramFromEntry(testFile)
@@ -623,22 +641,37 @@ func (tf *TestFramework) executeTest(testFile string) TestResult {
         return result
     }
     
-    // Validate and extract deftest blocks
-    validTestCode, err := tf.validateAndExtractTests(res.CombinedSource)
-    if err != nil {
-        result.Status = TestTranspileError
-        result.Error = fmt.Errorf("test validation error: %v", err)
-        result.Duration = time.Since(startTime)
-        return result
+    // Smart bootstrap - detect existing imports in all supported forms
+    hasFormatImport := false
+    hasTestImport := false
+    
+    lines := strings.Split(validTestCode, "\n")
+    for _, line := range lines {
+        trimmed := strings.TrimSpace(line)
+        if strings.HasPrefix(trimmed, "(import ") {
+            // Check various import forms:
+            // (import "fmt"), (import ["fmt" ...]), (import [["fmt" alias] ...])
+            if strings.Contains(trimmed, `"fmt"`) {
+                hasFormatImport = true
+            }
+            if strings.Contains(trimmed, `"vex.test"`) {
+                hasTestImport = true
+            }
+        }
     }
     
-    // Bootstrap with real test framework from stdlib
-    bootstrap := `(import "fmt")
-(import "vex.test")
-`
-    fullProgram := bootstrap + "\n" + validTestCode
+    var bootstrap strings.Builder
+    if !hasFormatImport {
+        bootstrap.WriteString(`(import "fmt")` + "\n")
+    }
+    if !hasTestImport {
+        bootstrap.WriteString(`(import "vex.test")` + "\n")
+    }
     
-    // Transpiler configuration
+    // Use the resolved combined source (includes imported packages) with bootstrap
+    fullProgram := bootstrap.String() + res.CombinedSource
+    
+    // Transpiler configuration - match regular transpilation settings
     cfg := transpiler.TranspilerConfig{
         EnableMacros:     true,
         CoreMacroPath:    "",
@@ -1047,6 +1080,8 @@ func (tf *TestFramework) validateAndExtractTests(sourceCode string) (string, err
     
     return strings.Join(validLines, "\n"), nil
 }
+
+
 
 func generateGoMod(vexDir string, modules map[string]string, verbose bool) error {
 	goModPath := filepath.Join(vexDir, "go.mod")

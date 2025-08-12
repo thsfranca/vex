@@ -212,9 +212,10 @@ Need to process data?
 
 ### Naming Conventions
 ```
-Variables: kebab-case (user-name, api-key)
-Functions: verb-noun (process-data, validate-input)
-Predicates: question-suffix (is-valid?, has-data?)
+All symbols: kebab-case (user-name, api-key, process-data)
+Functions: verb-noun kebab-case (process-data, validate-input)
+Predicates: question-suffix kebab-case (is-valid?, has-data?)
+Records: noun kebab-case (user-profile, order-item)
 Constants: ALL-CAPS (MAX-RETRIES, DEFAULT-PORT)
 ```
 
@@ -329,7 +330,7 @@ echo '(record Person [name: string age: number])' > rec.vx
 
 **Best Practices for AI Code Generation**:
 1. Always wrap complete expressions in parentheses
-2. Use descriptive variable names with kebab-case
+2. Use descriptive symbol names with kebab-case (all variables, functions, records)
 3. Prefer function composition over complex nesting
 4. Test generated code with `vex run` command
 5. Use macros for repetitive code patterns

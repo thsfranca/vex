@@ -66,6 +66,7 @@ const (
     
     // Symbol table
     CodeSymDup         Code = "SYMBOL-DUPLICATE"
+    CodeSymNaming      Code = "SYMBOL-NAMING"
     
     // Type/argument mismatch
     CodeTypArg         Code = "TYPE-ARGUMENT"

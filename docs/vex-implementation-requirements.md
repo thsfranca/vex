@@ -283,6 +283,7 @@ The defn macro provides comprehensive function definition capabilities:
 - ✅ Integration with Go function generation
 - ✅ Support for complex function bodies with conditionals
 - ✅ Error handling for malformed function definitions
+- ✅ Kebab-case naming enforcement for all symbols (SYMBOL-NAMING validation)
 
 This metaprogramming capability enables sophisticated AI code generation patterns and demonstrates advanced language design concepts through uniform macro syntax.
 

@@ -373,13 +373,13 @@ func (a *AnalyzerImpl) analyzeDef(ctx *parser.ListContext, args []Value) (Value,
 	name := args[0].String()
 	value := args[1]
 	
-	// Validate function naming convention for function definitions
-	if isFunction(value) && !isValidFunctionName(name) {
+	// Validate symbol naming convention for all symbols
+	if !isValidSymbolName(name) {
 		line := ctx.GetStart().GetLine()
 		column := ctx.GetStart().GetColumn()
-		        diag := diagnostics.New(diagnostics.CodeFunctionNaming, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("use kebab-case with dashes (e.g., 'my-function')")
+		diag := diagnostics.New(diagnostics.CodeSymNaming, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("use kebab-case with dashes (e.g., 'my-symbol')")
 		a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
-		return nil, fmt.Errorf("invalid function name: %s", name)
+		return nil, fmt.Errorf("invalid symbol name: %s", name)
 	}
 
     // Define the symbol
@@ -617,6 +617,15 @@ func (a *AnalyzerImpl) analyzeMacro(ctx *parser.ListContext, args []Value) (Valu
         diag := diagnostics.New(diagnostics.CodeMacroReserved, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("choose a different macro name")
         a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), MacroError)
 		return nil, fmt.Errorf("invalid macro name")
+	}
+	
+	// Validate macro naming convention 
+	if !isValidSymbolName(name) {
+		line := ctx.GetStart().GetLine()
+		column := ctx.GetStart().GetColumn()
+		diag := diagnostics.New(diagnostics.CodeSymNaming, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("use kebab-case with dashes (e.g., 'my-macro')")
+		a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), MacroError)
+		return nil, fmt.Errorf("invalid macro name: %s", name)
 	}
 	
 	// Define the macro as a symbol
@@ -1228,6 +1237,15 @@ func (a *AnalyzerImpl) analyzeRecord(ctx *parser.ListContext, args []Value) (Val
         a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
         return nil, fmt.Errorf("invalid record name")
     }
+    
+    // Validate record naming convention
+    if !isValidSymbolName(name) {
+        line := ctx.GetStart().GetLine()
+        column := ctx.GetStart().GetColumn()
+        diag := diagnostics.New(diagnostics.CodeSymNaming, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("use kebab-case with dashes (e.g., 'my-record')")
+        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+        return nil, fmt.Errorf("invalid record name: %s", name)
+    }
     var fields map[string]string
     var order []string
     if arr, ok := ctx.GetChild(3).(*parser.ArrayContext); ok {
@@ -1286,6 +1304,7 @@ func (a *AnalyzerImpl) parseRecordFields(arr *parser.ArrayContext) (map[string]s
             i += 3
         }
         if nameTok == "" || isReservedWord(nameTok) { return nil, nil, fmt.Errorf("invalid field name '%s'", nameTok) }
+        if !isValidSymbolName(nameTok) { return nil, nil, fmt.Errorf("field name '%s' must use kebab-case (e.g., 'my-field')", nameTok) }
         if typeTok == "" { return nil, nil, fmt.Errorf("missing type for field '%s'", nameTok) }
         if _, exists := fields[nameTok]; exists { return nil, nil, fmt.Errorf("duplicate field '%s'", nameTok) }
         fields[nameTok] = typeTok
@@ -1491,6 +1510,17 @@ func isFunction(value Value) bool {
 // isValidFunctionName validates that function names use kebab-case (dashes, not underscores)
 func isValidFunctionName(name string) bool {
     // Function names should not contain underscores (use dashes instead)
+    return !strings.Contains(name, "_")
+}
+
+// isValidSymbolName validates that symbol names use kebab-case (dashes, not underscores)
+func isValidSymbolName(name string) bool {
+    // Skip validation for reserved words, builtin functions, and package functions
+    if isReservedWord(name) || isBuiltinFunction(name) || strings.Contains(name, "/") {
+        return true
+    }
+    
+    // Symbol names should not contain underscores (use dashes instead)
     return !strings.Contains(name, "_")
 }
 

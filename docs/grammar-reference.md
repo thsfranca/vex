@@ -32,6 +32,10 @@ SYMBOL: (LETTER | INTEGER | '.' | '+' | '-' | '*' | '/' | '=' | '!' | '<' | '>' 
 ```
 Symbols can contain letters, numbers, dots, and various operators including arithmetic operators (+, -, *, /), comparison operators (=, !, <, >), namespace separators (:), and other special characters (?, _, ~).
 
+**Naming Convention**: Vex enforces kebab-case (dash-separated) naming for **all symbols** including variables, functions, macros, and record names. Examples:
+- ✅ Valid: `my-variable`, `calculate-area`, `is-positive`, `user-data`
+- ❌ Invalid: `my_variable`, `calculate_area`, `is_positive`, `user_data` (error code: SYMBOL-NAMING)
+
 #### STRING
 ```antlr
 STRING: '"' ( ~'"' | '\\' '"' )* '"' ;

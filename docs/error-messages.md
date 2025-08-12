@@ -25,6 +25,8 @@ Optional detail lines (keep order):
   - Macros: `MACRO-RESERVED`, `MACRO-UNDEFINED`
   - Records: `RECORD-FIELD`, `RECORD-FIELD-TYPE`, `RECORD-NOMINAL`
   - Imports/packages: `IMPORT-SYNTAX`, `PACKAGE-NOT-EXPORTED`, `PACKAGE-CYCLE`
+  - Function naming: `FN-NAMING` (enforces kebab-case naming convention)
+  - Symbol naming: `SYMBOL-NAMING` (enforces kebab-case for all symbols)
 
 ### Suggesting fixes
 Include a one-line suggestion only when it is obvious and safe:
@@ -76,6 +78,16 @@ Suggestions must be:
     First mismatch at pair 3
     Expected: string
     Got: int`
+
+- Function naming convention violation
+  - `file.vx:8:1: error: [FN-NAMING]: function names must use kebab-case
+    Name: my_function
+    Suggestion: use kebab-case with dashes (e.g., 'my-function')`
+
+- Symbol naming convention violation
+  - `file.vx:5:1: error: [SYMBOL-NAMING]: symbol names must use kebab-case
+    Name: user_data
+    Suggestion: use kebab-case with dashes (e.g., 'user-data')`
 
 ### Tone and style
 - Lowercase `error:` prefix after position (Go-style).

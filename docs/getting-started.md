@@ -143,6 +143,12 @@ Everything in Vex follows the pattern: `(operation arguments...)`
 (fmt/Println greeting result positive)
 ```
 
+**Naming Convention**: Vex enforces kebab-case (dash-separated) naming for **all symbols** including variables, functions, macros, and records. Always use dashes instead of underscores:
+- ✅ Variables: `user-name`, `api-key`, `is-active`
+- ✅ Functions: `calculate-total`, `process-data`, `is-valid`
+- ✅ Records: `user-profile`, `order-item`
+- ❌ Invalid: `user_name`, `calculate_total`, `user_profile`
+
 ### Conditional Logic
 ```vex
 (def score 85)

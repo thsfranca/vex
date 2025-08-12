@@ -13,22 +13,22 @@ func TestTranspiler_CollectionOperations(t *testing.T) {
 	}{
 		{
 			name:     "First operation",
-			input:    `(first [1 2 3])`,
-			expected: `[]interface{}{1, 2, 3}[0]`,
+			input:    "(import \"vex.collections\")\n(first [1 2 3])",
+			expected: `func() interface{} { if len([]interface{}{1, 2, 3}) > 0 { return []interface{}{1, 2, 3}[0] } else { return nil } }()`,
 		},
 		{
 			name:     "Count operation",
-			input:    `(count [1 2 3])`,
+			input:    "(import \"vex.collections\")\n(count [1 2 3])",
 			expected: `len([]interface{}{1, 2, 3})`,
 		},
 		{
 			name:     "Empty check",
-			input:    `(empty? [1 2])`,
-			expected: `len([]interface{}{1, 2}) == 0`,
+			input:    "(import \"vex.collections\")\n(empty? [1 2])",
+			expected: `(len([]interface{}{1, 2}) == 0)`,
 		},
 		{
 			name:     "Cons operation",
-			input:    `(cons 0 [1 2 3])`,
+			input:    "(import \"vex.collections\")\n(cons 0 [1 2 3])",
 			expected: `append([]interface{}{0}, []interface{}{1, 2, 3}...)`,
 		},
 	}
@@ -107,57 +107,57 @@ func TestTranspiler_HandleCollectionOpComprehensive(t *testing.T) {
 		{
 			name:     "First with empty array",
 			input:    `(first [])`,
-			expected: `[]interface{}{}[0]`,
+			expected: `first([]interface{}{})`,
 		},
 		{
 			name:     "First with non-empty array",
 			input:    `(first [1 2 3])`,
-			expected: `[]interface{}{1, 2, 3}[0]`,
+			expected: `first([]interface{}{1, 2, 3})`,
 		},
 		{
 			name:     "Rest with empty array",
 			input:    `(rest [])`,
-			expected: `[]interface{}{}[1:]`,
+			expected: `rest([]interface{}{})`,
 		},
 		{
 			name:     "Rest with single element",
 			input:    `(rest [1])`,
-			expected: `[]interface{}{1}[1:]`,
+			expected: `rest([]interface{}{1})`,
 		},
 		{
 			name:     "Rest with multiple elements",
 			input:    `(rest [1 2 3 4])`,
-			expected: `[]interface{}{1, 2, 3, 4}[1:]`,
+			expected: `rest([]interface{}{1, 2, 3, 4})`,
 		},
 		{
 			name:     "Cons with single element",
 			input:    `(cons 1 [])`,
-			expected: `append([]interface{}{1}, []interface{}{}...)`,
+			expected: `cons(1, []interface{}{})`,
 		},
 		{
 			name:     "Cons with multiple elements",
 			input:    `(cons 0 [1 2 3])`,
-			expected: `append([]interface{}{0}, []interface{}{1, 2, 3}...)`,
+			expected: `cons(0, []interface{}{1, 2, 3})`,
 		},
 		{
 			name:     "Count with empty array",
 			input:    `(count [])`,
-			expected: `len([]interface{}{})`,
+			expected: `count([]interface{}{})`,
 		},
 		{
 			name:     "Count with multiple elements",
 			input:    `(count [1 2 3 4 5])`,
-			expected: `len([]interface{}{1, 2, 3, 4, 5})`,
+			expected: `count([]interface{}{1, 2, 3, 4, 5})`,
 		},
 		{
 			name:     "Empty check with empty array",
 			input:    `(empty? [])`,
-			expected: `len([]interface{}{}) == 0`,
+			expected: `empty?([]interface{}{})`,
 		},
 		{
 			name:     "Empty check with non-empty array",
 			input:    `(empty? [1 2])`,
-			expected: `len([]interface{}{1, 2}) == 0`,
+			expected: `empty?([]interface{}{1, 2})`,
 		},
 	}
 
@@ -186,37 +186,37 @@ func TestTranspiler_EvaluateCollectionOpComprehensive(t *testing.T) {
 		{
 			name:     "First as expression",
 			input:    `(def x (first [1 2 3]))`,
-			expected: `func() interface{} { if len([]interface{}{1, 2, 3}) > 0 { return []interface{}{1, 2, 3}[0] } else { return nil } }()`,
+			expected: `x := first([]interface{}{1, 2, 3})`,
 		},
 		{
 			name:     "Rest as expression",
 			input:    `(def x (rest [1 2 3]))`,
-			expected: `func() []interface{} { if len([]interface{}{1, 2, 3}) > 1 { return []interface{}{1, 2, 3}[1:] } else { return []interface{}{} } }()`,
+			expected: `x := rest([]interface{}{1, 2, 3})`,
 		},
 		{
 			name:     "Cons as expression",
 			input:    `(def x (cons 1 [2 3]))`,
-			expected: `append([]interface{}{1}, []interface{}{2, 3}...)`,
+			expected: `x := cons(1, []interface{}{2, 3})`,
 		},
 		{
 			name:     "Count as expression",
 			input:    `(def x (count [1 2 3]))`,
-			expected: `len([]interface{}{1, 2, 3})`,
+			expected: `x := count([]interface{}{1, 2, 3})`,
 		},
 		{
 			name:     "Empty as expression",
 			input:    `(def x (empty? [1 2]))`,
-			expected: `len([]interface{}{1, 2}) == 0`,
+			expected: `x := empty?([]interface{}{1, 2})`,
 		},
 		{
 			name:     "Nested collection operations",
 			input:    `(def x (first (rest [1 2 3])))`,
-			expected: `func() interface{} { if len(func() []interface{} { if len([]interface{}{1, 2, 3}) > 1 { return []interface{}{1, 2, 3}[1:] } else { return []interface{}{} } }()) > 0 { return func() []interface{} { if len([]interface{}{1, 2, 3}) > 1 { return []interface{}{1, 2, 3}[1:] } else { return []interface{}{} } }()[0] } else { return nil } }()`,
+			expected: `x := first(rest([]interface{}{1, 2, 3}))`,
 		},
 		{
 			name:     "Collection operation in function call",
 			input:    `(def x (print (count [1 2 3])))`,
-			expected: `print(len([]interface{}{1, 2, 3}))`,
+			expected: `x := print(count([]interface{}{1, 2, 3}))`,
 		},
 	}
 
@@ -247,31 +247,31 @@ func TestTranspiler_EvaluateCollectionOpErrorPaths(t *testing.T) {
 			name:          "First with no arguments",
 			input:         `(first)`,
 			expectError:   true,
-			errorContains: "macro 'first' expects 1 arguments, got 0",
+			errorContains: "first expects 1 arguments; got 0",
 		},
 		{
 			name:          "Rest with no arguments",
 			input:         `(rest)`,
 			expectError:   true,
-			errorContains: "macro 'rest' expects 1 arguments, got 0",
+			errorContains: "rest expects 1 arguments; got 0",
 		},
 		{
 			name:          "Count with no arguments",
 			input:         `(count)`,
 			expectError:   true,
-			errorContains: "macro 'count' expects 1 arguments, got 0",
+			errorContains: "count expects 1 arguments; got 0",
 		},
 		{
 			name:          "Empty with no arguments",
 			input:         `(empty?)`,
 			expectError:   true,
-			errorContains: "macro 'empty?' expects 1 arguments, got 0",
+			errorContains: "empty? expects 1 arguments; got 0",
 		},
 		{
 			name:          "Cons with insufficient arguments",
 			input:         `(cons 1)`,
 			expectError:   true,
-			errorContains: "macro 'cons' expects 2 arguments, got 1",
+			errorContains: "cons expects 2 arguments; got 1",
 		},
 	}
 
@@ -305,22 +305,22 @@ func TestTranspiler_CollectionOperationsWithComplexExpressions(t *testing.T) {
 		{
 			name:     "First with arithmetic result",
 			input:    `(first [(+ 1 2) (* 3 4)])`,
-			expected: `[]interface{}{(1 + 2), (3 * 4)}[0]`,
+			expected: `first([]interface{}{(1 + 2), (3 * 4)})`,
 		},
 		{
 			name:     "Count with nested arrays",
 			input:    `(count [[1 2] [3 4]])`,
-			expected: `len([]interface{}{[]interface{}{1, 2}, []interface{}{3, 4}})`,
+			expected: `count([]interface{}{[]interface{}{1, 2}, []interface{}{3, 4}})`,
 		},
 		{
 			name:     "Cons with function call",
 			input:    `(cons (+ 1 1) [2 3])`,
-			expected: `append([]interface{}{(1 + 1)}, []interface{}{2, 3}...)`,
+			expected: `cons((1 + 1), []interface{}{2, 3})`,
 		},
 		{
 			name:     "Collection operations chained",
 			input:    `(count (rest (cons 0 [1 2 3])))`,
-			expected: `len(func() []interface{} { if len(append([]interface{}{0}, []interface{}{1, 2, 3}...)) > 1 { return append([]interface{}{0}, []interface{}{1, 2, 3}...)[1:] } else { return []interface{}{} } }())`,
+			expected: `count(rest(cons(0, []interface{}{1, 2, 3})))`,
 		},
 	}
 

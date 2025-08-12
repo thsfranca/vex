@@ -632,21 +632,9 @@ func (tf *TestFramework) executeTest(testFile string) TestResult {
         return result
     }
     
-    // Bootstrap with working test macros embedded
+    // Bootstrap with real test framework from stdlib
     bootstrap := `(import "fmt")
-;; Working test macros - simplified but functional
-(macro assert-eq [actual expected msg]
-  (do
-    (fmt/Print "✅ ")
-    (fmt/Println msg)))
-
-(macro deftest [name body]
-  (do
-    (fmt/Print "🧪 RUN: ")
-    (fmt/Println name)
-    body
-    (fmt/Print "✅ PASS: ")
-    (fmt/Println name)))
+(import "vex.test")
 `
     fullProgram := bootstrap + "\n" + validTestCode
     

@@ -225,10 +225,10 @@ Optimize transpiler performance for faster CLI operations and improved developer
 
 ---
 
-## Phase 4.6: Enhanced Test Coverage - Function-Level Tracking 📊 **READY FOR IMPLEMENTATION**
+## Phase 4.6: Minimal Go Runtime — Self-Hosting Strategy 🚧 **HIGH PRIORITY**
 
 ### Goal
-Enhance the current file-based test coverage system with function-level granularity for more actionable coverage insights.
+Implement progressive Go code reduction strategy aligned with Minimal Go Implementation design principle. Reduce Go codebase from ~20,719 lines through systematic self-hosting in Vex.
 
 ### Implementation Ready - Foundation Complete:
 - ✅ **Coverage Infrastructure** - Complete coverage system with enhanced reporting capability

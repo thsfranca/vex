@@ -167,6 +167,9 @@ func (r *Resolver) BuildProgramFromEntry(entryFile string) (*Result, error) {
         if ex, ok := exports[pkgPath]; ok && len(ex) > 0 {
             if sch, err := r.collectPackageSchemes(pkgPath, ex); err == nil && len(sch) > 0 {
                 pkgSchemes[pkgPath] = sch
+            } else if err != nil {
+                // TODO: Remove debug - temporarily expose error
+                return nil, fmt.Errorf("failed to collect schemes for package %s: %w", pkgPath, err)
             }
         }
     }
@@ -349,7 +352,8 @@ func (r *Resolver) collectPackageSchemes(importPath string, exported map[string]
     ast := &resolverAnalysisAST{root: prog}
     if _, err := a.Analyze(ast); err != nil {
         // Return empty on analysis error; caller may ignore
-        return map[string]*analysis.TypeScheme{}, nil
+        // TODO: Remove debug - temporarily expose error
+        return map[string]*analysis.TypeScheme{}, fmt.Errorf("analysis failed: %w", err)
     }
 
     out := make(map[string]*analysis.TypeScheme)

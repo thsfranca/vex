@@ -17,7 +17,7 @@ type EnhancedCoverageReport struct {
 	Packages          []EnhancedPackageCoverage  `json:"packages"`
 	UncoveredFunctions []FunctionInfo            `json:"uncovered_functions"`
 	Summary           CoverageSummary           `json:"summary"`
-	// Advanced features
+	// Advanced features (minimal)
 	LineCoverage      map[string]*FileCoverage   `json:"line_coverage"`
 	BranchCoverage    map[string]*BranchCoverage `json:"branch_coverage"`
 	QualityMetrics    map[string]*TestQualityMetrics `json:"quality_metrics"`
@@ -51,7 +51,7 @@ type CoverageSummary struct {
 	NeedsAttention      []string `json:"needs_attention_packages"`
 }
 
-// EnhancedCoverageReporter generates sophisticated coverage reports
+// EnhancedCoverageReporter generates sophisticated coverage reports (minimal Go)
 type EnhancedCoverageReporter struct {
 	discovery       *FunctionDiscovery
 	correlation     *TestCorrelation
@@ -257,23 +257,23 @@ func (ecr *EnhancedCoverageReporter) generateSummary(report *EnhancedCoverageRep
 	return summary
 }
 
-// performAdvancedAnalysis conducts line, branch, and quality analysis
+// performAdvancedAnalysis conducts minimal analysis (Vex principle: minimal Go)
 func (ecr *EnhancedCoverageReporter) performAdvancedAnalysis(packageDir, packageName string, packageCoverage *EnhancedPackageCoverage, report *EnhancedCoverageReport) {
-	// Line coverage analysis for each source file
+	// Minimal implementation - complex analysis should be in Vex stdlib
 	for _, sourceFile := range packageCoverage.SourceFiles {
-		fileCoverage, err := ecr.lineAnalyzer.AnalyzeFile(sourceFile, packageName, packageCoverage.TestedFunctions)
-		if err == nil {
+		// Basic line coverage
+		if fileCoverage, err := ecr.lineAnalyzer.AnalyzeFile(sourceFile, packageName, packageCoverage.TestedFunctions); err == nil {
 			report.LineCoverage[sourceFile] = fileCoverage
 			
-			// Branch coverage analysis
-			branchCoverage := ecr.branchAnalyzer.AnalyzeBranches(fileCoverage)
-			report.BranchCoverage[sourceFile] = branchCoverage
+			// Basic branch coverage
+			if branchCoverage := ecr.branchAnalyzer.AnalyzeBranches(fileCoverage); branchCoverage != nil {
+				report.BranchCoverage[sourceFile] = branchCoverage
+			}
 		}
 	}
 	
-	// Test quality analysis
-	qualityMetrics, err := ecr.qualityAnalyzer.AnalyzeTestQuality(packageCoverage.TestFiles, packageName)
-	if err == nil {
+	// Basic quality analysis
+	if qualityMetrics, err := ecr.qualityAnalyzer.AnalyzeTestQuality(packageCoverage.TestFiles, packageName); err == nil {
 		report.QualityMetrics[packageName] = qualityMetrics
 	}
 }
@@ -403,6 +403,8 @@ func (ecr *EnhancedCoverageReporter) printAdvancedMetrics(packageName string, re
 			fmt.Printf("     🌿 Branch: %.1f%% (%d/%d)\n", branchPercent, coveredBranches, totalBranches)
 		}
 	}
+	
+	// Path coverage removed - following Vex minimal principle
 	
 	// Show test quality
 	if quality := report.QualityMetrics[packageName]; quality != nil {

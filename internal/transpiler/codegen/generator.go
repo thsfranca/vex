@@ -226,6 +226,8 @@ func (g *GoCodeGenerator) VisitList(ctx *parser.ListContext) (Value, error) {
 		return g.generateComparison(funcName, args)
 	case "get", "slice", "len", "append":
 		return g.generatePrimitiveOp(funcName, args)
+	case "empty?", "count", "first", "rest", "cons":
+		return g.generateCollectionOp(funcName, args)
 	default:
         // Optional specialization: if the call is a pure comparison, emit bool directly
         // Otherwise fallback
@@ -565,6 +567,52 @@ func (g *GoCodeGenerator) generatePrimitiveOp(op string, args []string) (Value, 
 		}
 		// Append operation - use spread operator for array arguments
 		code := fmt.Sprintf("append(%s, %s...)", args[0], args[1])
+		return analysis.NewBasicValue(code, "[]interface{}"), nil
+	default:
+		return analysis.NewBasicValue("nil", "interface{}"), nil
+	}
+}
+
+func (g *GoCodeGenerator) generateCollectionOp(op string, args []string) (Value, error) {
+	switch op {
+	case "empty?":
+		if len(args) != 1 {
+			return analysis.NewBasicValue("false", "bool"), nil
+		}
+		// Check for empty array literal: []interface{}{}
+		if args[0] == "[]interface{}{}" {
+			return analysis.NewBasicValue("true", "bool"), nil
+		}
+		// Generate standard Go len() check
+		code := fmt.Sprintf("(len(%s) == 0)", args[0])
+		return analysis.NewBasicValue(code, "bool"), nil
+	case "count":
+		if len(args) != 1 {
+			return analysis.NewBasicValue("0", "int"), nil
+		}
+		// Generate standard Go len() call
+		code := fmt.Sprintf("len(%s)", args[0])
+		return analysis.NewBasicValue(code, "int"), nil
+	case "first":
+		if len(args) != 1 {
+			return analysis.NewBasicValue("nil", "interface{}"), nil
+		}
+		// Generate first element access with bounds checking using standard Go
+		code := fmt.Sprintf("func() interface{} { if len(%s) > 0 { return %s[0] } else { return nil } }()", args[0], args[0])
+		return analysis.NewBasicValue(code, "interface{}"), nil
+	case "rest":
+		if len(args) != 1 {
+			return analysis.NewBasicValue("[]interface{}{}", "[]interface{}"), nil
+		}
+		// Generate rest operation using standard Go slicing
+		code := fmt.Sprintf("func() []interface{} { if len(%s) > 1 { return %s[1:] } else { return []interface{}{} } }()", args[0], args[0])
+		return analysis.NewBasicValue(code, "[]interface{}"), nil
+	case "cons":
+		if len(args) != 2 {
+			return analysis.NewBasicValue("[]interface{}{}", "[]interface{}"), nil
+		}
+		// Generate cons operation using standard Go append
+		code := fmt.Sprintf("append([]interface{}{%s}, %s...)", args[0], args[1])
 		return analysis.NewBasicValue(code, "[]interface{}"), nil
 	default:
 		return analysis.NewBasicValue("nil", "interface{}"), nil

@@ -18,6 +18,7 @@ purpose: "Machine-readable reference for AI code generation"
 **Concurrency**: Automatic via Go goroutines (HTTP requests scale naturally)  
 **Macro System**: Advanced user-defined macros with template expansion, parameter validation, and core macro bootstrapping  
 **Diagnostics**: Structured error codes (VEX-TYP-*) with AI-friendly formatting and suggestions  
+**Implementation Philosophy**: Minimal Go runtime with maximum self-hosting - language features, standard library, and development tools implemented in Vex wherever feasible  
 **Project Status**: Multi-stage compilation pipeline complete; HM type system implemented; package discovery operational; CLI commands fully functional  
 
 ## Language Specification

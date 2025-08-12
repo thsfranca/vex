@@ -18,6 +18,10 @@ Vex is a statically-typed functional programming language designed specifically 
 
 **🧩 Functional Programming**: Immutable data structures, pure functions, and functional composition as primary paradigms that AI can reliably generate and that provide automatic thread-safety for all programs.
 
+**🔗 Minimal Go Implementation**: Vex maintains the smallest possible Go runtime implementation, with all language features, standard library components, and development tools self-hosted in Vex whenever feasible.
+
+**🚀 Self-Hosting Philosophy**: Everything that can be implemented in Vex should be implemented in Vex, reducing dependency on Go implementation details and maximizing the language's self-sufficiency.
+
 ### AI-Friendly Design Goals
 
 **Uniform Syntax**: S-expressions provide consistent `(operation args...)` structure with no precedence rules or special cases.
@@ -337,9 +341,165 @@ This metaprogramming capability enables sophisticated AI code generation pattern
   - `internal/transpiler/macro`: `BenchmarkMacro_ExpandChained` < 3µs/op, < 5KB/op, < 100 allocs/op.
   - `internal/transpiler/packages`: Resolver benchmark shows cached steady-state in sub-10µs/op on repeated runs within the same process.
 
-Note: This phase executes before Phase 4.6. Subsequent phase numbers reflect execution order.
+## Phase 4.6: Minimal Go Runtime — Self-Hosting Strategy — HIGH PRIORITY
 
-## Phase 4.6: Codebase AI/Human Friendliness — HIGH PRIORITY — DEVELOPER EXPERIENCE
+### Goals
+
+Implement a progressive Go code reduction strategy aligned with the **Minimal Go Implementation** and **Self-Hosting Philosophy** design principles. Reduce the Go codebase from ~20,719 lines to achieve maximum language independence while demonstrating Vex's capabilities for real-world development.
+
+### Phased Implementation Strategy
+
+#### Phase 4.6.1: Self-Hosted Development Tools (6-8 weeks)
+**Target: 23% Go code reduction (~1,155 lines)**
+
+**Move to Vex:**
+- **Coverage analysis tools** (`internal/transpiler/coverage/`) → `stdlib/vex/coverage/`
+- **Build automation** (`tools/release-manager/`, `tools/change-detector/`) → Vex scripts with Go interop
+- **File processing utilities** (`tools/extension-tester/`, `tools/debug-helper/`) → Vex with `os` package
+- **Grammar validation** (`tools/grammar-validator/`) → Vex test framework integration
+
+**Implementation Example:**
+```vex
+;; Coverage analysis in Vex (already started in stdlib/vex/coverage/)
+(import ["os" "encoding/json" "fmt"])
+
+(defn analyze-package-coverage [package-dir: string] -> interface{}
+  (-> package-dir
+      (discover-functions)
+      (correlate-with-tests)
+      (calculate-metrics)))
+
+(defn generate-coverage-report [coverage-data: interface{}] -> string
+  (-> coverage-data
+      (format-enhanced-report)
+      (add-visual-indicators)
+      (create-json-export)))
+```
+
+**Benefits:**
+- **Immediate measurable progress** - 1,155 fewer lines of Go code
+- **Dogfooding demonstration** - development tools written in Vex
+- **AI-friendly tooling** - uniform S-expression syntax for all tools
+- **Foundation for advanced self-hosting** - proves Vex capabilities
+
+#### Phase 4.6.2: Self-Hosted Standard Library Extensions (8-12 weeks)
+**Target: Enhanced Vex stdlib capabilities**
+
+**Expand Vex capabilities:**
+- **Advanced string processing** - regex patterns, text manipulation
+- **File system operations** - directory traversal, file analysis
+- **Data structure libraries** - collections, maps, sets with functional operations
+- **JSON/data processing** - parsing, transformation, serialization
+
+**Implementation Example:**
+```vex
+;; String processing library
+(defn analyze-source-file [file-path: string] -> interface{}
+  (-> file-path
+      (read-file-content)
+      (extract-function-definitions)
+      (parse-test-correlations)
+      (build-coverage-map)))
+
+;; File operations
+(defn walk-directory [dir: string filter-fn: function] -> []string
+  (-> dir
+      (list-directory-contents)
+      (filter filter-fn)
+      (map get-absolute-path)))
+```
+
+#### Phase 4.6.3: Self-Hosted Analysis Components (12-16 weeks)
+**Target: 15-20% additional reduction (~2,000-3,000 lines)**
+
+**Move to Vex:**
+- **Macro expansion logic** (`internal/transpiler/macro/`) → Vex metaprogramming
+- **Symbol table management** (`internal/transpiler/analysis/symbols.go`) → Vex data structures
+- **Package resolution** (`internal/transpiler/packages/`) → Vex with filesystem operations
+- **Error formatting** (`internal/transpiler/diagnostics/`) → Vex string processing
+
+**Implementation Example:**
+```vex
+;; Macro system in Vex
+(record Macro [name params body])
+(record Registry [macros loaded-modules])
+
+(defn expand-macro [registry: Registry macro-name: string args: []string] -> string
+  (-> (get-macro registry macro-name)
+      (validate-arity args)
+      (substitute-parameters args)
+      (recursively-expand registry)))
+
+;; Symbol table management
+(defn analyze-symbols [ast: interface{} env: interface{}] -> interface{}
+  (match ast
+    [:def name value] (register-symbol env name (infer-type value))
+    [:defn name params body] (register-function env name params (analyze-body body env))
+    [:call func args] (validate-call env func args)))
+```
+
+#### Phase 4.6.4: Evaluation Phase (Future)
+**Target: Assess code generation self-hosting (~20-25% more reduction)**
+
+Based on lessons learned from previous phases, evaluate moving:
+- **Go code templates** → Vex string manipulation
+- **AST traversal logic** → Vex tree operations  
+- **Import management** → Vex data processing
+- **Type-aware generation** → Vex pattern matching
+
+### Expected Impact by Phase
+
+| Phase | Go Lines Reduced | Cumulative Reduction | Risk Level | Benefits |
+|-------|------------------|---------------------|------------|----------|
+| **4.6.1 Tools** | 1,155 (23%) | 23% | Low | Immediate wins, dogfooding |
+| **4.6.2 Stdlib** | +stdlib expansion | Enhanced capabilities | Low | Foundation for complex self-hosting |
+| **4.6.3 Analysis** | +2,000-3,000 (35% total) | ~35% | Medium | Advanced language features |
+| **4.6.4 Evaluation** | +2,000-4,000 (50%+ total) | 50%+ | High | Major architectural change |
+
+### Implementation Principles
+
+**Progressive Migration:**
+- Start with lowest-risk, highest-visibility components
+- Maintain backward compatibility during transition
+- Implement comprehensive testing for self-hosted components
+- Document migration patterns for future reference
+
+**Performance Considerations:**
+- Benchmark self-hosted components against Go equivalents
+- Use Go interop for performance-critical paths when needed
+- Optimize Vex implementations through iterative improvement
+- Maintain CLI responsiveness as primary constraint
+
+**Quality Standards:**
+- Self-hosted tools must match or exceed Go tool functionality
+- Comprehensive error handling and validation
+- AI-friendly code patterns throughout
+- Extensive documentation and examples
+
+### Acceptance Criteria
+
+**Phase 4.6.1 (Tools):**
+- All development tools successfully migrated to Vex
+- CLI functionality unchanged from user perspective
+- Performance impact < 10% for tool operations
+- 1,155+ lines of Go code removed
+
+**Phase 4.6.3 (Analysis):**
+- Macro system fully operational in Vex
+- Symbol analysis maintains type checking accuracy
+- Package resolution performance acceptable
+- 3,000+ total lines of Go code removed
+
+### Strategic Value
+
+This approach advances multiple project goals simultaneously:
+- **Demonstrates language maturity** through self-hosting capabilities
+- **Reduces Go maintenance burden** by eliminating code
+- **Showcases AI-friendly development** with uniform syntax patterns
+- **Validates functional programming approach** for complex systems
+- **Provides educational value** in language implementation techniques
+
+## Phase 4.7: Codebase AI/Human Friendliness — DEVELOPER EXPERIENCE
 
 ### Goals
 
@@ -450,7 +610,55 @@ This phase should be implemented gradually alongside other development:
 3. **Medium-term (Phase 4.6.3)**: Package reorganization and structure improvements
 4. **Long-term (Phase 4.6.4)**: Functional pattern adoption and alignment
 
-## Phase 5: Immutable Data Structures ⏳ **PLANNED**
+## Phase 5: Enhanced Language Features ⏳ **PLANNED**
+
+### Record System Implementation
+
+**Record Construction and Access**
+Complete the record system implementation with:
+- Record constructor generation from analyzer schemas
+- Field access patterns with type checking
+- Pattern matching integration for destructuring
+- Immutable update operations
+
+**Advanced Control Flow**
+Implement sophisticated control structures:
+- `when` and `unless` with multiple conditions
+- `cond` with pattern matching
+- `match` expressions for destructuring
+- Loop constructs with functional iteration patterns
+
+**Lambda Expressions**
+Add anonymous function support:
+- Lambda syntax with capture semantics
+- Higher-order function patterns
+- Closure generation with proper scoping
+- Integration with collection operations
+
+### Implementation Strategy
+
+```vex
+;; Record usage patterns
+(record Person [name: string age: number email: string])
+
+(def user (Person "Alice" 30 "alice@example.com"))
+(def updated-user (assoc user :age 31))
+
+;; Advanced control flow
+(when (and (> age 18) (< age 65))
+  (send-notification user)
+  (update-database user))
+
+(match user
+  (Person name age email) (format-contact name email)
+  _ (error "Invalid user record"))
+
+;; Lambda expressions
+(def users (map (fn [name] (Person name 0 "")) names))
+(def adults (filter (fn [p] (> (:age p) 18)) users))
+```
+
+## Phase 6: Immutable Data Structures ⏳ **PLANNED**
 
 ### Persistent Collection Implementation
 
@@ -474,7 +682,7 @@ Implement hash array mapped tries (HAMT) for persistent maps with:
 - Cache hash codes for map keys to avoid recomputation
 - Use bit manipulation tricks for efficient tree traversal
 
-## Phase 6: Concurrency and Backend Service Features ⏳ **PLANNED**
+## Phase 7: Concurrency and Backend Service Features ⏳ **PLANNED**
 
 ### Concurrency Model
 
@@ -507,7 +715,7 @@ Built-in support for HTTP service development:
 - Connection pooling for database operations
 - Metrics collection for observability
 
-## Phase 7: Development Tooling and Developer Experience ⏳ **PLANNED**
+## Phase 8: Development Tooling and Developer Experience ⏳ **PLANNED**
 
 ### Compiler Implementation
 
@@ -590,7 +798,7 @@ Leveraging AI for comprehensive test coverage:
 - Stack trace mapping from Go back to Vex
 - Variable inspection with type information
 
-## Phase 8: Standard Library and Ecosystem ⏳ **PLANNED**
+## Phase 9: Standard Library and Ecosystem ⏳ **PLANNED**
 
 ### Core Standard Library
 
@@ -617,7 +825,7 @@ Specialized libraries for backend development:
 - Integration with Go modules for Go library dependencies
 - Package registry for sharing Vex libraries
 
-## Phase 9: Performance Optimization and Production Readiness ⏳ **PLANNED**
+## Phase 10: Performance Optimization and Production Readiness ⏳ **PLANNED**
 
 ### Compilation Optimizations
 

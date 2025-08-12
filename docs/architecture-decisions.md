@@ -1,3 +1,67 @@
+## ADR-0019: Progressive Go Code Reduction Strategy — Phase Reorganization
+
+- Status: Accepted
+- Decision: Reorganize implementation phases with a systematic approach to Go code reduction, implementing a progressive self-hosting strategy that reduces the Go codebase from ~20,719 lines through strategic migration to Vex.
+- Context: The project has reached sufficient maturity (complete parser, transpiler, type system, macros, and testing) to begin substantial self-hosting. A reorganized phase structure provides better distribution of effort and clearer progress milestones.
+- **New Phase Organization**:
+  - **Phase 4.6**: Minimal Go Runtime — Self-Hosting Strategy (NEW - HIGH PRIORITY)
+    - Phase 4.6.1: Self-Hosted Development Tools (23% reduction target)
+    - Phase 4.6.2: Enhanced Vex Standard Library
+    - Phase 4.6.3: Self-Hosted Analysis Components (35% total reduction target)
+    - Phase 4.6.4: Code Generation Evaluation (50%+ reduction potential)
+  - **Phase 5**: Enhanced Language Features (Records, Control Flow, Lambdas)
+  - **Phase 6**: Immutable Data Structures
+  - **Phase 7**: Concurrency Primitives
+  - **Phase 8**: HTTP Server Framework
+  - **Phases 9-12**: Standard Library, Tooling, Performance, Production Readiness
+- **Implementation Strategy**:
+  - **Start with low-risk, high-visibility wins**: Development tools migration (1,155 lines)
+  - **Progressive complexity increase**: Tools → Standard Library → Analysis Components → Code Generation
+  - **Maintain performance standards**: <10% overhead for migrated components
+  - **Comprehensive testing**: Self-hosted components must match Go functionality
+  - **Documentation patterns**: Establish migration methodologies for future use
+- **Target Reductions**:
+  - Phase 4.6.1 (Tools): 1,155 lines (23% of current Go code)
+  - Phase 4.6.3 (Analysis): +2,000-3,000 lines (35% total)
+  - Phase 4.6.4 (Generation): +2,000-4,000 lines (50%+ total)
+  - Potential ultimate target: 60-70% reduction maintaining essential Go runtime
+- Benefits:
+  - **Measurable progress tracking** with specific line reduction targets
+  - **Risk management** through progressive complexity increase
+  - **Educational demonstration** of functional programming and self-hosting
+  - **AI-friendly development** showcasing uniform S-expression patterns
+  - **Reduced maintenance burden** through Go code elimination
+- Consequences:
+  - Requires significant development effort across multiple phases
+  - Performance monitoring essential to maintain CLI responsiveness
+  - Bootstrap complexity increases as more components move to Vex
+  - Success depends on Vex stdlib maturity for advanced operations
+- References: Phase reorganization in vex-implementation-requirements.md and PROGRESS.md
+
+## ADR-0018: Minimal Go Implementation and Self-Hosting Philosophy
+
+- Status: Accepted
+- Decision: Adopt minimal Go implementation principle and self-hosting philosophy where Vex maintains the smallest possible Go runtime implementation, with all language features, standard library components, and development tools self-hosted in Vex whenever feasible.
+- Context: To maximize language independence, reduce maintenance burden of Go implementation details, and demonstrate language capabilities, Vex should minimize its Go footprint and implement as much functionality as possible in Vex itself.
+- Implementation Strategy:
+  - **Minimal Go Runtime**: Keep only essential Go code for bootstrapping, FFI bindings, and performance-critical operations that benefit from Go's optimizations
+  - **Self-Hosted Standard Library**: Implement collections, string processing, mathematical operations, and utility functions in Vex
+  - **Self-Hosted Development Tools**: Build testing framework, package manager, documentation generators, and development utilities in Vex
+  - **Self-Hosted Language Features**: Implement advanced macros, type system extensions, and language constructs using Vex's own capabilities
+  - **Strategic Go Usage**: Preserve Go usage for low-level runtime operations, system integration, compiler bootstrapping, and performance-critical paths
+- Benefits:
+  - **Language Independence**: Reduced dependency on Go implementation details and evolution
+  - **Self-Sufficiency**: Vex becomes more self-contained and demonstrates its own capabilities
+  - **Maintenance Simplification**: Less Go code to maintain, debug, and keep synchronized with Vex features
+  - **Feature Velocity**: New features can be developed in Vex rather than requiring Go implementation
+  - **Educational Value**: Self-hosting demonstrates language maturity and functional programming principles
+- Consequences:
+  - Requires careful planning of what remains in Go versus what moves to Vex
+  - Performance implications must be measured and acceptable for self-hosted components
+  - Bootstrap sequence becomes more complex as more functionality moves to Vex
+  - Testing strategy must ensure both Go and Vex components work correctly together
+- References: Core design principles update in vex-implementation-requirements.md; detailed implementation in ADR-0019
+
 ## ADR-0017: Codebase AI/Human Friendliness — Code Quality and Developer Experience
 
 - Status: Accepted (Phase 4.6 implementation planned)

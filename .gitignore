@@ -85,3 +85,9 @@ coverage.html
 debug*.go
 debug*.vx
 debug*.vex
+
+# Temporary test files and directories
+test-*/
+*_test.vx
+*-test-results.log
+deftest-*/

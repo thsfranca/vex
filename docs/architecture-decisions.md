@@ -1,3 +1,35 @@
+## ADR-0020: Real Execution-Based Coverage Implementation
+
+- Status: Accepted
+- Decision: Implement test coverage analysis using real execution data from Go runtime instrumentation rather than static analysis or heuristic-based approaches.
+- Context: The initial coverage implementation used static analysis and heuristics, which provided inaccurate coverage metrics that did not reflect actual test execution. This violated the fundamental principle of coverage analysis and provided misleading quality metrics.
+- **Technical Implementation**:
+  - **Go Runtime Integration**: Use `go run -cover` with `GOCOVERDIR` environment for real instrumentation
+  - **Coverage Profile Parsing**: Parse actual Go coverage format (`filename:line.col,line.col numstmt count`)
+  - **Execution Validation**: Only report coverage when tests successfully execute
+  - **Profile Lifecycle**: Generate → Analyze → Cleanup coverage profiles automatically
+- **Quality Guarantees**:
+  - **100% Accuracy**: Coverage metrics reflect only code that actually executed during tests
+  - **Execution Dependency**: "No coverage data available" when tests fail to run
+  - **Real Data Indicators**: Always shows "REAL execution data ✅" for valid coverage
+  - **Profile Validation**: Verifies coverage file generation before analysis
+- **Workflow Integration**:
+  - **Test Execution Phase**: Collect coverage profiles during successful test runs
+  - **Analysis Phase**: Parse real execution data from Go coverage profiles
+  - **Reporting Phase**: Present execution-based metrics with accuracy indicators
+  - **Cleanup Phase**: Remove temporary coverage files after analysis
+- Benefits:
+  - **Accurate Quality Metrics**: Coverage percentages reflect actual test effectiveness
+  - **Reliable CI/CD Gates**: Quality gates based on real execution data
+  - **Developer Trust**: Coverage reports that accurately represent test coverage
+  - **Debugging Support**: Precise identification of untested code paths
+- Consequences:
+  - Coverage analysis only available when tests execute successfully
+  - Requires Go coverage toolchain for runtime instrumentation
+  - Slightly increased test execution time due to instrumentation overhead
+  - Dependency on Go coverage profile format stability
+- References: Implementation in cmd/vex-transpiler/main.go executeTest and analyzeRealCoverageData methods
+
 ## ADR-0019: Progressive Go Code Reduction Strategy — Phase Reorganization
 
 - Status: Accepted

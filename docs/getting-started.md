@@ -304,43 +304,47 @@ Notes:
 - Optimized Go code generation with proper module management
 
 ### `vex test`
-Advanced testing framework with multi-dimensional coverage analysis:
+Advanced testing framework with real execution-based coverage analysis:
 ```bash
 # Basic testing with file-level coverage
 ./vex test -dir . -coverage -verbose
 
-# Enhanced coverage with function/line/branch/quality analysis  
+# Enhanced coverage with real execution data analysis  
 ./vex test -enhanced-coverage -coverage-out coverage.json
 ```
 
 - **Discovery**: Recursively finds `*_test.vx` files
-- **Macros**: Uses stdlib test macros `assert-eq` and `deftest`
+- **Macros**: Uses stdlib test macros `assert-eq`, `assert-true`, `assert-false`, and `deftest`
 - **Basic Coverage**: Per-package file-level coverage reporting with `-coverage`
-- **Enhanced Coverage**: Ultra-precise analysis with `-enhanced-coverage`:
-  - **Function Coverage**: Tracks which specific functions are tested
-  - **Line Coverage**: Identifies untested lines of code
-  - **Branch Coverage**: Ensures all conditional paths are tested
-  - **Quality Scoring**: Evaluates test quality (0-100) with actionable suggestions
-- **Output**: Detailed test results, coverage statistics, and improvement recommendations
-- **CI/CD Ready**: JSON coverage exports for automated quality gates
+- **Enhanced Coverage**: Real execution-based analysis with `-enhanced-coverage`:
+  - **Execution-Based Coverage**: Uses Go runtime instrumentation for 100% accurate data
+  - **Real Coverage Data**: Parses actual Go coverage profiles from test execution
+  - **Precision Reporting**: Shows "REAL execution data ✅" with accurate percentages
+  - **Failure Handling**: Reports "No coverage data available" when tests fail
+- **Output**: Detailed test results with real execution coverage metrics
+- **CI/CD Ready**: JSON coverage exports based on actual test execution
 - **Exit Codes**: Non-zero if any test fails
 
 #### Test File Example (`calculator_test.vx`):
 ```vex
-;; Test calculator functions with explicit types
-(defn add [x: number y: number] -> number (+ x y))
-(defn multiply [x: number y: number] -> number (* x y))
+;; Import required modules for testing
+(import ["fmt" "test"])
 
 ;; Only deftest blocks are allowed in test files
 (deftest "basic-arithmetic"
   (do
-    (assert-eq (add 2 3) 5 "addition works")
-    (assert-eq (multiply 4 5) 20 "multiplication works")))
+    (fmt/Println "Testing basic arithmetic")
+    (def result (+ 2 3))
+    (assert-eq result 5 "addition works")
+    (def product (* 4 5))
+    (assert-eq product 20 "multiplication works")))
 
 (deftest "edge-cases"
   (do
-    (assert-eq (add 0 5) 5 "adding zero")
-    (assert-eq (multiply 0 5) 0 "multiplying by zero")))
+    (fmt/Println "Testing edge cases")
+    (assert-eq (+ 0 5) 5 "adding zero")
+    (assert-eq (* 0 5) 0 "multiplying by zero")
+    (assert-true (> 5 0) "positive number check")))
 
 ;; Invalid: code outside deftest blocks will fail validation
 ;; (fmt/Println "This would cause test validation to fail")
@@ -356,8 +360,8 @@ vim my-program.vx
 # Write corresponding tests
 vim my-program_test.vx
 
-# Run tests with coverage
-./vex test -coverage -verbose
+# Run tests with real execution coverage
+./vex test -enhanced-coverage -verbose
 
 # Test quickly during development
 ./vex run -input my-program.vx

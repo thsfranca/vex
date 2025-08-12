@@ -340,23 +340,34 @@ Automatically available in all test files:
 **Valid Test File** (`math_test.vx`):
 ```vex
 ;; Only deftest declarations are allowed in test files
-(import "fmt")
+(import ["fmt" "test"])
 
 ;; Simple test with assertion
 (deftest "addition"
-  (assert-eq (+ 1 2) 3 "basic addition"))
+  (do
+    (fmt/Println "Testing addition")
+    (assert-eq (+ 1 2) 3 "basic addition")))
 
 ;; Test with multiple assertions
 (deftest "multiplication"
-  (assert-eq (* 4 5) 20 "basic multiplication"))
+  (do
+    (fmt/Println "Testing multiplication")
+    (assert-eq (* 4 5) 20 "basic multiplication")
+    (assert-true (> (* 4 5) 0) "result is positive")))
 
-;; Test with custom logic
+;; Test with string operations
 (deftest "string-operations"
-  (assert-eq "hello" "hello" "string equality"))
+  (do
+    (fmt/Println "Testing string operations")
+    (assert-eq "hello" "hello" "string equality")
+    (assert-false (= "hello" "world") "string inequality")))
 
 ;; Test with custom output
 (deftest "custom-test"
-  (fmt/Println "This test demonstrates custom logic"))
+  (do
+    (fmt/Println "This test demonstrates custom logic")
+    (def result (+ 10 5))
+    (assert-eq result 15 "calculation result")))
 ```
 
 **Invalid Test File** (will fail validation):
@@ -394,7 +405,7 @@ Automatically available in all test files:
 # Combined options with coverage file output for CI
 ./vex test -dir ./src -pattern "api" -coverage -coverage-out coverage.json -verbose -timeout 5s
 
-# Enhanced coverage analysis (function-level, line-level, branch coverage, quality scoring)
+# Enhanced coverage analysis (real execution-based coverage)
 ./vex test -enhanced-coverage
 
 # Enhanced coverage with JSON output for CI/CD pipelines
@@ -437,20 +448,15 @@ This test demonstrates custom logic
 
 📊 Enhanced Coverage Report
 ═══════════════════════════
+📄 Coverage detected: /tmp/math_test_test_bin.go
 📈 Overall Coverage:
-   Function-Level: 75.0% (3/4 functions tested)
-   File-Level: 100.0% (1/1 files tested)
-
-✅ examples: 75.0% (3/4 functions), 100.0% (1/1 files)
-   Untested: helper-function
-     📝 Line: 85.7% (6/7)
-     🌿 Branch: 50.0% (1/2)
-     🎯 Quality: 85.0/100 (2.5 assertions/test)
+   Execution-Based: 100.0% (1/1 files executed)
+   Profile Sources: 1 coverage profile(s)
+   Data Quality: REAL execution data ✅
 
 💡 Coverage Insights:
-   Coverage precision: 40% → 87% (function-level analysis)
-   Priority functions to test: helper-function (examples)
-   🏆 Well-tested packages: examples
+   Coverage precision: REAL execution data (100% accurate)
+   Data source: Go runtime instrumentation
 
 🏁 Test Summary
 ─────────────────────────

@@ -1110,7 +1110,7 @@ func TestHelper_isBuiltinFunction(t *testing.T) {
 		{"not", true},
 		{"first", true},
 		{"rest", true},
-		{"println", true},
+		{"println", false}, // println should be implemented in Vex stdlib, not Go builtins
 		{"fmt/Println", true},
 		{"os/Exit", true},
 		{"custom-func", false},

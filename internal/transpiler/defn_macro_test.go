@@ -15,7 +15,8 @@ func TestTranspiler_DefnMacro(t *testing.T) {
 	}{
 		{
 			name: "Simple function definition",
-			input: `(defn add [a: int b: int] -> int (+ a b))
+			input: `(import "vex.core")
+(defn add [a: int b: int] -> int (+ a b))
 (add 3 4)`,
 			expected: []string{
 				"add := func(a interface{}, b interface{}) interface{} { return (a + b) }",
@@ -24,7 +25,8 @@ func TestTranspiler_DefnMacro(t *testing.T) {
 		},
 		{
 			name: "Function with single parameter",
-			input: `(defn square [x: int] -> int (* x x))
+			input: `(import "vex.core")
+(defn square [x: int] -> int (* x x))
 (square 5)`,
 			expected: []string{
 				"square := func(x interface{}) interface{} { return (x * x) }",
@@ -33,7 +35,8 @@ func TestTranspiler_DefnMacro(t *testing.T) {
 		},
 		{
 			name: "Function with no parameters",
-			input: `(defn get-answer [] -> int 42)
+			input: `(import "vex.core")
+(defn get-answer [] -> int 42)
 (get-answer)`,
 			expected: []string{
 				"get_answer := func() interface{} { return 42 }",
@@ -42,7 +45,8 @@ func TestTranspiler_DefnMacro(t *testing.T) {
 		},
 		{
 			name: "Function with string body",
-			input: `(defn greet [name: string] -> string (fmt/Sprintf "Hello %s" name))
+			input: `(import "vex.core")
+(defn greet [name: string] -> string (fmt/Sprintf "Hello %s" name))
 (greet "World")`,
 			expected: []string{
 				"greet := func(name interface{}) interface{} { return fmt.Sprintf(\"Hello %s\", name) }",
@@ -51,7 +55,8 @@ func TestTranspiler_DefnMacro(t *testing.T) {
 		},
 		{
 			name: "Multiple function definitions",
-			input: `(defn add [a: int b: int] -> int (+ a b))
+			input: `(import "vex.core")
+(defn add [a: int b: int] -> int (+ a b))
 (defn multiply [x: int y: int] -> int (* x y))
 (add 1 2)
 (multiply 3 4)`,
@@ -64,7 +69,8 @@ func TestTranspiler_DefnMacro(t *testing.T) {
 		},
 		{
 			name: "Function calling another function",
-			input: `(defn double [x: int] -> int (* x 2))
+			input: `(import "vex.core")
+(defn double [x: int] -> int (* x 2))
 (defn quadruple [x: int] -> int (double (double x)))
 (quadruple 5)`,
 			expected: []string{
@@ -109,21 +115,24 @@ func TestTranspiler_DefnMacroTypeInference(t *testing.T) {
 	}{
 		{
 			name:  "Integer arithmetic function",
-			input: `(defn calculate [a: int b: int] -> int (+ (* a 2) b))`,
+			input: `(import "vex.core")
+(defn calculate [a: int b: int] -> int (+ (* a 2) b))`,
 			expected: []string{
 				"calculate := func(a interface{}, b interface{}) interface{} { return ((a * 2) + b) }",
 			},
 		},
 		{
 			name:  "String manipulation function",
-			input: `(defn concat [s1: string s2: string] -> string (+ s1 s2))`,
+			input: `(import "vex.core")
+(defn concat [s1: string s2: string] -> string (+ s1 s2))`,
 			expected: []string{
 				"concat := func(s1 interface{}, s2 interface{}) interface{} { return (s1 + s2) }",
 			},
 		},
 		{
 			name:  "Boolean function",
-			input: `(defn is-positive [x: int] -> bool (> x 0))`,
+			input: `(import "vex.core")
+(defn is-positive [x: int] -> bool (> x 0))`,
 			expected: []string{
 				"is_positive := func(x interface{}) interface{} { return (x > 0) }",
 			},
@@ -187,7 +196,8 @@ func TestTranspiler_DefnMacroErrorHandling(t *testing.T) {
 		},
 		{
 			name:          "defn with valid kebab-case function name",
-			input:         `(defn my-function [x: int] -> int (* x 2))`,
+			input:         `(import "vex.core")
+(defn my-function [x: int] -> int (* x 2))`,
 			expectedError: false,
 		},
 	}
@@ -219,21 +229,25 @@ func TestTranspiler_DefnMacroComplexBodies(t *testing.T) {
 	}{
 		{
 			name:  "Function with conditional body",
-			input: `(defn abs [x: int] -> int (if (< x 0) (- x) x))`,
+			input: `(import "vex.core")
+(defn abs [x: int] -> int (if (< x 0) (- x) x))`,
 			expected: []string{
 				"abs := func(x interface{}) interface{} { return func() interface{} { if (x < 0) { return 0 } else { return x } }() }",
 			},
 		},
 		{
 			name:  "Function with nested operations",
-			input: `(defn complex [a: int b: int c: int] -> int (+ (* a b) (/ c 2)))`,
+			input: `(import "vex.core")
+(defn complex [a: int b: int c: int] -> int (+ (* a b) (/ c 2)))`,
 			expected: []string{
 				"complex := func(a interface{}, b interface{}, c interface{}) interface{} { return ((a * b) + (c / 2)) }",
 			},
 		},
 		{
 			name:  "Function with array operations",
-			input: `(defn get-first [arr: [int]] -> int (get arr 0))`,
+			input: `(import "vex.core")
+(import "collections")
+(defn get-first [arr: [int]] -> int (get arr 0))`,
 			expected: []string{
 				"get_first := func(arr interface{}) interface{} { return func() interface{} { if len(arr) > 0 { return arr[0] } else",
 			},

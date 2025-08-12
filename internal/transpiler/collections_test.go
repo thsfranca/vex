@@ -58,27 +58,27 @@ func TestTranspiler_CollectionOperationsAsExpressions(t *testing.T) {
 		{
 			name:     "First in variable definition",
 			input:    `(def result (first [1 2 3]))`,
-			expected: `func() interface{} { if len([]interface{}{1, 2, 3}) > 0 { return []interface{}{1, 2, 3}[0] } else { return nil } }()`,
+			expected: `first([]interface{}{1, 2, 3})`,
 		},
 		{
 			name:     "Rest in variable definition",
 			input:    `(def result (rest [1 2 3]))`,
-			expected: `func() []interface{} { if len([]interface{}{1, 2, 3}) > 1 { return []interface{}{1, 2, 3}[1:] } else { return []interface{}{} } }()`,
+			expected: `rest([]interface{}{1, 2, 3})`,
 		},
 		{
 			name:     "Count in variable definition",
 			input:    `(def result (count [1 2 3]))`,
-			expected: `len([]interface{}{1, 2, 3})`,
+			expected: `count([]interface{}{1, 2, 3})`,
 		},
 		{
 			name:     "Empty check in variable definition",
 			input:    `(def result (empty? []))`,
-			expected: `len([]interface{}{}) == 0`,
+			expected: `empty?([]interface{}{})`,
 		},
 		{
 			name:     "Cons in variable definition",
 			input:    `(def result (cons 0 [1 2]))`,
-			expected: `append([]interface{}{0}, []interface{}{1, 2}...)`,
+			expected: `cons(0, []interface{}{1, 2})`,
 		},
 	}
 

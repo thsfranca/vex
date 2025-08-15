@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Vex grammar defines a Lisp-like programming language with support for S-expressions, arrays, symbols, and strings.
+The Vex grammar defines a functional programming language specialized for data engineering, with S-expressions optimized for ETL pipelines, stream processing, and real-time analytics. The syntax supports data transformation patterns, windowing operations, and pipeline definitions.
 
 ## Grammar Rules
 
@@ -32,6 +32,10 @@ SYMBOL: (LETTER | INTEGER | '.' | '+' | '-' | '*' | '/' | '=' | '!' | '<' | '>' 
 ```
 Symbols can contain letters, numbers, dots, and various operators including arithmetic operators (+, -, *, /), comparison operators (=, !, <, >), namespace separators (:), and other special characters (?, _, ~).
 
+**Naming Convention**: Vex enforces kebab-case (dash-separated) naming for **all symbols** including variables, functions, macros, and record names. This promotes consistency and readability. Examples:
+- ✅ Valid: `my-variable`, `calculate-area`, `is-positive`, `user-data`
+- ❌ Invalid: `my_variable`, `calculate_area`, `is_positive`, `user_data` (error code: SYMBOL-NAMING)
+
 #### STRING
 ```antlr
 STRING: '"' ( ~'"' | '\\' '"' )* '"' ;
@@ -56,6 +60,40 @@ Comments start with `;` and continue to end of line.
 Whitespace (spaces, tabs, newlines) and commas are ignored.
 
 ## Examples
+
+### Data Engineering Examples
+
+#### ETL Pipeline Syntax
+```vex
+;; Data transformation pipeline
+(defn process-events [events]
+  (-> events
+      (filter valid-event?)
+      (map enrich-with-data)
+      (aggregate-by :user-id)
+      (emit-to warehouse)))
+
+;; Stream processing with windowing
+(defstream user-clicks
+  :source (kafka "clicks")
+  :window (minutes 5)
+  :processing-type :tumbling)
+```
+
+#### Real-time Analytics Patterns
+```vex
+;; Pipeline definition with sources and sinks
+(defpipeline fraud-detection
+  :sources [(database "transactions") (stream "user-activity")]
+  :transforms [detect-anomalies calculate-risk-score]
+  :sinks [(alerts "security") (database "risk-analysis")])
+
+;; Complex event processing
+(defpattern suspicious-login
+  [:failed-login :location-change :password-reset]
+  :within (minutes 10)
+  :action (alert security-team))
+```
 
 ### Valid Programs
 
@@ -99,15 +137,15 @@ Whitespace (spaces, tabs, newlines) and commas are ignored.
 ; Enhanced typed function syntax (planned)
 (defn add [x: int y: int] -> int (+ x y))
 
-; HTTP server patterns (planned)
-(http-server
-  :port 8080
-  :routes [(GET "/api/users" get-users)])
+; Data processing patterns (planned)
+(data-pipeline
+  :input "data.csv"
+  :transformations [(filter valid?) (map transform)])
 
-; HTTP server patterns (planned)
-(http-server
-  :port 8080
-  :routes [(GET "/api/users" get-users)])
+; Data processing patterns (planned)
+(data-pipeline
+  :input "data.csv"
+  :transformations [(filter valid?) (map transform)])
 ```
 
 ### Language Features Supported by Grammar

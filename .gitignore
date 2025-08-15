@@ -80,3 +80,14 @@ coverage-report.md
 coverage_core.html
 coverage.html
 *.coverage.out
+
+# Debug files
+debug*.go
+debug*.vx
+debug*.vex
+
+# Temporary test files and directories
+test-*/
+*_test.vx
+*-test-results.log
+deftest-*/

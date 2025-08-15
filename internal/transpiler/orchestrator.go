@@ -2,7 +2,6 @@ package transpiler
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/thsfranca/vex/internal/transpiler/codegen"
@@ -32,8 +31,8 @@ func NewBuilder() *TranspilerBuilder {
 			CoreMacroPath:    "", // Will be determined dynamically
 			PackageName:      "main",
 			GenerateComments: true,
-            IgnoreImports:    make(map[string]bool),
-            Exports:          make(map[string]map[string]bool),
+			IgnoreImports:    make(map[string]bool),
+			Exports:          make(map[string]map[string]bool),
 		},
 	}
 }
@@ -44,23 +43,11 @@ func (b *TranspilerBuilder) WithConfig(config TranspilerConfig) *TranspilerBuild
 	return b
 }
 
-// WithMacros enables or disables macro support
-func (b *TranspilerBuilder) WithMacros(enabled bool) *TranspilerBuilder {
-	b.config.EnableMacros = enabled
-	return b
-}
 
-// WithCoreMacroPath sets the path to core macro definitions
-func (b *TranspilerBuilder) WithCoreMacroPath(path string) *TranspilerBuilder {
-	b.config.CoreMacroPath = path
-	return b
-}
 
-// WithPackageName sets the package name for generated code
-func (b *TranspilerBuilder) WithPackageName(name string) *TranspilerBuilder {
-	b.config.PackageName = name
-	return b
-}
+
+
+
 
 // Build creates the configured transpiler
 func (b *TranspilerBuilder) Build() (*VexTranspiler, error) {
@@ -72,29 +59,28 @@ func (b *TranspilerBuilder) Build() (*VexTranspiler, error) {
 	if b.config.EnableMacros {
 		macroConfig := macro.Config{
 			CoreMacroPath:    b.config.CoreMacroPath,
+			StdlibPath:       b.config.StdlibPath,
 			EnableValidation: true,
 		}
 		registry := macro.NewRegistry(macroConfig)
-		
-		// Load core macros
-		if err := registry.LoadCoreMacros(); err != nil {
-			return nil, fmt.Errorf("failed to load core macros: %v", err)
-		}
-		
+
+		// Core macros are now loaded only via explicit imports
+		// Auto-loading removed to enforce explicit stdlib imports
+
 		macroSystem = NewMacroExpanderAdapter(macro.NewMacroExpander(registry))
 	}
 
-    // Create analyzer
-    analyzer := NewAnalyzerAdapter()
-    // Provide package environment for analyzer (package exports/ignore/schemes)
-    analyzer.SetPackageEnv(b.config.IgnoreImports, b.config.Exports, b.config.PkgSchemes)
+	// Create analyzer
+	analyzer := NewAnalyzerAdapter()
+	// Provide package environment for analyzer (package exports/ignore/schemes)
+	analyzer.SetPackageEnv(b.config.IgnoreImports, b.config.Exports, b.config.PkgSchemes)
 
 	// Create code generator
 	codeGenConfig := codegen.Config{
 		PackageName:      b.config.PackageName,
 		GenerateComments: b.config.GenerateComments,
 		IndentSize:       4,
-        IgnoreImports:    b.config.IgnoreImports,
+		IgnoreImports:    b.config.IgnoreImports,
 	}
 	codeGen := NewCodeGeneratorAdapter(codeGenConfig)
 
@@ -112,10 +98,17 @@ func (b *TranspilerBuilder) Build() (*VexTranspiler, error) {
 func (vt *VexTranspiler) TranspileFromInput(input string) (string, error) {
 	// Reset detected modules for each transpilation
 	vt.detectedModules = make(map[string]string)
-	
+
 	// Detect third-party modules from imports
 	vt.detectThirdPartyModules(input)
-	
+
+	// Phase 0: Extract and load stdlib imports before macro expansion
+	if vt.config.EnableMacros && vt.macroSystem != nil {
+		if err := vt.loadStdlibImports(input); err != nil {
+			return "", fmt.Errorf("stdlib import error: %v", err)
+		}
+	}
+
 	// Phase 1: Parse
 	ast, err := vt.parser.Parse(input)
 	if err != nil {
@@ -145,31 +138,47 @@ func (vt *VexTranspiler) TranspileFromInput(input string) (string, error) {
 	return code, nil
 }
 
-// TranspileFromFile transpiles a Vex file to Go
-func (vt *VexTranspiler) TranspileFromFile(filename string) (string, error) {
-	// Read file content and use TranspileFromInput
-	content, err := os.ReadFile(filename)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file %s: %v", filename, err)
+// loadStdlibImports extracts import statements from source and loads required stdlib modules
+func (vt *VexTranspiler) loadStdlibImports(input string) error {
+	// Parse import statements from the source using a simple regex approach
+	// This is a lightweight pre-processing step before full parsing
+	lines := strings.Split(input, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Look for import statements: (import vex.module) or (import "vex.module")
+		if strings.HasPrefix(line, "(import ") && strings.HasSuffix(line, ")") {
+			// Extract module name between "import " and ")"
+			importContent := strings.TrimSpace(line[8 : len(line)-1]) // Remove "(import " and ")"
+
+			// Remove quotes if present
+			moduleName := strings.Trim(importContent, "\"")
+
+			// Only handle stdlib modules (starting with "vex.")
+			if strings.HasPrefix(moduleName, "vex.") {
+				if err := vt.macroSystem.LoadStdlibModule(moduleName); err != nil {
+					return fmt.Errorf("failed to load stdlib module '%s': %v", moduleName, err)
+				}
+				// Add to IgnoreImports so it doesn't get output as a Go import
+				if vt.config.IgnoreImports == nil {
+					vt.config.IgnoreImports = make(map[string]bool)
+				}
+				vt.config.IgnoreImports[moduleName] = true
+			}
+		}
 	}
-	
-	return vt.TranspileFromInput(string(content))
+
+	return nil
 }
 
-// GetMacroSystem returns the macro system (for testing/debugging)
-func (vt *VexTranspiler) GetMacroSystem() MacroExpander {
-	return vt.macroSystem
-}
 
-// GetAnalyzer returns the analyzer (for testing/debugging)
-func (vt *VexTranspiler) GetAnalyzer() Analyzer {
-	return vt.analyzer
-}
 
-// GetCodeGenerator returns the code generator (for testing/debugging)
-func (vt *VexTranspiler) GetCodeGenerator() CodeGenerator {
-	return vt.codeGen
-}
+
+
+
+
+
 
 // GetDetectedModules returns detected third-party modules
 func (vt *VexTranspiler) GetDetectedModules() map[string]string {
@@ -178,17 +187,9 @@ func (vt *VexTranspiler) GetDetectedModules() map[string]string {
 	return vt.detectedModules
 }
 
-// Helper method to convert AST back to string (for macro processing)
-func (vt *VexTranspiler) astToString(ast AST) string {
-	// This is a simplified implementation
-	// In a real system, you'd want a proper AST-to-string converter
-	return "/* AST conversion not implemented yet */"
-}
 
-// NewVexTranspiler builds a VexTranspiler with default configuration.
-func NewVexTranspiler() (*VexTranspiler, error) {
-	return NewBuilder().Build()
-}
+
+
 
 // NewTranspilerWithConfig builds a VexTranspiler using the provided configuration.
 func NewTranspilerWithConfig(config TranspilerConfig) (*VexTranspiler, error) {

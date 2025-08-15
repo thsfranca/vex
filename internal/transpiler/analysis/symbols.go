@@ -22,8 +22,8 @@ type Value interface {
 type BasicValue struct {
 	value string
 	typ   string
-    ty    Type
-    raw   bool
+	ty    Type
+	raw   bool
 }
 
 // NewBasicValue constructs a simple Value carrying a printable form and outward type.
@@ -44,40 +44,41 @@ func (v *BasicValue) getType() Type { return v.ty }
 // MarkRaw marks this value as originating from a raw macro/body fragment.
 func (v *BasicValue) MarkRaw() *BasicValue { v.raw = true; return v }
 
-// isRaw reports whether this value is raw.
-func (v *BasicValue) isRaw() bool { return v.raw }
+
 
 // RecordValue represents a record type declaration
 type RecordValue struct {
-    name       string
-    fields     map[string]string
-    fieldOrder []string
+	name       string
+	fields     map[string]string
+	fieldOrder []string
 }
 
 // NewRecordValue creates a record declaration with a field map and order.
 func NewRecordValue(name string, fields map[string]string, order []string) *RecordValue {
-    return &RecordValue{name: name, fields: fields, fieldOrder: order}
+	return &RecordValue{name: name, fields: fields, fieldOrder: order}
 }
 
 func (r *RecordValue) String() string { return r.name }
 func (r *RecordValue) Type() string   { return "record" }
 
 func (r *RecordValue) GetFields() map[string]string {
-    cp := make(map[string]string, len(r.fields))
-    for k, v := range r.fields { cp[k] = v }
-    return cp
+	cp := make(map[string]string, len(r.fields))
+	for k, v := range r.fields {
+		cp[k] = v
+	}
+	return cp
 }
 
 func (r *RecordValue) GetFieldOrder() []string {
-    out := make([]string, len(r.fieldOrder))
-    copy(out, r.fieldOrder)
-    return out
+	out := make([]string, len(r.fieldOrder))
+	copy(out, r.fieldOrder)
+	return out
 }
 
 // SymbolTableImpl implements the SymbolTable interface
 type SymbolTableImpl struct {
-	symbols     map[string]*Symbol
-	scopes      []map[string]*Symbol
+	symbols      map[string]*Symbol
+	scopes       []map[string]*Symbol
 	currentScope int
 }
 
@@ -89,10 +90,10 @@ func NewSymbolTable() *SymbolTableImpl {
 		scopes:       make([]map[string]*Symbol, 0),
 		currentScope: 0,
 	}
-	
+
 	// Add global scope
 	st.scopes = append(st.scopes, make(map[string]*Symbol))
-	
+
 	return st
 }
 
@@ -101,13 +102,13 @@ func (st *SymbolTableImpl) Define(name string, value Value) error {
 	if name == "" {
 		return fmt.Errorf("symbol name cannot be empty")
 	}
-	
+
 	// Check if already defined in current scope
 	currentScopeSymbols := st.scopes[st.currentScope]
 	if _, exists := currentScopeSymbols[name]; exists {
-		return fmt.Errorf("symbol '%s' already defined in current scope", name)
+		return fmt.Errorf("[SYMBOL-DUPLICATE]: symbol '%s' already defined in current scope", name)
 	}
-	
+
 	// Create new symbol
 	symbol := &Symbol{
 		Name:  name,
@@ -115,11 +116,11 @@ func (st *SymbolTableImpl) Define(name string, value Value) error {
 		Value: value,
 		Scope: st.currentScope,
 	}
-	
+
 	// Add to current scope and global table
 	currentScopeSymbols[name] = symbol
 	st.symbols[name] = symbol
-	
+
 	return nil
 }
 
@@ -131,7 +132,7 @@ func (st *SymbolTableImpl) Lookup(name string) (Value, bool) {
 			return symbol.Value, true
 		}
 	}
-	
+
 	return nil, false
 }
 
@@ -149,7 +150,7 @@ func (st *SymbolTableImpl) ExitScope() {
 		for name := range scopeToRemove {
 			delete(st.symbols, name)
 		}
-		
+
 		// Remove the scope
 		st.scopes = st.scopes[:len(st.scopes)-1]
 		st.currentScope--
@@ -169,20 +170,20 @@ func (st *SymbolTableImpl) GetSymbol(name string) (*Symbol, bool) {
 			return symbol, true
 		}
 	}
-	
+
 	return nil, false
 }
 
 // GetAllSymbols returns all symbols in the current scope
 func (st *SymbolTableImpl) GetAllSymbols() map[string]*Symbol {
 	result := make(map[string]*Symbol)
-	
+
 	// Collect all symbols from global to current scope
 	for i := 0; i <= st.currentScope; i++ {
 		for name, symbol := range st.scopes[i] {
 			result[name] = symbol
 		}
 	}
-	
+
 	return result
 }

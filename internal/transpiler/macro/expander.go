@@ -26,17 +26,17 @@ func NewExpander(registry *Registry) *Expander {
 func (e *Expander) ExpandMacro(macroName string, args []string) (string, error) {
 	macro, exists := e.registry.GetMacro(macroName)
 	if !exists {
-		return "", fmt.Errorf("macro '%s' not found", macroName)
+		return "", fmt.Errorf("[MACRO-UNDEFINED]: macro '%s' not found", macroName)
 	}
 
 	if len(args) != len(macro.Params) {
-		return "", fmt.Errorf("macro '%s' expects %d arguments, got %d", 
+		return "", fmt.Errorf("[ARITY-ARGUMENTS]: macro '%s' expects %d arguments, got %d",
 			macroName, len(macro.Params), len(args))
 	}
 
 	// Substitute parameters in macro body
 	expanded := e.substituteParameters(macro.Body, macro.Params, args)
-	
+
 	// Recursively expand any nested macros
 	return e.recursivelyExpandMacros(expanded)
 }
@@ -85,7 +85,7 @@ func (e *Expander) substituteParametersInAST(body string, paramMap map[string]st
 	for param, arg := range paramMap {
 		result = e.replaceWholeWord(result, param, arg)
 	}
-	
+
 	return result
 }
 
@@ -121,7 +121,7 @@ func (e *Expander) substituteInList(ctx *parser.ListContext, paramMap map[string
 			parts = append(parts, e.reconstructVexSyntax(substituted))
 		}
 	}
-	
+
 	// Use smart spacing like in reconstructVexSyntax
 	reconstructed := ""
 	for i, part := range parts {
@@ -135,17 +135,17 @@ func (e *Expander) substituteInList(ctx *parser.ListContext, paramMap map[string
 			reconstructed += " " + part // Add space before other parts
 		}
 	}
-	
+
 	// Parse the reconstructed expression back into an AST node
 	inputStream := antlr.NewInputStream(reconstructed)
 	lexer := parser.NewVexLexer(inputStream)
 	tokenStream := antlr.NewCommonTokenStream(lexer, 0)
 	vexParser := parser.NewVexParser(tokenStream)
-	
+
 	if listTree := vexParser.List(); listTree != nil {
 		return listTree.(*parser.ListContext)
 	}
-	
+
 	return ctx // Fallback
 }
 
@@ -159,19 +159,19 @@ func (e *Expander) substituteInArray(ctx *parser.ArrayContext, paramMap map[stri
 			parts = append(parts, e.reconstructVexSyntax(substituted))
 		}
 	}
-	
+
 	reconstructed := strings.Join(parts, " ")
-	
+
 	// Parse back into array
 	inputStream := antlr.NewInputStream(reconstructed)
 	lexer := parser.NewVexLexer(inputStream)
 	tokenStream := antlr.NewCommonTokenStream(lexer, 0)
 	vexParser := parser.NewVexParser(tokenStream)
-	
+
 	if arrayTree := vexParser.Array(); arrayTree != nil {
 		return arrayTree.(*parser.ArrayContext)
 	}
-	
+
 	return ctx // Fallback
 }
 
@@ -235,13 +235,13 @@ func (e *Expander) replaceWholeWord(text, param, arg string) string {
 			result += text[i:]
 			break
 		}
-		
+
 		// Adjust index to absolute position
 		index += i
-		
+
 		// Check if it's a whole word (not part of another identifier)
 		isWholeWord := true
-		
+
 		// Check character before
 		if index > 0 {
 			prevChar := rune(text[index-1])
@@ -249,7 +249,7 @@ func (e *Expander) replaceWholeWord(text, param, arg string) string {
 				isWholeWord = false
 			}
 		}
-		
+
 		// Check character after
 		if index+len(param) < len(text) {
 			nextChar := rune(text[index+len(param)])
@@ -257,25 +257,25 @@ func (e *Expander) replaceWholeWord(text, param, arg string) string {
 				isWholeWord = false
 			}
 		}
-		
+
 		if isWholeWord {
 			// Replace the parameter
 			result += text[i:index] + arg
 			i = index + len(param)
 		} else {
 			// Not a whole word, skip this occurrence
-			result += text[i:index+1]
+			result += text[i : index+1]
 			i = index + 1
 		}
 	}
-	
+
 	return result
 }
 
 // isIdentifierChar checks if a character can be part of an identifier
 func (e *Expander) isIdentifierChar(r rune) bool {
-	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || 
-		   (r >= '0' && r <= '9') || r == '_' || r == '-' || r == '?' || r == '!'
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+		(r >= '0' && r <= '9') || r == '_' || r == '-' || r == '?' || r == '!'
 }
 
 // reconstructVexSyntax reconstructs Vex syntax from an AST node
@@ -331,14 +331,18 @@ type substitutedTerminal struct {
 	text string
 }
 
-func (s *substitutedTerminal) GetText() string { return s.text }
-func (s *substitutedTerminal) GetSymbol() antlr.Token { return nil }
+func (s *substitutedTerminal) GetText() string                                   { return s.text }
+func (s *substitutedTerminal) GetSymbol() antlr.Token                            { return nil }
 func (s *substitutedTerminal) Accept(visitor antlr.ParseTreeVisitor) interface{} { return nil }
-func (s *substitutedTerminal) GetChild(i int) antlr.Tree { return nil }
-func (s *substitutedTerminal) GetChildCount() int { return 0 }
-func (s *substitutedTerminal) GetChildren() []antlr.Tree { return nil }
-func (s *substitutedTerminal) GetParent() antlr.Tree { return nil }
-func (s *substitutedTerminal) GetPayload() interface{} { return s.text }
-func (s *substitutedTerminal) GetSourceInterval() antlr.Interval { return antlr.Interval{Start: -1, Stop: -1} }
+func (s *substitutedTerminal) GetChild(i int) antlr.Tree                         { return nil }
+func (s *substitutedTerminal) GetChildCount() int                                { return 0 }
+func (s *substitutedTerminal) GetChildren() []antlr.Tree                         { return nil }
+func (s *substitutedTerminal) GetParent() antlr.Tree                             { return nil }
+func (s *substitutedTerminal) GetPayload() interface{}                           { return s.text }
+func (s *substitutedTerminal) GetSourceInterval() antlr.Interval {
+	return antlr.Interval{Start: -1, Stop: -1}
+}
 func (s *substitutedTerminal) SetParent(parent antlr.Tree) {}
-func (s *substitutedTerminal) ToStringTree(ruleNames []string, recog antlr.Recognizer) string { return s.text }
+func (s *substitutedTerminal) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return s.text
+}

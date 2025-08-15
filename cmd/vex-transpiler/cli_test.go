@@ -9,69 +9,7 @@ import (
 	"github.com/thsfranca/vex/internal/transpiler"
 )
 
-func TestLoadCoreVex(t *testing.T) {
-	tests := []struct {
-		name     string
-		setup    func(string) error
-		expected string
-		hasError bool
-	}{
-		{
-			name: "Valid core.vx file",
-			setup: func(dir string) error {
-				coreContent := `(import "fmt")
-(fmt/Println "Core loaded")`
-				return os.WriteFile(filepath.Join(dir, "core.vx"), []byte(coreContent), 0644)
-			},
-			expected: `(import "fmt")`,
-			hasError: false,
-		},
-		{
-			name: "Missing core.vx file",
-			setup: func(dir string) error {
-				// Don't create the file
-				return nil
-			},
-			expected: "",
-			hasError: false, // loadCoreVex returns empty string, not error
-		},
-		{
-			name: "Empty core.vx file",
-			setup: func(dir string) error {
-				return os.WriteFile(filepath.Join(dir, "core.vx"), []byte(""), 0644)
-			},
-			expected: "",
-			hasError: false,
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tempDir := t.TempDir()
-			
-			// Setup test environment
-			if err := tt.setup(tempDir); err != nil {
-				t.Fatalf("Setup failed: %v", err)
-			}
-
-			// Change to temp directory for the test
-			oldWd, _ := os.Getwd()
-			defer os.Chdir(oldWd)
-			os.Chdir(tempDir)
-
-			result := loadCoreVex(false)
-
-			if tt.hasError && result != "" {
-				t.Error("Expected empty result for error case")
-				return
-			}
-
-			if !tt.hasError && tt.expected != "" && !strings.Contains(result, tt.expected) {
-				t.Errorf("Expected result to contain: %s\nActual result: %s", tt.expected, result)
-			}
-		})
-	}
-}
 
 func TestGenerateGoMod(t *testing.T) {
 	tests := []struct {
@@ -190,14 +128,9 @@ go 1.21
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
-	// Test the build function
-	binaryPath := filepath.Join(binDir, "test")
-	err = buildBinary(tempDir, genDir, binaryPath, false)
-	if err != nil {
-		// This might fail in CI environments without Go, so we log but don't fail
-		t.Logf("buildBinary failed (expected in some environments): %v", err)
-		return
-	}
+	// Test the build function - buildBinary function removed in current implementation
+	// Skip this test as the function no longer exists
+	t.Skip("buildBinary function removed in current implementation")
 
 	// Check if binary was created
 	if _, err := os.Stat(filepath.Join(binDir, "app")); os.IsNotExist(err) {
@@ -284,52 +217,7 @@ func TestRunCommandUnit(t *testing.T) {
 	}
 }
 
-func TestLoadCoreVexEdgeCases(t *testing.T) {
-	tests := []struct {
-		name        string
-		setup       func(string) error
-		verbose     bool
-		expectedLen int
-	}{
-		{
-			name: "Large core.vx file",
-			setup: func(dir string) error {
-				content := strings.Repeat("(import \"fmt\")\n", 100)
-				return os.WriteFile(filepath.Join(dir, "core.vx"), []byte(content), 0644)
-			},
-			verbose:     true,
-			expectedLen: 500, // Should be substantial
-		},
-		{
-			name: "Verbose mode",
-			setup: func(dir string) error {
-				return os.WriteFile(filepath.Join(dir, "core.vx"), []byte("(import \"fmt\")"), 0644)
-			},
-			verbose:     true,
-			expectedLen: 10,
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tempDir := t.TempDir()
-			
-			if err := tt.setup(tempDir); err != nil {
-				t.Fatalf("Setup failed: %v", err)
-			}
-
-			oldWd, _ := os.Getwd()
-			defer os.Chdir(oldWd)
-			os.Chdir(tempDir)
-
-			result := loadCoreVex(tt.verbose)
-
-			if len(result) < tt.expectedLen {
-				t.Errorf("Expected result length >= %d, got %d", tt.expectedLen, len(result))
-			}
-		})
-	}
-}
 
 func TestGenerateGoModEdgeCases(t *testing.T) {
 	tests := []struct {
@@ -422,12 +310,9 @@ func main() {}`
 go 1.21`
 	os.WriteFile(filepath.Join(tempDir, "go.mod"), []byte(goModContent), 0644)
 
-	// Test with verbose = true
-	binaryPath := filepath.Join(binDir, "test-verbose")
-	err := buildBinary(tempDir, genDir, binaryPath, true)
-	if err != nil {
-		t.Logf("buildBinary with verbose failed (expected in test environments): %v", err)
-	}
+	// Test with verbose = true - buildBinary function removed in current implementation
+	// Skip this test as the function no longer exists
+	t.Skip("buildBinary function removed in current implementation")
 }
 
 // Test the actual CLI command functions to boost coverage significantly
@@ -481,8 +366,20 @@ func TestTranspileCommandDirect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Call transpileCommand directly - this will test the function
 			err := func() error {
-				tr := transpiler.New()
-				goCode, err := tr.TranspileFromFile(tt.inputFile)
+				config := transpiler.TranspilerConfig{
+					EnableMacros:     true,
+					PackageName:      "main",
+					GenerateComments: true,
+				}
+				tr, err := transpiler.NewTranspilerWithConfig(config)
+				if err != nil {
+					return err
+				}
+				content, err := os.ReadFile(tt.inputFile)
+				if err != nil {
+					return err
+				}
+				goCode, err := tr.TranspileFromInput(string(content))
 				if err != nil {
 					return err
 				}
@@ -554,8 +451,20 @@ func TestRunCommandDirect(t *testing.T) {
 			// Test runCommand logic (simplified version)
 			err := func() error {
 				// This tests the core logic of runCommand
-				tr := transpiler.New()
-				_, err := tr.TranspileFromFile(tt.inputFile)
+				config := transpiler.TranspilerConfig{
+					EnableMacros:     true,
+					PackageName:      "main",
+					GenerateComments: true,
+				}
+				tr, err := transpiler.NewTranspilerWithConfig(config)
+				if err != nil {
+					return err
+				}
+				content, err := os.ReadFile(tt.inputFile)
+				if err != nil {
+					return err
+				}
+				_, err = tr.TranspileFromInput(string(content))
 				return err
 			}()
 
@@ -571,20 +480,12 @@ func TestRunCommandDirect(t *testing.T) {
 func TestBuildCommandDirect(t *testing.T) {
 	tempDir := t.TempDir()
 	
-	// Create core.vx file for build command
-	coreFile := filepath.Join(tempDir, "core.vx")
-	coreContent := `(import "fmt")`
-	err := os.WriteFile(coreFile, []byte(coreContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create core.vx: %v", err)
-	}
-
 	// Create test Vex file
 	inputFile := filepath.Join(tempDir, "build-test.vx")
 	vexContent := `(import "fmt")
 (fmt/Println "Hello from build test")`
 	
-	err = os.WriteFile(inputFile, []byte(vexContent), 0644)
+	err := os.WriteFile(inputFile, []byte(vexContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create input file: %v", err)
 	}
@@ -638,14 +539,12 @@ func TestBuildCommandDirect(t *testing.T) {
 					return err
 				}
 				
-				// Load core (this tests loadCoreVex)
-				coreCode := loadCoreVex(tt.verbose)
-				if coreCode == "" && tt.verbose {
-					t.Logf("No core.vx found (expected in some test scenarios)")
-				}
-				
 				// Test transpilation
-				_, transpileErr := tr.TranspileFromFile(tt.inputFile)
+				content, err := os.ReadFile(tt.inputFile)
+				if err != nil {
+					return err
+				}
+				_, transpileErr := tr.TranspileFromInput(string(content))
 				return transpileErr
 			}()
 
@@ -780,7 +679,15 @@ func TestTranspilerMissingCoverage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := transpiler.New()
+			config := transpiler.TranspilerConfig{
+				EnableMacros:     true,
+				PackageName:      "main",
+				GenerateComments: true,
+			}
+			tr, err := transpiler.NewTranspilerWithConfig(config)
+			if err != nil {
+				t.Fatalf("Failed to create transpiler: %v", err)
+			}
 			result, err := tr.TranspileFromInput(tt.input)
 			
             if strings.Contains(tt.input, "unknown-function") || strings.Contains(tt.name, "unknown symbol") {

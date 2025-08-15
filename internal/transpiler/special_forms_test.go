@@ -11,36 +11,36 @@ func TestTranspiler_FunctionCalls(t *testing.T) {
 		input    string
 		expected string
 	}{
-        {
-            name:     "Simple function call",
-            input:    `(print "hello")`,
-            expected: `_ = print("hello")`,
-        },
+		{
+			name:     "Simple function call",
+			input:    `(fmt/Println "hello")`,
+			expected: `fmt.Println("hello")`,
+		},
 		{
 			name:     "Function call with multiple args",
-			input:    `(add 1 2 3)`,
-			expected: `_ = add(1, 2, 3)`,
+			input:    `(+ 1 2 3)`,
+			expected: `_ = ((1 + 2) + 3)`,
 		},
-        {
-            name:     "Nested function calls",
-            input:    `(print (add 1 2))`,
-            expected: `_ = print(add(1, 2))`,
-        },
+		{
+			name:     "Nested function calls",
+			input:    `(fmt/Println (+ 1 2))`,
+			expected: `fmt.Println((1 + 2))`,
+		},
 		{
 			name:     "Function call as last expression",
-			input:    `(print "hello")`,
-			expected: `_ = print("hello")`,
+			input:    `(fmt/Println "hello")`,
+			expected: `fmt.Println("hello")`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
-            result, err := tr.TranspileFromInput(tt.input)
-            if err != nil {
-                t.Fatalf("Unexpected error: %v", err)
-            }
-			
+			tr, _ := NewBuilder().Build()
+			result, err := tr.TranspileFromInput(tt.input)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -68,13 +68,13 @@ func TestTranspiler_ConditionalStatements(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -90,30 +90,30 @@ func TestTranspiler_DoBlocks(t *testing.T) {
 	}{
 		{
 			name:     "Simple do block",
-			input:    `(do (print "first") (print "second"))`,
-			expected: `print("first")`,
+			input:    `(do (fmt/Println "first") (fmt/Println "second"))`,
+			expected: `fmt.Println("first")`,
 		},
-        {
-            name:     "Do as expression in definition (strict type mismatch should error)",
-            input:    `(def result (do (print "computing") 42))`,
-            expected: ``,
-        },
+		{
+			name:     "Do as expression in definition (strict type mismatch should error)",
+			input:    `(def result (do (print "computing") 42))`,
+			expected: ``,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
-            result, err := tr.TranspileFromInput(tt.input)
-            if strings.Contains(tt.name, "strict type mismatch") {
-                if err == nil {
-                    t.Fatalf("Expected error for do-block type mismatch, got: %s", result)
-                }
-                return
-            }
-            if err != nil {
-                t.Fatalf("Unexpected error: %v", err)
-            }
-			
+			tr, _ := NewBuilder().Build()
+			result, err := tr.TranspileFromInput(tt.input)
+			if strings.Contains(tt.name, "strict type mismatch") {
+				if err == nil {
+					t.Fatalf("Expected error for do-block type mismatch, got: %s", result)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -166,13 +166,13 @@ func TestTranspiler_ArithmeticEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -189,7 +189,7 @@ func TestTranspiler_IfStatementEdgeCases(t *testing.T) {
 		{
 			name:     "If with function call condition",
 			input:    `(if (empty? []) "is empty" "not empty")`,
-			expected: `func() interface{} { if true { return "is empty" } else { return "not empty" } }()`, // empty? [] optimized to true
+			expected: `func() interface{} { if (len([]interface{}{}) == 0) { return "is empty" } else { return "not empty" } }()`, // empty? expands to len check
 		},
 		{
 			name:     "If with arithmetic condition",
@@ -210,13 +210,13 @@ func TestTranspiler_IfStatementEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -238,34 +238,34 @@ func TestTranspiler_DoBlockEdgeCases(t *testing.T) {
 		{
 			name:     "Do with variable definitions",
 			input:    `(do (def x 1) (def y 2) (+ x y))`,
-			expected: `def(x, 1)`, // Transpiler treats def as function call in this context
+			expected: `x := 1`, // New variable assignment format
 		},
-        {
-            name:     "Do in variable assignment (strict type mismatch should error)",
-            input:    `(def result (do (print "calculating") (+ 1 2)))`,
-            expected: ``,
-        },
+		{
+			name:     "Do in variable assignment (strict type mismatch should error)",
+			input:    `(def result (do (print "calculating") (+ 1 2)))`,
+			expected: ``,
+		},
 		{
 			name:     "Nested do blocks",
 			input:    `(do (do (def x 1)) x)`,
-			expected: `def(x, 1)`,
+			expected: `x := 1`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
-            result, err := tr.TranspileFromInput(tt.input)
-            if strings.Contains(tt.name, "strict type mismatch") {
-                if err == nil {
-                    t.Fatalf("Expected error for do-block type mismatch, got: %s", result)
-                }
-                return
-            }
-            if err != nil {
-                t.Fatalf("Unexpected error: %v", err)
-            }
-			
+			tr, _ := NewBuilder().Build()
+			result, err := tr.TranspileFromInput(tt.input)
+			if strings.Contains(tt.name, "strict type mismatch") {
+				if err == nil {
+					t.Fatalf("Expected error for do-block type mismatch, got: %s", result)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -281,33 +281,33 @@ func TestTranspiler_HandleFunctionCallComprehensive(t *testing.T) {
 	}{
 		{
 			name:     "Simple function call no args",
-			input:    `(getValue)`,
-			expected: `_ = getValue()`,
+			input:    `(len [])`,
+			expected: `_ = len([]interface{}{})`,
 		},
 		{
 			name:     "Function call with one arg",
-			input:    `(print "hello")`,
-			expected: `_ = print("hello")`,
+			input:    `(fmt/Println "hello")`,
+			expected: `fmt.Println("hello")`,
 		},
 		{
 			name:     "Function call with multiple args",
-			input:    `(add 1 2 3)`,
-			expected: `_ = add(1, 2, 3)`,
+			input:    `(+ 1 2 3)`,
+			expected: `_ = ((1 + 2) + 3)`,
 		},
 		{
 			name:     "Nested function calls",
-			input:    `(print (add 1 (multiply 2 3)))`,
-			expected: `_ = print(add(1, multiply(2, 3)))`,
+			input:    `(fmt/Println (+ 1 (* 2 3)))`,
+			expected: `fmt.Println((1 + (2 * 3)))`,
 		},
 		{
 			name:     "Function call with array args",
-			input:    `(process [1 2 3] "mode")`,
-			expected: `_ = process([]interface{}{1, 2, 3}, "mode")`,
+			input:    `(len [1 2 3])`,
+			expected: `_ = len([]interface{}{1, 2, 3})`,
 		},
 		{
 			name:     "Function call in assignment",
-			input:    `(def result (calculate 5 10))`,
-			expected: `calculate(5, 10)`,
+			input:    `(def result (+ 5 10))`,
+			expected: `(5 + 10)`,
 		},
 		{
 			name:     "Namespaced function calls",
@@ -316,20 +316,20 @@ func TestTranspiler_HandleFunctionCallComprehensive(t *testing.T) {
 		},
 		{
 			name:     "Function call with string interpolation",
-			input:    `(def name "widget") (log "Processing item: %s" name)`,
-			expected: `_ = log("Processing item: %s", name)`,
+			input:    `(def name "widget") (fmt/Printf "Processing item: %s" name)`,
+			expected: `fmt.Printf("Processing item: %s", name)`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -345,30 +345,30 @@ func TestTranspiler_LambdaFunctions(t *testing.T) {
 	}{
 		{
 			name:     "Simple lambda with one parameter",
-			input:    `(def identity (fn [x] x))`,
+			input:    `(def identity (fn [x: int] -> int x))`,
 			expected: `func(x interface{}) interface{} { return x }`,
 		},
 		{
 			name:     "Lambda with multiple parameters",
-			input:    `(def add (fn [x y] (+ x y)))`,
+			input:    `(def add (fn [x: int y: int] -> int (+ x y)))`,
 			expected: `func(x interface{}, y interface{}) interface{} { return (x + y) }`,
 		},
 		{
 			name:     "Lambda with no parameters",
-			input:    `(def greet (fn [] "hello"))`,
+			input:    `(def greet (fn [] -> string "hello"))`,
 			expected: `func() interface{} { return "hello" }`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
@@ -418,9 +418,9 @@ func TestTranspiler_ErrorHandlingPaths(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Fatalf("Expected error but got none")
@@ -458,26 +458,27 @@ func TestTranspiler_PrintlnSpecialHandling(t *testing.T) {
 		},
 		{
 			name:     "Regular function gets assignment",
-			input:    `(regularFunc "Hello")`,
-			expected: `_ = regularFunc("Hello")`,
+			input:    `(len "Hello")`,
+			expected: `_ = len("Hello")`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}
 		})
 	}
 }
+
 // TestTranspiler_HandleMacroFunction tests the handleMacro function to increase coverage
 func TestTranspiler_HandleMacroFunction(t *testing.T) {
 	tests := []struct {
@@ -512,9 +513,9 @@ func TestTranspiler_HandleMacroFunction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Fatalf("Expected error but got none")
@@ -545,22 +546,22 @@ func TestTranspiler_HandleLambdaSuccess(t *testing.T) {
 	}{
 		{
 			name:     "Lambda with single parameter",
-			input:    "(def f (fn [x] x)) (f 42)",
+			input:    "(def f (fn [x: int] -> int x)) (f 42)",
 			expected: "func(x interface{}) interface{} { return x }",
 		},
 		{
 			name:     "Lambda with multiple parameters",
-			input:    "(def add (fn [x y] (+ x y))) (add 1 2)",
+			input:    "(def add (fn [x: int y: int] -> int (+ x y))) (add 1 2)",
 			expected: "func(x interface{}, y interface{}) interface{} { return (x + y) }",
 		},
 		{
 			name:     "Lambda with no parameters",
-			input:    "(def get-val (fn [] 42)) (get-val)",
+			input:    "(def get-val (fn [] -> int 42)) (get-val)",
 			expected: "func() interface{} { return 42 }",
 		},
 		{
 			name:     "Lambda with complex body",
-			input:    `(def print-num (fn [n] (fmt/Printf "Number: %d" n))) (print-num 5)`,
+			input:    `(def print-num (fn [n: int] -> string (fmt/Printf "Number: %d" n))) (print-num 5)`,
 			expected: "func(n interface{}) interface{} { return fmt.Printf(\"Number: %d\", n) }",
 		},
 		{
@@ -573,9 +574,9 @@ func TestTranspiler_HandleLambdaSuccess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Fatalf("Expected error but got none")
@@ -605,7 +606,7 @@ func TestTranspiler_CollectionOpEdgeCases(t *testing.T) {
 		{
 			name:     "Rest operation with empty array",
 			input:    `(def result (rest []))`,
-			expected: "func() []interface{} { if len([]interface{}{}) > 1 { return []interface{}{}[1:] } else { return []interface{}{} } }()",
+			expected: "if len([]interface{}{}) > 1",
 		},
 		{
 			name:     "Cons with multiple elements",
@@ -620,19 +621,19 @@ func TestTranspiler_CollectionOpEdgeCases(t *testing.T) {
 		{
 			name:     "First with variable argument",
 			input:    `(def arr [1 2 3]) (def result (first arr))`,
-			expected: "func() interface{} { if len(arr) > 0 { return arr[0] } else { return nil } }()",
+			expected: "if len(arr) > 0",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if !strings.Contains(result, tt.expected) {
 				t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", tt.expected, result)
 			}

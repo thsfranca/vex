@@ -1,0 +1,22 @@
+;; Complete example with explicit types only
+;; All functions require explicit parameter and return type annotations
+
+(import "vex.core")
+
+;; Simple arithmetic function
+(defn add [x: int y: int] -> int (+ x y))
+
+;; String manipulation function  
+(defn greet [name: string] -> string (+ "Hello " name))
+
+;; Boolean function
+(defn is-positive [n: int] -> bool (> n 0))
+
+;; Function with multiple typed parameters
+(defn calculate-area [length: float width: float] -> float 
+  (* length width))
+
+;; Using the functions
+(def result (add 10 20))
+(def message (greet "World"))
+(def check (is-positive 5))

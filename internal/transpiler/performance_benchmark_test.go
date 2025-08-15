@@ -7,10 +7,10 @@ import (
 // Benchmark simple transpilation performance
 func BenchmarkTranspileSimple(b *testing.B) {
 	input := `(+ 1 2 3)`
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		transpiler := New()
+		transpiler, _ := NewBuilder().Build()
 		_, err := transpiler.TranspileFromInput(input)
 		if err != nil {
 			b.Fatal(err)
@@ -21,10 +21,10 @@ func BenchmarkTranspileSimple(b *testing.B) {
 // Benchmark arithmetic expression building
 func BenchmarkArithmeticExpression(b *testing.B) {
 	input := `(+ 1 2 3 4 5 6 7 8 9 10)`
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		transpiler := New()
+		transpiler, _ := NewBuilder().Build()
 		_, err := transpiler.TranspileFromInput(input)
 		if err != nil {
 			b.Fatal(err)
@@ -38,10 +38,10 @@ func BenchmarkMacroExpansion(b *testing.B) {
 (macro greet [name] (fmt/Println "Hello" name))
 (greet "World")
 `
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		transpiler := New()
+		transpiler, _ := NewBuilder().Build()
 		_, err := transpiler.TranspileFromInput(input)
 		if err != nil {
 			b.Fatal(err)
@@ -56,22 +56,22 @@ func BenchmarkDebugMode(b *testing.B) {
 (greet "World")
 (+ 1 2 3)
 `
-	
+
 	b.Run("NoDebug", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			transpiler := New()
+			transpiler, _ := NewBuilder().Build()
 			_, err := transpiler.TranspileFromInput(input)
 			if err != nil {
 				b.Fatal(err)
 			}
 		}
 	})
-	
+
 	b.Run("WithDebug", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			transpiler := NewWithDebug()
+			transpiler, _ := NewBuilder().Build()
 			_, err := transpiler.TranspileFromInput(input)
 			if err != nil {
 				b.Fatal(err)
@@ -88,10 +88,10 @@ func BenchmarkComplexExpression(b *testing.B) {
 (def z (/ 10 2))
 (+ (* x y) (- z 1))
 `
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		transpiler := New()
+		transpiler, _ := NewBuilder().Build()
 		_, err := transpiler.TranspileFromInput(input)
 		if err != nil {
 			b.Fatal(err)

@@ -17,7 +17,7 @@ type ParserAdapter struct {
 // NewParserAdapter constructs a Parser backed by the AST-level Vex parser.
 func NewParserAdapter() *ParserAdapter {
 	return &ParserAdapter{
-        parser:  ast.NewParser(),
+		parser: ast.NewParser(),
 	}
 }
 
@@ -26,7 +26,7 @@ func (pa *ParserAdapter) Parse(input string) (AST, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Convert ast.AST to our AST interface
 	return NewConcreteAST(astResult.Root()), nil
 }
@@ -36,7 +36,7 @@ func (pa *ParserAdapter) ParseFile(filename string) (AST, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return NewConcreteAST(astResult.Root()), nil
 }
 
@@ -55,12 +55,12 @@ func NewAnalyzerAdapter() *AnalyzerAdapter {
 func (aa *AnalyzerAdapter) Analyze(ast AST) (SymbolTable, error) {
 	// Create a compatible AST for the analyzer
 	analysisAST := &AnalysisAST{ast: ast}
-	
+
 	symbolTable, err := aa.analyzer.Analyze(analysisAST)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Wrap the symbol table
 	return &SymbolTableAdapter{table: symbolTable}, nil
 }
@@ -73,7 +73,7 @@ func (aa *AnalyzerAdapter) SetErrorReporter(reporter ErrorReporter) {
 
 // SetPackageEnv passes package information to the underlying analyzer.
 func (aa *AnalyzerAdapter) SetPackageEnv(ignore map[string]bool, exports map[string]map[string]bool, schemes map[string]map[string]*analysis.TypeScheme) {
-    aa.analyzer.SetPackageEnv(ignore, exports, schemes)
+	aa.analyzer.SetPackageEnv(ignore, exports, schemes)
 }
 
 // CodeGeneratorAdapter adapts codegen.GoCodeGenerator to the CodeGenerator interface
@@ -92,7 +92,7 @@ func (cga *CodeGeneratorAdapter) Generate(ast AST, symbols SymbolTable) (string,
 	// Create compatible types
 	codegenAST := &CodegenAST{ast: ast}
 	codegenSymbols := &CodegenSymbolTable{table: symbols}
-	
+
 	return cga.generator.Generate(codegenAST, codegenSymbols)
 }
 
@@ -304,12 +304,12 @@ func NewMacroExpanderAdapter(expander *macro.MacroExpanderImpl) *MacroExpanderAd
 func (mea *MacroExpanderAdapter) ExpandMacros(ast AST) (AST, error) {
 	// Convert AST to macro.AST
 	macroAST := &MacroASTAdapter{ast: ast}
-	
+
 	expandedAST, err := mea.expander.ExpandMacros(macroAST)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Convert back to our AST interface
 	return NewConcreteAST(expandedAST.Root()), nil
 }
@@ -324,6 +324,10 @@ func (mea *MacroExpanderAdapter) HasMacro(name string) bool {
 
 func (mea *MacroExpanderAdapter) GetMacro(name string) (*macro.Macro, bool) {
 	return mea.expander.GetMacro(name)
+}
+
+func (mea *MacroExpanderAdapter) LoadStdlibModule(moduleName string) error {
+	return mea.expander.LoadStdlibModule(moduleName)
 }
 
 // MacroASTAdapter adapts our AST to macro.AST
@@ -405,7 +409,7 @@ func (era *ErrorReporterAdapter) HasErrors() bool {
 func (era *ErrorReporterAdapter) GetErrors() []analysis.CompilerError {
 	errors := era.reporter.GetErrors()
 	analysisErrors := make([]analysis.CompilerError, len(errors))
-	
+
 	for i, err := range errors {
 		analysisErrors[i] = analysis.CompilerError{
 			Line:    err.Line,
@@ -414,6 +418,6 @@ func (era *ErrorReporterAdapter) GetErrors() []analysis.CompilerError {
 			Type:    analysis.ErrorType(err.Type), // Assuming compatible enum values
 		}
 	}
-	
+
 	return analysisErrors
 }

@@ -28,13 +28,13 @@ func NewMacroExpander(registry *Registry) *MacroExpanderImpl {
 func (me *MacroExpanderImpl) ExpandMacros(ast AST) (AST, error) {
 	// Get the root node
 	root := ast.Root()
-	
+
 	// Expand macros in the tree
 	expandedRoot, err := me.expandMacrosInTree(root)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Return new AST with expanded tree
 	return NewVexAST(expandedRoot), nil
 }
@@ -52,6 +52,11 @@ func (me *MacroExpanderImpl) HasMacro(name string) bool {
 // GetMacro retrieves a macro
 func (me *MacroExpanderImpl) GetMacro(name string) (*Macro, bool) {
 	return me.registry.GetMacro(name)
+}
+
+// LoadStdlibModule loads a specific stdlib module
+func (me *MacroExpanderImpl) LoadStdlibModule(moduleName string) error {
+	return me.registry.LoadStdlibModule(moduleName)
 }
 
 // expandMacrosInTree recursively expands macros in an AST tree
@@ -73,7 +78,7 @@ func (me *MacroExpanderImpl) expandMacrosInProgram(ctx *parser.ProgramContext) (
 	// Collect all expanded children
 	var expandedChildren []antlr.Tree
 	hasChanges := false
-	
+
 	for _, child := range ctx.GetChildren() {
 		if listCtx, ok := child.(*parser.ListContext); ok {
 			expanded, err := me.expandMacrosInList(listCtx)
@@ -89,12 +94,12 @@ func (me *MacroExpanderImpl) expandMacrosInProgram(ctx *parser.ProgramContext) (
 			expandedChildren = append(expandedChildren, child)
 		}
 	}
-	
+
 	// If no changes were made, return the original context
 	if !hasChanges {
 		return ctx, nil
 	}
-	
+
 	// Create a new program by re-parsing the expanded content
 	return me.reconstructProgramFromChildren(expandedChildren)
 }
@@ -146,7 +151,7 @@ func (me *MacroExpanderImpl) expandMacrosInList(ctx *parser.ListContext) (antlr.
 	// Not a macro call, but still need to recursively process children for nested macros
 	hasChanges := false
 	newChildren := make([]antlr.Tree, childCount)
-	
+
 	// Copy all children, recursively expanding any that need it
 	for i := 0; i < childCount; i++ {
 		child := ctx.GetChild(i)
@@ -164,12 +169,12 @@ func (me *MacroExpanderImpl) expandMacrosInList(ctx *parser.ListContext) (antlr.
 			newChildren[i] = child
 		}
 	}
-	
+
 	// If no changes were made, return original context
 	if !hasChanges {
 		return ctx, nil
 	}
-	
+
 	// Create a new list context with expanded children
 	return me.reconstructListFromChildren(newChildren)
 }
@@ -178,19 +183,19 @@ func (me *MacroExpanderImpl) expandMacrosInList(ctx *parser.ListContext) (antlr.
 func (me *MacroExpanderImpl) reconstructListFromChildren(children []antlr.Tree) (antlr.Tree, error) {
 	// For now, we'll reconstruct by creating Vex syntax and re-parsing
 	// This is not the most efficient but ensures correctness
-	
+
 	var parts []string
 	parts = append(parts, "(")
-	
+
 	for i := 1; i < len(children)-1; i++ { // Skip opening and closing parentheses
 		if children[i] != nil {
 			parts = append(parts, me.reconstructVexSyntax(children[i]))
 		}
 	}
-	
+
 	parts = append(parts, ")")
 	vexCode := strings.Join(parts, " ")
-	
+
 	// Parse the reconstructed code back into an AST
 	return me.parseExpandedCode(vexCode)
 }
@@ -206,7 +211,7 @@ func (me *MacroExpanderImpl) expandMacrosInArray(ctx *parser.ArrayContext) (antl
 			}
 		}
 	}
-	
+
 	return ctx, nil
 }
 
@@ -338,17 +343,17 @@ func (me *MacroExpanderImpl) reconstructProgramFromChildren(children []antlr.Tre
 			if _, ok := child.(*antlr.ErrorNodeImpl); ok {
 				continue
 			}
-			
+
 			childText := me.nodeToString(child)
 			if strings.TrimSpace(childText) != "" && childText != "<EOF>" {
 				parts = append(parts, childText)
 			}
 		}
 	}
-	
+
 	// Join with spaces for proper program structure
 	programText := strings.Join(parts, " ")
-	
+
 	// Parse the reconstructed program
 	inputStream := antlr.NewInputStream(programText)
 	lexer := parser.NewVexLexer(inputStream)
@@ -359,6 +364,6 @@ func (me *MacroExpanderImpl) reconstructProgramFromChildren(children []antlr.Tre
 	if programTree := vexParser.Program(); programTree != nil {
 		return programTree.(*parser.ProgramContext), nil
 	}
-	
+
 	return nil, fmt.Errorf("failed to reconstruct program AST from: %s", programText)
 }

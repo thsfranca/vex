@@ -13,8 +13,8 @@ func TestTranspiler_MacroRegistration(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:    "Simple macro definition and usage",
-			input:   `(macro greet [name] (fmt/Println "Hello" name))\n(greet "World")`,
+			name:  "Simple macro definition and usage",
+			input: `(macro greet [name] (fmt/Println "Hello" name))\n(greet "World")`,
 			expected: []string{
 				"package main",
 				"func main()",
@@ -22,8 +22,8 @@ func TestTranspiler_MacroRegistration(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "Macro with multiple parameters - definition and usage",
-			input:   `(macro add-and-print [x y] (fmt/Println (+ x y)))\n(add-and-print 5 10)`,
+			name:  "Macro with multiple parameters - definition and usage",
+			input: `(macro add-and-print [x y] (fmt/Println (+ x y)))\n(add-and-print 5 10)`,
 			expected: []string{
 				"package main",
 				"func main()",
@@ -31,8 +31,8 @@ func TestTranspiler_MacroRegistration(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "Macro definition only (should compile without errors)",
-			input:   `(macro hello [] (fmt/Println "Hello World"))`,
+			name:  "Macro definition only (should compile without errors)",
+			input: `(macro hello [] (fmt/Println "Hello World"))`,
 			expected: []string{
 				"package main",
 				"func main()",
@@ -43,13 +43,13 @@ func TestTranspiler_MacroRegistration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			for _, expected := range tt.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", expected, result)
@@ -81,26 +81,17 @@ func TestTranspiler_MacroExpansion(t *testing.T) {
 				"_ = (5 * 2)",
 			},
 		},
-		// TODO: Identity macro expansion has AST corruption issues - needs architectural fix
-		// {
-		// 	name: "Identity macro",
-		// 	input: `(macro identity [x] x)
-		// (identity "test")`,
-		// 	expected: []string{
-		// 		"_ = \"test\"",
-		// 	},
-		// },
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			for _, expected := range tt.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", expected, result)
@@ -118,7 +109,7 @@ func TestTranspiler_BuiltinMacros(t *testing.T) {
 		skip     bool // Skip tests that aren't working yet
 	}{
 		{
-			name: "defn macro usage",
+			name:  "defn macro usage",
 			input: `(defn add [x y] (+ x y))`,
 			expected: []string{
 				"// Expanding macro defn:",
@@ -133,15 +124,15 @@ func TestTranspiler_BuiltinMacros(t *testing.T) {
 			t.Skip("Skipping test that requires advanced macro features")
 			continue
 		}
-		
+
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			for _, expected := range tt.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", expected, result)
@@ -180,9 +171,9 @@ func TestTranspiler_MacroErrorHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			_, err := tr.TranspileFromInput(tt.input)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Fatalf("Expected error but got none")
@@ -201,8 +192,8 @@ func TestTranspiler_MacroErrorHandling(t *testing.T) {
 
 func TestTranspiler_MacroParameterMismatch(t *testing.T) {
 	tests := []struct {
-		name         string
-		input        string
+		name          string
+		input         string
 		errorContains string
 	}{
 		{
@@ -221,13 +212,13 @@ func TestTranspiler_MacroParameterMismatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			_, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err == nil {
 				t.Fatalf("Expected error but transpilation succeeded")
 			}
-			
+
 			if !strings.Contains(err.Error(), tt.errorContains) {
 				t.Errorf("Expected error to contain:\n%s\n\nActual error:\n%s", tt.errorContains, err.Error())
 			}
@@ -241,15 +232,7 @@ func TestTranspiler_MacroParameterSubstitution(t *testing.T) {
 		input    string
 		expected []string
 	}{
-		// TODO: Single parameter substitution (identity macro) has AST corruption issues
-		// {
-		// 	name: "Single parameter substitution",
-		// 	input: `(macro echo [x] x)
-		// (echo "hello")`,
-		// 	expected: []string{
-		// 		"_ = \"hello\"",
-		// 	},
-		// },
+
 		{
 			name: "Multiple parameter substitution",
 			input: `(macro combine [a b] (+ a b))
@@ -270,13 +253,13 @@ func TestTranspiler_MacroParameterSubstitution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			for _, expected := range tt.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", expected, result)
@@ -313,13 +296,13 @@ func TestTranspiler_MacroWithFunctionCalls(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			for _, expected := range tt.expected {
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected output to contain:\n%s\n\nActual output:\n%s", expected, result)

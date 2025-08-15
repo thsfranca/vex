@@ -56,13 +56,14 @@ type MacroExpander interface {
 	RegisterMacro(name string, macro *macro.Macro) error
 	HasMacro(name string) bool
 	GetMacro(name string) (*macro.Macro, bool)
+	LoadStdlibModule(moduleName string) error
 }
 
 // SymbolTable manages variable and function definitions
 type SymbolTable interface {
 	Define(name string, value Value) error
 	Lookup(name string) (Value, bool)
-	EnterScope() 
+	EnterScope()
 	ExitScope()
 }
 
@@ -91,9 +92,9 @@ type Parser interface {
 type Analyzer interface {
 	Analyze(ast AST) (SymbolTable, error)
 	SetErrorReporter(reporter ErrorReporter)
-    // SetPackageEnv informs the analyzer about local Vex packages, their exports,
-    // and provided type schemes to enable package-boundary typing.
-    SetPackageEnv(ignore map[string]bool, exports map[string]map[string]bool, schemes map[string]map[string]*analysis.TypeScheme)
+	// SetPackageEnv informs the analyzer about local Vex packages, their exports,
+	// and provided type schemes to enable package-boundary typing.
+	SetPackageEnv(ignore map[string]bool, exports map[string]map[string]bool, schemes map[string]map[string]*analysis.TypeScheme)
 }
 
 // Error represents a compilation error
@@ -118,9 +119,10 @@ const (
 type TranspilerConfig struct {
 	EnableMacros     bool
 	CoreMacroPath    string
+	StdlibPath       string
 	PackageName      string
 	GenerateComments bool
-    IgnoreImports    map[string]bool
-    Exports          map[string]map[string]bool
-    PkgSchemes       map[string]map[string]*analysis.TypeScheme
+	IgnoreImports    map[string]bool
+	Exports          map[string]map[string]bool
+	PkgSchemes       map[string]map[string]*analysis.TypeScheme
 }

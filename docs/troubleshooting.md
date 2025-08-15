@@ -105,7 +105,7 @@ Error: Invalid symbol '123invalid'
 ```vex
 ;; ✅ Valid symbols
 (def valid-name "value")
-(def another_name 42)
+(def another-name 42)
 (def is-valid? true)
 
 ;; ❌ Invalid symbols  

@@ -2,7 +2,6 @@ package transpiler
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/thsfranca/vex/internal/transpiler/codegen"
@@ -44,23 +43,11 @@ func (b *TranspilerBuilder) WithConfig(config TranspilerConfig) *TranspilerBuild
 	return b
 }
 
-// WithMacros enables or disables macro support
-func (b *TranspilerBuilder) WithMacros(enabled bool) *TranspilerBuilder {
-	b.config.EnableMacros = enabled
-	return b
-}
 
-// WithCoreMacroPath sets the path to core macro definitions
-func (b *TranspilerBuilder) WithCoreMacroPath(path string) *TranspilerBuilder {
-	b.config.CoreMacroPath = path
-	return b
-}
 
-// WithPackageName sets the package name for generated code
-func (b *TranspilerBuilder) WithPackageName(name string) *TranspilerBuilder {
-	b.config.PackageName = name
-	return b
-}
+
+
+
 
 // Build creates the configured transpiler
 func (b *TranspilerBuilder) Build() (*VexTranspiler, error) {
@@ -185,31 +172,13 @@ func (vt *VexTranspiler) loadStdlibImports(input string) error {
 	return nil
 }
 
-// TranspileFromFile transpiles a Vex file to Go
-func (vt *VexTranspiler) TranspileFromFile(filename string) (string, error) {
-	// Read file content and use TranspileFromInput
-	content, err := os.ReadFile(filename)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file %s: %v", filename, err)
-	}
 
-	return vt.TranspileFromInput(string(content))
-}
 
-// GetMacroSystem returns the macro system (for testing/debugging)
-func (vt *VexTranspiler) GetMacroSystem() MacroExpander {
-	return vt.macroSystem
-}
 
-// GetAnalyzer returns the analyzer (for testing/debugging)
-func (vt *VexTranspiler) GetAnalyzer() Analyzer {
-	return vt.analyzer
-}
 
-// GetCodeGenerator returns the code generator (for testing/debugging)
-func (vt *VexTranspiler) GetCodeGenerator() CodeGenerator {
-	return vt.codeGen
-}
+
+
+
 
 // GetDetectedModules returns detected third-party modules
 func (vt *VexTranspiler) GetDetectedModules() map[string]string {
@@ -218,17 +187,9 @@ func (vt *VexTranspiler) GetDetectedModules() map[string]string {
 	return vt.detectedModules
 }
 
-// Helper method to convert AST back to string (for macro processing)
-func (vt *VexTranspiler) astToString(ast AST) string {
-	// This is a simplified implementation
-	// In a real system, you'd want a proper AST-to-string converter
-	return "/* AST conversion not implemented yet */"
-}
 
-// NewVexTranspiler builds a VexTranspiler with default configuration.
-func NewVexTranspiler() (*VexTranspiler, error) {
-	return NewBuilder().Build()
-}
+
+
 
 // NewTranspilerWithConfig builds a VexTranspiler using the provided configuration.
 func NewTranspilerWithConfig(config TranspilerConfig) (*VexTranspiler, error) {

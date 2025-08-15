@@ -1,0 +1,2448 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>analysis: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/thsfranca/vex/internal/transpiler/analysis/analyzer.go (66.7%)</option>
+				
+				<option value="file1">github.com/thsfranca/vex/internal/transpiler/analysis/errors.go (98.0%)</option>
+				
+				<option value="file2">github.com/thsfranca/vex/internal/transpiler/analysis/schemes.go (94.1%)</option>
+				
+				<option value="file3">github.com/thsfranca/vex/internal/transpiler/analysis/symbols.go (100.0%)</option>
+				
+				<option value="file4">github.com/thsfranca/vex/internal/transpiler/analysis/typesys.go (100.0%)</option>
+				
+				<option value="file5">github.com/thsfranca/vex/internal/transpiler/analysis/unify.go (73.5%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package analysis
+
+import (
+        "fmt"
+        "strings"
+
+        "github.com/antlr4-go/antlr/v4"
+        "github.com/thsfranca/vex/internal/transpiler/diagnostics"
+        "github.com/thsfranca/vex/internal/transpiler/parser"
+)
+
+// AnalyzerImpl implements the Analyzer interface
+// AnalyzerImpl performs semantic analysis and explicit type checking over Vex AST.
+type AnalyzerImpl struct {
+        symbolTable   *SymbolTableImpl
+        errorReporter *ErrorReporterImpl
+        typeEnv       TypeEnv
+        freshId       int
+        subst         Subst
+        // Package environment (optional): provided by resolver/build when available
+        ignoreImports map[string]bool                   // local Vex packages (not real Go imports)
+        pkgExports    map[string]map[string]bool        // package -&gt; exported symbols
+        pkgSchemes    map[string]map[string]*TypeScheme // package -&gt; symbol -&gt; scheme
+}
+
+// installBuiltinSchemes seeds the type environment with polymorphic types for core functions
+func (a *AnalyzerImpl) installBuiltinSchemes() <span class="cov8" title="1">{
+        fresh := func() int </span><span class="cov8" title="1">{ a.freshId++; return a.freshId }</span>
+        // helper to build a scheme from a type with its current free vars
+        <span class="cov8" title="1">makeScheme := func(t Type) *TypeScheme </span><span class="cov8" title="1">{ return generalize(a.typeEnv, t) }</span>
+
+        // Arithmetic &amp; comparison &amp; logic schemes
+        <span class="cov8" title="1">num := &amp;TypeConstant{Name: "number"}
+        boolean := &amp;TypeConstant{Name: "bool"}
+        a.typeEnv["+"] = makeScheme(&amp;TypeFunction{Params: []Type{num, num}, Result: num})
+        a.typeEnv["-"] = makeScheme(&amp;TypeFunction{Params: []Type{num, num}, Result: num})
+        a.typeEnv["*"] = makeScheme(&amp;TypeFunction{Params: []Type{num, num}, Result: num})
+        a.typeEnv["/"] = makeScheme(&amp;TypeFunction{Params: []Type{num, num}, Result: num})
+        a.typeEnv["&gt;"] = makeScheme(&amp;TypeFunction{Params: []Type{num, num}, Result: boolean})
+        a.typeEnv["&lt;"] = makeScheme(&amp;TypeFunction{Params: []Type{num, num}, Result: boolean})
+        aVarEq := &amp;TypeVariable{ID: fresh()}
+        a.typeEnv["="] = makeScheme(&amp;TypeFunction{Params: []Type{aVarEq, aVarEq}, Result: boolean})
+        a.typeEnv["not"] = makeScheme(&amp;TypeFunction{Params: []Type{boolean}, Result: boolean})
+        a.typeEnv["and"] = makeScheme(&amp;TypeFunction{Params: []Type{boolean, boolean}, Result: boolean})
+        a.typeEnv["or"] = makeScheme(&amp;TypeFunction{Params: []Type{boolean, boolean}, Result: boolean})
+
+        // (first [a]) -&gt; a
+        aVar := &amp;TypeVariable{ID: fresh()}
+        firstT := &amp;TypeFunction{Params: []Type{&amp;TypeArray{Elem: aVar}}, Result: aVar}
+        a.typeEnv["first"] = makeScheme(firstT)
+
+        // (rest [a]) -&gt; [a]
+        aVar2 := &amp;TypeVariable{ID: fresh()}
+        restT := &amp;TypeFunction{Params: []Type{&amp;TypeArray{Elem: aVar2}}, Result: &amp;TypeArray{Elem: aVar2}}
+        a.typeEnv["rest"] = makeScheme(restT)
+
+        // (cons a [a]) -&gt; [a]
+        aVar3 := &amp;TypeVariable{ID: fresh()}
+        consT := &amp;TypeFunction{Params: []Type{aVar3, &amp;TypeArray{Elem: aVar3}}, Result: &amp;TypeArray{Elem: aVar3}}
+        a.typeEnv["cons"] = makeScheme(consT)
+
+        // (count [a]) -&gt; number (int internally)
+        a.typeEnv["count"] = makeScheme(&amp;TypeFunction{Params: []Type{&amp;TypeArray{Elem: &amp;TypeVariable{ID: fresh()}}}, Result: &amp;TypeConstant{Name: "int"}})
+
+        // (empty? [a]) -&gt; bool
+        a.typeEnv["empty?"] = makeScheme(&amp;TypeFunction{Params: []Type{&amp;TypeArray{Elem: &amp;TypeVariable{ID: fresh()}}}, Result: &amp;TypeConstant{Name: "bool"}})
+
+        // (len [a]) -&gt; number (int internally)
+        a.typeEnv["len"] = makeScheme(&amp;TypeFunction{Params: []Type{&amp;TypeArray{Elem: &amp;TypeVariable{ID: fresh()}}}, Result: &amp;TypeConstant{Name: "int"}})</span>
+}
+
+// NewAnalyzer creates a new analyzer
+// NewAnalyzer constructs an AnalyzerImpl with built-in type schemes installed.
+func NewAnalyzer() *AnalyzerImpl <span class="cov8" title="1">{
+        a := &amp;AnalyzerImpl{
+                symbolTable:   NewSymbolTable(),
+                errorReporter: NewErrorReporter(),
+                typeEnv:       make(TypeEnv),
+                freshId:       0,
+                subst:         Subst{},
+                ignoreImports: make(map[string]bool),
+                pkgExports:    make(map[string]map[string]bool),
+                pkgSchemes:    make(map[string]map[string]*TypeScheme),
+        }
+        a.installBuiltinSchemes()
+        return a
+}</span>
+
+// Analyze performs semantic analysis on the AST
+func (a *AnalyzerImpl) Analyze(ast AST) (SymbolTable, error) <span class="cov8" title="1">{
+        // Reset for new analysis
+        a.symbolTable = NewSymbolTable()
+        a.errorReporter.Clear()
+        a.typeEnv = make(TypeEnv)
+        a.installBuiltinSchemes()
+        a.freshId = 0
+        a.subst = Subst{}
+
+        // Visit the AST
+        if err := ast.Accept(a); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // Check for errors
+        <span class="cov8" title="1">if a.errorReporter.HasErrors() </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("analysis failed with errors:\n%s", a.errorReporter.FormatErrors())
+        }</span>
+
+        <span class="cov8" title="1">return a.symbolTable, nil</span>
+}
+
+// SetPackageEnv injects package boundary information for local Vex packages.
+// ignore marks import paths that are local Vex packages; exports lists visible symbols
+// and schemes provides typing for exported symbols.
+func (a *AnalyzerImpl) SetPackageEnv(ignore map[string]bool, exports map[string]map[string]bool, schemes map[string]map[string]*TypeScheme) <span class="cov8" title="1">{
+        if ignore != nil </span><span class="cov8" title="1">{
+                a.ignoreImports = ignore
+        }</span> else<span class="cov0" title="0"> {
+                a.ignoreImports = make(map[string]bool)
+        }</span>
+        <span class="cov8" title="1">if exports != nil </span><span class="cov8" title="1">{
+                a.pkgExports = exports
+        }</span> else<span class="cov0" title="0"> {
+                a.pkgExports = make(map[string]map[string]bool)
+        }</span>
+        <span class="cov8" title="1">if schemes != nil </span><span class="cov8" title="1">{
+                a.pkgSchemes = schemes
+        }</span> else<span class="cov0" title="0"> {
+                a.pkgSchemes = make(map[string]map[string]*TypeScheme)
+        }</span>
+}
+
+// SetErrorReporter sets the error reporter
+func (a *AnalyzerImpl) SetErrorReporter(reporter ErrorReporter) <span class="cov8" title="1">{
+        if impl, ok := reporter.(*ErrorReporterImpl); ok </span><span class="cov8" title="1">{
+                a.errorReporter = impl
+        }</span>
+}
+
+// GetErrorReporter returns the current error reporter
+func (a *AnalyzerImpl) GetErrorReporter() *ErrorReporterImpl <span class="cov8" title="1">{
+        return a.errorReporter
+}</span>
+
+// GetTypeScheme returns the generalized type scheme for a symbol if present in the environment.
+func (a *AnalyzerImpl) GetTypeScheme(name string) (*TypeScheme, bool) <span class="cov8" title="1">{
+        sch, ok := a.typeEnv[name]
+        if !ok </span><span class="cov8" title="1">{
+                return nil, false
+        }</span>
+        <span class="cov8" title="1">return sch, true</span>
+}
+
+// VisitProgram analyzes a program node
+func (a *AnalyzerImpl) VisitProgram(ctx *parser.ProgramContext) error <span class="cov8" title="1">{
+        for _, child := range ctx.GetChildren() </span><span class="cov8" title="1">{
+                if listCtx, ok := child.(*parser.ListContext); ok </span><span class="cov8" title="1">{
+                        _, err := a.VisitList(listCtx)
+                        if err != nil </span><span class="cov8" title="1">{
+                                // Error already reported, continue analysis
+                                continue</span>
+                        }
+                }
+        }
+        <span class="cov8" title="1">return nil</span>
+}
+
+// VisitList analyzes a list expression
+func (a *AnalyzerImpl) VisitList(ctx *parser.ListContext) (Value, error) <span class="cov8" title="1">{
+        childCount := ctx.GetChildCount()
+        if childCount &lt; 3 </span><span class="cov8" title="1">{ // Need at least: '(', function, ')'
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeSyntaxEmpty, diagnostics.SeverityError, "", line, column, nil)
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+                return nil, fmt.Errorf("empty expression")
+        }</span>
+
+        // Get function name (first child after '(')
+        <span class="cov8" title="1">funcNameNode := ctx.GetChild(1)
+        funcName := a.nodeToString(funcNameNode)
+
+        // Special handling: if funcName is a declared record, support constructor and field calls
+        if sym, ok := a.symbolTable.GetSymbol(funcName); ok </span><span class="cov8" title="1">{
+                if _, isRec := sym.Value.(*RecordValue); isRec </span><span class="cov8" title="1">{
+                        // Constructor: (RecordName [fields...])
+                        if childCount &gt;= 4 </span><span class="cov8" title="1">{
+                                if _, okArr := ctx.GetChild(2).(*parser.ArrayContext); okArr </span><span class="cov8" title="1">{
+                                        return a.analyzeRecordConstructor(ctx, sym.Value.(*RecordValue))
+                                }</span>
+                        }
+                        // Field call: (RecordName [:field])
+                        <span class="cov8" title="1">return a.analyzeRecordFieldCall(ctx, sym)</span>
+                }
+        }
+
+        // Extract arguments
+        <span class="cov8" title="1">var args []Value
+        for i := 2; i &lt; childCount-1; i++ </span><span class="cov8" title="1">{ // Skip '(' and ')'
+                child := ctx.GetChild(i)
+                if child == nil </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov8" title="1">switch funcName </span>{
+                case "macro":<span class="cov0" title="0">
+                        argText := a.nodeToFlatText(child)
+                        args = append(args, NewBasicValue(argText, "raw").MarkRaw())</span>
+                case "def":<span class="cov8" title="1">
+                        if len(args) == 0 </span><span class="cov8" title="1">{
+                                argText := a.nodeToFlatText(child)
+                                args = append(args, NewBasicValue(argText, "raw").MarkRaw())
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">fallthrough</span>
+                case "fn":<span class="cov8" title="1">
+                        // For 'fn', capture arguments as raw to preserve type annotations
+                        // Handle both (fn [params] body) and (fn [params] -&gt; type body)
+                        if funcName == "fn" &amp;&amp; len(args) &lt; 4 </span><span class="cov0" title="0">{
+                                argText := a.nodeToFlatText(child)
+                                args = append(args, NewBasicValue(argText, "raw").MarkRaw())
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">fallthrough</span>
+                case "record":<span class="cov8" title="1">
+                        // Treat record children as raw to avoid premature symbol lookups
+                        if funcName == "record" </span><span class="cov8" title="1">{
+                                argText := a.nodeToFlatText(child)
+                                args = append(args, NewBasicValue(argText, "raw").MarkRaw())
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">fallthrough</span>
+                case "export":<span class="cov8" title="1">
+                        if funcName == "export" </span><span class="cov8" title="1">{
+                                argText := a.nodeToFlatText(child)
+                                args = append(args, NewBasicValue(argText, "raw"))
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">fallthrough</span>
+                default:<span class="cov8" title="1">
+                        arg, err := a.visitNode(child)
+                        if err != nil </span><span class="cov0" title="0">{
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">args = append(args, arg)</span>
+                }
+        }
+
+        // Analyze special forms
+        <span class="cov8" title="1">switch funcName </span>{
+        case "def":<span class="cov8" title="1">
+                return a.analyzeDef(ctx, args)</span>
+        case "defn":<span class="cov0" title="0">
+                return a.analyzeDefn(ctx, args)</span>
+        case "if":<span class="cov0" title="0">
+                return a.analyzeIf(ctx, args)</span>
+        case "do":<span class="cov8" title="1">
+                return a.analyzeDo(ctx, args)</span>
+        case "fn":<span class="cov0" title="0">
+                return a.analyzeFn(ctx, args)</span>
+        case "macro":<span class="cov0" title="0">
+                return a.analyzeMacro(ctx, args)</span>
+        case "import":<span class="cov0" title="0">
+                // Handle stdlib imports - they are already loaded during macro expansion phase
+                if len(args) &gt; 0 </span><span class="cov0" title="0">{
+                        importName := args[0].String()
+                        // Remove quotes if present
+                        importName = strings.Trim(importName, "\"")
+                        // Stdlib imports (vex.*) are handled by macro system, just accept them
+                        if strings.HasPrefix(importName, "vex.") </span><span class="cov0" title="0">{
+                                return NewBasicValue("import", "void"), nil
+                        }</span>
+                }
+                // Other imports are handled in codegen/pipeline
+                <span class="cov0" title="0">return NewBasicValue("import", "void"), nil</span>
+        case "export":<span class="cov8" title="1">
+                return a.analyzeExport(ctx, args)</span>
+        case "record":<span class="cov8" title="1">
+                return a.analyzeRecord(ctx, args)</span>
+        case "map":<span class="cov8" title="1">
+                return a.analyzeMap(ctx, args)</span>
+        default:<span class="cov8" title="1">
+                return a.analyzeFunctionCall(ctx, funcName, args)</span>
+        }
+}
+
+// analyzeExport records exported symbols for current package scope
+func (a *AnalyzerImpl) analyzeExport(ctx *parser.ListContext, args []Value) (Value, error) <span class="cov8" title="1">{
+        if len(args) &lt; 1 </span><span class="cov8" title="1">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeExportArguments, diagnostics.SeverityError, "", line, column, nil)
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid export")
+        }</span>
+        // Minimal placeholder: accept and no-op. Enforcement will be performed cross-package in future step.
+        <span class="cov8" title="1">return NewBasicValue("export", "void"), nil</span>
+}
+
+// VisitArray analyzes an array literal
+func (a *AnalyzerImpl) VisitArray(ctx *parser.ArrayContext) (Value, error) <span class="cov8" title="1">{
+        elements := make([]Value, 0)
+
+        // Analyze all elements
+        for i := 1; i &lt; ctx.GetChildCount()-1; i++ </span><span class="cov8" title="1">{ // Skip '[' and ']'
+                child := ctx.GetChild(i)
+                if child != nil </span><span class="cov8" title="1">{
+                        element, err := a.visitNode(child)
+                        if err != nil </span><span class="cov8" title="1">{
+                                continue</span> // Error already reported
+                        }
+                        <span class="cov8" title="1">elements = append(elements, element)</span>
+                }
+        }
+        // HM: unify element types using global substitution; outward type remains []interface{}
+        <span class="cov8" title="1">var elemT Type
+        if len(elements) &gt; 0 </span><span class="cov8" title="1">{
+                elemT = a.typeFromValue(elements[0]).apply(a.subst)
+                for i := 1; i &lt; len(elements); i++ </span><span class="cov8" title="1">{
+                        nextT := a.typeFromValue(elements[i]).apply(a.subst)
+                        if s, err := unify(elemT, nextT); err == nil </span><span class="cov8" title="1">{
+                                a.subst = a.subst.compose(s)
+                                elemT = elemT.apply(a.subst)
+                        }</span> else<span class="cov8" title="1"> {
+                                // Strict HM: incompatible element types should be an error
+                                line := ctx.GetStart().GetLine()
+                                column := ctx.GetStart().GetColumn()
+                                diag := diagnostics.New(diagnostics.CodeTypArrayElem, diagnostics.SeverityError, "", line, column, map[string]any{"Got": fmt.Sprintf("%s vs %s", a.publicTypeString(elemT), a.publicTypeString(nextT))})
+                                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                        }</span>
+                }
+        } else<span class="cov0" title="0"> {
+                elemT = a.freshTypeVar()
+        }</span>
+        <span class="cov8" title="1">return NewBasicValue("array", "[]interface{}").WithType(&amp;TypeArray{Elem: elemT}), nil</span>
+}
+
+// VisitTerminal analyzes a terminal node
+func (a *AnalyzerImpl) VisitTerminal(node antlr.TerminalNode) (Value, error) <span class="cov8" title="1">{
+        text := node.GetText()
+
+        // Determine type based on content
+        if strings.HasPrefix(text, "\"") &amp;&amp; strings.HasSuffix(text, "\"") </span><span class="cov8" title="1">{
+                return NewBasicValue(text, "string"), nil
+        }</span>
+
+        // Numbers: float or int; keep outward type as "number" and store concrete internally
+        <span class="cov8" title="1">if isFloat(text) </span><span class="cov8" title="1">{
+                return NewBasicValue(text, "number").WithType(&amp;TypeConstant{Name: "float"}), nil
+        }</span>
+        <span class="cov8" title="1">if isInt(text) </span><span class="cov8" title="1">{
+                return NewBasicValue(text, "number").WithType(&amp;TypeConstant{Name: "int"}), nil
+        }</span>
+
+        // Check if it's a boolean
+        <span class="cov8" title="1">if text == "true" || text == "false" </span><span class="cov8" title="1">{
+                return NewBasicValue(text, "bool"), nil
+        }</span>
+
+        // Symbol: if defined, instantiate scheme and return a fresh value copy with attached type
+        <span class="cov8" title="1">if value, exists := a.symbolTable.Lookup(text); exists </span><span class="cov8" title="1">{
+                if sch, ok := a.typeEnv[text]; ok </span><span class="cov8" title="1">{
+                        inst := instantiate(sch, func() int </span><span class="cov0" title="0">{ a.freshId++; return a.freshId }</span>)
+                        // return a fresh value rather than mutating the stored symbol value
+                        <span class="cov8" title="1">return NewBasicValue(value.String(), value.Type()).WithType(inst), nil</span>
+                }
+                // If we have a concrete internal type on the stored value, also return a fresh copy
+                <span class="cov8" title="1">if bv, okb := value.(*BasicValue); okb &amp;&amp; bv.getType() != nil </span><span class="cov8" title="1">{
+                        return NewBasicValue(bv.String(), bv.Type()).WithType(bv.getType()), nil
+                }</span>
+                <span class="cov0" title="0">return value, nil</span>
+        }
+        // Unknown symbol: report error for unresolved identifier
+        // Do not treat as a fresh type var; enforce strict HM unknown-identifier policy
+        <span class="cov8" title="1">line, col := 0, 0
+        if tok := node.GetSymbol(); tok != nil </span><span class="cov8" title="1">{
+                line = tok.GetLine()
+                col = tok.GetColumn()
+        }</span>
+        <span class="cov8" title="1">diag := diagnostics.New(diagnostics.CodeTypeUndefined, diagnostics.SeverityError, "", line, col, map[string]any{"Name": text})
+        a.errorReporter.ReportDiagnosticBody(line, col, diag.RenderBody(), TypeError)
+        return NewBasicValue(text, "undefined"), fmt.Errorf("undefined identifier: %s", text)</span>
+}
+
+// analyzeDef analyzes a definition
+func (a *AnalyzerImpl) analyzeDef(ctx *parser.ListContext, args []Value) (Value, error) <span class="cov8" title="1">{
+        if len(args) &lt; 2 </span><span class="cov8" title="1">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeDefArguments, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (def name value)")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid def")
+        }</span>
+
+        <span class="cov8" title="1">name := args[0].String()
+        value := args[1]
+
+        // Validate symbol naming convention for all symbols
+        if !isValidSymbolName(name) </span><span class="cov0" title="0">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeSymNaming, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("use kebab-case with dashes (e.g., 'my-symbol')")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid symbol name: %s", name)
+        }</span>
+
+        // Define the symbol
+        <span class="cov8" title="1">if err := a.symbolTable.Define(name, value); err != nil </span><span class="cov0" title="0">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                a.errorReporter.ReportError(line, column, err.Error())
+                return nil, err
+        }</span>
+
+        // Generalize and store scheme in type environment with value restriction
+        <span class="cov8" title="1">if bv, ok := value.(*BasicValue); ok </span><span class="cov8" title="1">{
+                var t Type
+                if bv.getType() != nil </span><span class="cov8" title="1">{
+                        t = bv.getType()
+                }</span> else<span class="cov8" title="1"> {
+                        switch bv.Type() </span>{
+                        case "string", "bool", "number":<span class="cov8" title="1">
+                                t = &amp;TypeConstant{Name: bv.Type()}</span>
+                        case "[]interface{}":<span class="cov0" title="0">
+                                t = &amp;TypeArray{Elem: a.freshTypeVar()}</span>
+                        case "map[interface{}]interface{}":<span class="cov0" title="0">
+                                t = &amp;TypeMap{Key: a.freshTypeVar(), Val: a.freshTypeVar()}</span>
+                        case "record":<span class="cov0" title="0">
+                                t = &amp;TypeConstant{Name: "record"}</span>
+                        case "func":<span class="cov0" title="0">
+                                t = &amp;TypeFunction{Params: []Type{}, Result: a.freshTypeVar()}</span>
+                        default:<span class="cov0" title="0">
+                                t = &amp;TypeConstant{Name: bv.Type()}</span>
+                        }
+                }
+                <span class="cov8" title="1">if a.shouldGeneralizeValue(bv, t) </span><span class="cov8" title="1">{
+                        a.typeEnv[name] = generalize(a.typeEnv, t)
+                }</span>
+        }
+
+        <span class="cov8" title="1">return value, nil</span>
+}
+
+// analyzeDefn analyzes a function definition (defn name [params] body)
+// Converts to (def name (fn [params] body)) and delegates to analyzeDef
+func (a *AnalyzerImpl) analyzeDefn(ctx *parser.ListContext, args []Value) (Value, error) <span class="cov0" title="0">{
+        if len(args) &lt; 3 </span><span class="cov0" title="0">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeDefArguments, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (defn name [params] body)")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid defn")
+        }</span>
+
+        <span class="cov0" title="0">name := args[0]
+        params := args[1]
+        body := args[2]
+
+        // Create function value from params and body: (fn [params] body)
+        fnValue, err := a.analyzeFn(ctx, []Value{params, body})
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // Now define the function: (def name fnValue)
+        <span class="cov0" title="0">return a.analyzeDef(ctx, []Value{name, fnValue})</span>
+}
+
+// shouldGeneralizeValue applies a lightweight value restriction:
+// generalize only syntactic values such as literals, functions, and record constructors.
+func (a *AnalyzerImpl) shouldGeneralizeValue(v *BasicValue, t Type) bool <span class="cov8" title="1">{
+        // Disallow generalization for non-values like application/do results
+        if v.value == "call-result" || v.value == "do-result" </span><span class="cov8" title="1">{
+                return false
+        }</span>
+        <span class="cov8" title="1">switch v.Type() </span>{
+        case "string", "bool", "number":<span class="cov8" title="1">
+                return true</span>
+        case "func":<span class="cov8" title="1">
+                return true</span>
+        case "record":<span class="cov0" title="0">
+                return true</span>
+        case "[]interface{}", "map[interface{}]interface{}":<span class="cov0" title="0">
+                // Conservatively allow generalization of empty/constructed collections
+                return true</span>
+        default:<span class="cov0" title="0">
+                // Do not generalize results of applications or unknown shapes
+                return false</span>
+        }
+}
+
+// analyzeIf analyzes an if expression
+func (a *AnalyzerImpl) analyzeIf(ctx *parser.ListContext, args []Value) (Value, error) <span class="cov8" title="1">{
+        if len(args) &lt; 2 </span><span class="cov8" title="1">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeIfArgs, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (if condition then-expr [else-expr])")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid if")
+        }</span>
+
+        // Analyze condition
+        <span class="cov8" title="1">condition := args[0]
+        thenBranch := args[1]
+
+        // Optional else branch
+        var elseBranch Value
+        if len(args) &gt; 2 </span><span class="cov8" title="1">{
+                elseBranch = args[2]
+        }</span>
+
+        // Type checking: condition should be boolean-compatible
+        <span class="cov8" title="1">if condition.Type() != "bool" </span><span class="cov8" title="1">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeTypCond, diagnostics.SeverityError, "", line, column, map[string]any{"Got": condition.Type()})
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+        }</span>
+
+        // Result type: unify then/else via global substitution
+        <span class="cov8" title="1">thenT := a.typeFromValue(thenBranch).apply(a.subst)
+        var resultT Type = thenT
+        if elseBranch != nil </span><span class="cov8" title="1">{
+                elseT := a.typeFromValue(elseBranch).apply(a.subst)
+                if s, err := unify(thenT, elseT); err == nil </span><span class="cov8" title="1">{
+                        a.subst = a.subst.compose(s)
+                        resultT = resultT.apply(a.subst)
+                }</span> else<span class="cov8" title="1"> {
+                        line := ctx.GetStart().GetLine()
+                        column := ctx.GetStart().GetColumn()
+                        // If both are nominal records but different names, emit specific nominal mismatch
+                        if ttc, ok1 := thenT.(*TypeConstant); ok1 &amp;&amp; ttc.Name != "record" </span><span class="cov8" title="1">{
+                                if etc, ok2 := elseT.(*TypeConstant); ok2 &amp;&amp; etc.Name != "record" &amp;&amp; etc.Name != ttc.Name </span><span class="cov8" title="1">{
+                                        diag := diagnostics.New(diagnostics.CodeRecNominal, diagnostics.SeverityError, "", line, column, map[string]any{"Got": fmt.Sprintf("then=%s, else=%s", ttc.Name, etc.Name)})
+                                        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                                }</span>
+                        }
+                        <span class="cov8" title="1">diag := diagnostics.New(diagnostics.CodeTypIfMismatch, diagnostics.SeverityError, "", line, column, map[string]any{"Expected": "type(then) == type(else)", "Got": fmt.Sprintf("then=%s, else=%s", a.publicTypeString(thenT), a.publicTypeString(elseT))})
+                        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)</span>
+                }
+        }
+        <span class="cov8" title="1">return NewBasicValue("if-result", a.publicTypeString(resultT)).WithType(resultT), nil</span>
+}
+
+// analyzeDo analyzes a do/block by evaluating all forms and returning the last form's type
+func (a *AnalyzerImpl) analyzeDo(ctx *parser.ListContext, args []Value) (Value, error) <span class="cov8" title="1">{
+        if len(args) == 0 </span><span class="cov0" title="0">{
+                return NewBasicValue("do", "interface{}"), nil
+        }</span>
+
+        // Process all expressions in the do block
+        // We don't need to unify all types - just evaluate each expression for side effects
+        // and return the type of the last expression
+        <span class="cov8" title="1">var lastValue Value = args[0]
+        for i := 1; i &lt; len(args); i++ </span><span class="cov8" title="1">{
+                lastValue = args[i]
+        }</span>
+
+        // Return the type of the last expression
+        <span class="cov8" title="1">lastT := a.typeFromValue(lastValue).apply(a.subst)
+        return NewBasicValue("do-result", a.publicTypeString(lastT)).WithType(lastT), nil</span>
+}
+
+// analyzeFn analyzes a function definition
+func (a *AnalyzerImpl) analyzeFn(ctx *parser.ListContext, args []Value) (Value, error) <span class="cov8" title="1">{
+        if len(args) &lt; 2 </span><span class="cov8" title="1">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeFnArgs, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (fn [params] body)")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid fn")
+        }</span>
+
+        // Enter new scope for function parameters
+        <span class="cov8" title="1">a.symbolTable.EnterScope()
+        defer a.symbolTable.ExitScope()
+
+        // Parse parameter list with required type annotations
+        paramTypes := make([]Type, 0)
+        paramList := args[0].String()
+        if strings.HasPrefix(paramList, "[") &amp;&amp; strings.HasSuffix(paramList, "]") </span><span class="cov8" title="1">{
+                inner := strings.TrimSpace(paramList[1 : len(paramList)-1])
+                if inner != "" </span><span class="cov8" title="1">{
+                        paramTypes = a.parseParameterListWithTypes(inner)
+                        if paramTypes == nil </span><span class="cov8" title="1">{
+                                line := ctx.GetStart().GetLine()
+                                column := ctx.GetStart().GetColumn()
+                                diag := diagnostics.New(diagnostics.CodeFnParams, diagnostics.SeverityError, "", line, column, nil)
+                                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                                return nil, fmt.Errorf("missing parameter type annotations")
+                        }</span>
+                }
+        }
+
+        // Parse required return type annotation
+        <span class="cov8" title="1">var resultType Type
+        if len(args) &gt;= 3 &amp;&amp; args[1].String() == "-&gt;" </span><span class="cov8" title="1">{
+                // (fn [params] -&gt; ReturnType body)
+                returnTypeStr := args[2].String()
+                resultType = a.typeNameToType(returnTypeStr)
+                // Body is now args[3]
+                bodyText := ""
+                if len(args) &gt; 3 </span><span class="cov8" title="1">{
+                        bodyText = args[3].String()
+                }</span>
+                <span class="cov8" title="1">args = append(args[:1], &amp;BasicValue{value: bodyText, typ: "expression"})</span> // Replace with body
+        } else<span class="cov0" title="0"> {
+                // ERROR: Return type annotation is required
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeFnRetType, diagnostics.SeverityError, "", line, column, nil)
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                return nil, fmt.Errorf("missing return type annotation")
+        }</span>
+
+        // Create function type with explicit result type
+        <span class="cov8" title="1">fnType := &amp;TypeFunction{Params: paramTypes, Result: resultType}
+
+        // Check body type by parsing the body and visiting the AST
+        bodyText := args[1].String()
+        if len(bodyText) &gt; 0 &amp;&amp; bodyText[0] != '(' &amp;&amp; bodyText[0] != '[' </span><span class="cov8" title="1">{
+                // Primitive or symbol literal in body; determine type directly without parsing
+                primitiveType := inferPrimitiveTypeString(bodyText)
+                bodyType := a.typeNameToType(primitiveType)
+                if s, errU := unify(fnType.Result, bodyType); errU == nil </span><span class="cov0" title="0">{
+                        appliedParams := make([]Type, len(fnType.Params))
+                        for i, p := range fnType.Params </span><span class="cov0" title="0">{
+                                appliedParams[i] = p.apply(s)
+                        }</span>
+                        <span class="cov0" title="0">fnType = &amp;TypeFunction{Params: appliedParams, Result: fnType.Result.apply(s)}</span>
+                }
+        } else<span class="cov8" title="1"> {
+                node := a.parseSingleExpression(bodyText)
+                if node != nil </span><span class="cov8" title="1">{
+                        // Visit with current scope (params already bound)
+                        if bodyVal, err := a.visitNode(node); err == nil &amp;&amp; bodyVal != nil </span><span class="cov8" title="1">{
+                                bodyType := a.typeFromValue(bodyVal)
+                                if s, errU := unify(fnType.Result, bodyType); errU == nil </span><span class="cov8" title="1">{
+                                        appliedParams := make([]Type, len(fnType.Params))
+                                        for i, p := range fnType.Params </span><span class="cov8" title="1">{
+                                                appliedParams[i] = p.apply(s)
+                                        }</span>
+                                        <span class="cov8" title="1">fnType = &amp;TypeFunction{Params: appliedParams, Result: fnType.Result.apply(s)}</span>
+                                }
+                        }
+                }
+        }
+
+        <span class="cov8" title="1">return NewBasicValue("function", "func").WithType(fnType), nil</span>
+}
+
+// analyzeMacro analyzes a macro definition
+func (a *AnalyzerImpl) analyzeMacro(ctx *parser.ListContext, args []Value) (Value, error) <span class="cov8" title="1">{
+        if len(args) &lt; 3 </span><span class="cov8" title="1">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeMacArgs, diagnostics.SeverityError, "", line, column, nil)
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), MacroError)
+                return nil, fmt.Errorf("invalid macro")
+        }</span>
+
+        <span class="cov8" title="1">name := args[0].String()
+
+        // Check for valid macro name
+        if isReservedWord(name) </span><span class="cov8" title="1">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeMacReserved, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("choose a different macro name")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), MacroError)
+                return nil, fmt.Errorf("invalid macro name")
+        }</span>
+
+        // Validate macro naming convention
+        <span class="cov8" title="1">if !isValidSymbolName(name) </span><span class="cov0" title="0">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeSymNaming, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("use kebab-case with dashes (e.g., 'my-macro')")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), MacroError)
+                return nil, fmt.Errorf("invalid macro name: %s", name)
+        }</span>
+
+        // Define the macro as a symbol
+        <span class="cov8" title="1">macroValue := NewBasicValue(name, "macro")
+        a.symbolTable.Define(name, macroValue)
+
+        return macroValue, nil</span>
+}
+
+// analyzeFunctionCall analyzes a function call
+func (a *AnalyzerImpl) analyzeFunctionCall(ctx *parser.ListContext, funcName string, args []Value) (Value, error) <span class="cov8" title="1">{
+        // Equality specialized typing: ∀a. a -&gt; a -&gt; bool with explicit mismatch diagnostic
+        if funcName == "=" </span><span class="cov8" title="1">{
+                if len(args) != 2 </span><span class="cov8" title="1">{
+                        line := ctx.GetStart().GetLine()
+                        column := ctx.GetStart().GetColumn()
+                        a.errorReporter.ReportTypedError(line, column, "[VEX-ARI-ARGS]: '=' expects 2 arguments", TypeError)
+                        return NewBasicValue("call-result", "bool"), nil
+                }</span>
+                <span class="cov8" title="1">t1 := a.typeFromValue(args[0]).apply(a.subst)
+                t2 := a.typeFromValue(args[1]).apply(a.subst)
+                if s, err := unify(t1, t2); err == nil </span><span class="cov8" title="1">{
+                        a.subst = a.subst.compose(s)
+                        return NewBasicValue("call-result", "bool").WithType(&amp;TypeConstant{Name: "bool"}), nil
+                }</span>
+                <span class="cov8" title="1">line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeTypEq, diagnostics.SeverityError, "", line, column, map[string]any{"Got": a.publicTypeString(t1) + " vs " + a.publicTypeString(t2)}).WithMessage("occur-check or mismatch: cannot unify")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                return NewBasicValue("call-result", "bool").WithType(&amp;TypeConstant{Name: "bool"}), nil</span>
+        }
+        // Namespaced call handling: pkg/path/Func
+        <span class="cov8" title="1">if strings.Contains(funcName, "/") </span><span class="cov8" title="1">{
+                parts := strings.Split(funcName, "/")
+                if len(parts) &gt;= 2 </span><span class="cov8" title="1">{
+                        importPath := strings.Join(parts[:len(parts)-1], "/")
+                        function := parts[len(parts)-1]
+                        // Local Vex package: enforce exports and attempt scheme-based typing
+                        if a.ignoreImports[importPath] </span><span class="cov8" title="1">{
+                                if ex, ok := a.pkgExports[importPath]; ok </span><span class="cov8" title="1">{
+                                        if !ex[function] </span><span class="cov8" title="1">{
+                                                line := ctx.GetStart().GetLine()
+                                                column := ctx.GetStart().GetColumn()
+                                                diag := diagnostics.New(diagnostics.CodePkgNotExported, diagnostics.SeverityError, "", line, column, map[string]any{"Name": function, "Pkg": importPath})
+                                                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                                                return NewBasicValue("call-result", "interface{}"), fmt.Errorf("symbol '%s' is not exported from package '%s'", function, importPath)
+                                        }</span>
+                                }
+                                // Type via provided package scheme, if available
+                                <span class="cov8" title="1">if schs, ok := a.pkgSchemes[importPath]; ok </span><span class="cov8" title="1">{
+                                        if sch, ok2 := schs[function]; ok2 </span><span class="cov8" title="1">{
+                                                ft, okf := instantiate(sch, func() int </span><span class="cov8" title="1">{ a.freshId++; return a.freshId }</span>).(*TypeFunction)
+                                                <span class="cov8" title="1">if okf </span><span class="cov8" title="1">{
+                                                        if len(ft.Params) != len(args) </span><span class="cov0" title="0">{
+                                                                line := ctx.GetStart().GetLine()
+                                                                column := ctx.GetStart().GetColumn()
+                                                                a.errorReporter.ReportTypedError(line, column, fmt.Sprintf("[VEX-ARI-ARGS]: %s expects %d arguments; got %d", funcName, len(ft.Params), len(args)), TypeError)
+                                                                return NewBasicValue("call-result", "interface{}"), nil
+                                                        }</span>
+                                                        <span class="cov8" title="1">subst := a.subst
+                                                        for i := range ft.Params </span><span class="cov8" title="1">{
+                                                                pt := ft.Params[i].apply(subst)
+                                                                at := a.typeFromValue(args[i]).apply(subst)
+                                                                s, err := unify(pt, at)
+                                                                if err != nil </span><span class="cov0" title="0">{
+                                                                        line := ctx.GetStart().GetLine()
+                                                                        column := ctx.GetStart().GetColumn()
+                                                                        a.errorReporter.ReportTypedError(line, column, fmt.Sprintf("[VEX-TYP-ARG]: argument %d type mismatch", i), TypeError)
+                                                                        return NewBasicValue("call-result", "interface{}"), nil
+                                                                }</span>
+                                                                <span class="cov8" title="1">subst = subst.compose(s)</span>
+                                                        }
+                                                        <span class="cov8" title="1">a.subst = subst
+                                                        rt := ft.Result.apply(a.subst)
+                                                        return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil</span>
+                                                }
+                                        }
+                                }
+                                // No scheme: accept call without typing info
+                                <span class="cov0" title="0">return NewBasicValue("call-result", "interface{}"), nil</span>
+                        }
+                }
+        }
+        // Variadic arithmetic folding for '+' to match language/tests semantics
+        <span class="cov8" title="1">if funcName == "+" </span><span class="cov8" title="1">{
+                if len(args) == 0 </span><span class="cov0" title="0">{
+                        return NewBasicValue("0", "number").WithType(&amp;TypeConstant{Name: "int"}), nil
+                }</span>
+                <span class="cov8" title="1">if len(args) == 1 </span><span class="cov0" title="0">{
+                        // (+ x) =&gt; x
+                        return args[0], nil
+                }</span>
+                // Fold left: (((a0 + a1) + a2) + ...)
+                <span class="cov8" title="1">sawFloat := false
+                accType := a.typeFromValue(args[0]).apply(a.subst)
+                if tc, ok := accType.(*TypeConstant); ok &amp;&amp; tc.Name == "float" </span><span class="cov0" title="0">{
+                        sawFloat = true
+                }</span>
+                <span class="cov8" title="1">for i := 1; i &lt; len(args); i++ </span><span class="cov8" title="1">{
+                        t := a.typeFromValue(args[i]).apply(a.subst)
+                        if tc, ok := t.(*TypeConstant); ok &amp;&amp; tc.Name == "float" </span><span class="cov8" title="1">{
+                                sawFloat = true
+                        }</span>
+                        <span class="cov8" title="1">if s, err := unify(accType, t); err == nil </span><span class="cov8" title="1">{
+                                a.subst = a.subst.compose(s)
+                                accType = accType.apply(a.subst)
+                        }</span> else<span class="cov8" title="1"> {
+                                line := ctx.GetStart().GetLine()
+                                column := ctx.GetStart().GetColumn()
+                                a.errorReporter.ReportTypedError(line, column, fmt.Sprintf("[VEX-TYP-ARG]: argument %d type mismatch", i), TypeError)
+                                return NewBasicValue("call-result", "interface{}"), nil
+                        }</span>
+                }
+                <span class="cov8" title="1">if sawFloat </span><span class="cov0" title="0">{
+                        return NewBasicValue("call-result", "number").WithType(&amp;TypeConstant{Name: "float"}), nil
+                }</span>
+                <span class="cov8" title="1">return NewBasicValue("call-result", "number").WithType(&amp;TypeConstant{Name: "int"}), nil</span>
+        }
+        // Unary minus support: (- x) =&gt; negate x
+        <span class="cov8" title="1">if funcName == "-" &amp;&amp; len(args) == 1 </span><span class="cov8" title="1">{
+                t := a.typeFromValue(args[0]).apply(a.subst)
+                // Enforce numeric
+                if tc, ok := t.(*TypeConstant); ok </span><span class="cov8" title="1">{
+                        if tc.Name == "float" </span><span class="cov0" title="0">{
+                                return NewBasicValue("call-result", "number").WithType(&amp;TypeConstant{Name: "float"}), nil
+                        }</span>
+                        <span class="cov8" title="1">if tc.Name == "int" || tc.Name == "number" </span><span class="cov8" title="1">{
+                                return NewBasicValue("call-result", "number").WithType(&amp;TypeConstant{Name: "int"}), nil
+                        }</span>
+                }
+                // Fallback to number
+                <span class="cov0" title="0">return NewBasicValue("call-result", "number").WithType(&amp;TypeConstant{Name: "number"}), nil</span>
+        }
+
+        // Precise HM for collection helpers using local unification, then fall back to schemes
+        <span class="cov8" title="1">switch funcName </span>{
+        case "cons":<span class="cov0" title="0">
+                if len(args) != 2 </span><span class="cov0" title="0">{
+                        goto SCHEME</span>
+                }
+                <span class="cov0" title="0">elemT := a.typeFromValue(args[0]).apply(a.subst)
+                arrT := a.typeFromValue(args[1]).apply(a.subst)
+                // unify arrT with [a]
+                aVar := a.freshTypeVar()
+                s1, err1 := unify(arrT, &amp;TypeArray{Elem: aVar})
+                if err1 == nil </span><span class="cov0" title="0">{
+                        a.subst = a.subst.compose(s1)
+                }</span>
+                // unify elemT with aVar (or elem of arr)
+                <span class="cov0" title="0">s2, err2 := unify(elemT.apply(a.subst), aVar)
+                if err2 == nil </span><span class="cov0" title="0">{
+                        a.subst = a.subst.compose(s2)
+                        rt := (&amp;TypeArray{Elem: aVar}).apply(a.subst)
+                        return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil
+                }</span>
+                <span class="cov0" title="0">goto SCHEME</span>
+        case "rest":<span class="cov0" title="0">
+                if len(args) != 1 </span><span class="cov0" title="0">{
+                        goto SCHEME</span>
+                }
+                <span class="cov0" title="0">arrT := a.typeFromValue(args[0]).apply(a.subst)
+                aVar := a.freshTypeVar()
+                if s, err := unify(arrT, &amp;TypeArray{Elem: aVar}); err == nil </span><span class="cov0" title="0">{
+                        a.subst = a.subst.compose(s)
+                        rt := (&amp;TypeArray{Elem: aVar}).apply(a.subst)
+                        return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil
+                }</span>
+                <span class="cov0" title="0">goto SCHEME</span>
+        case "first":<span class="cov0" title="0">
+                if len(args) != 1 </span><span class="cov0" title="0">{
+                        goto SCHEME</span>
+                }
+                <span class="cov0" title="0">arrT := a.typeFromValue(args[0]).apply(a.subst)
+                aVar := a.freshTypeVar()
+                if s, err := unify(arrT, &amp;TypeArray{Elem: aVar}); err == nil </span><span class="cov0" title="0">{
+                        a.subst = a.subst.compose(s)
+                        rt := aVar.apply(a.subst)
+                        return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil
+                }</span>
+                <span class="cov0" title="0">goto SCHEME</span>
+        case "count":<span class="cov0" title="0">
+                if len(args) != 1 </span><span class="cov0" title="0">{
+                        goto SCHEME</span>
+                }
+                <span class="cov0" title="0">arrT := a.typeFromValue(args[0]).apply(a.subst)
+                aVar := a.freshTypeVar()
+                if s, err := unify(arrT, &amp;TypeArray{Elem: aVar}); err == nil </span><span class="cov0" title="0">{
+                        a.subst = a.subst.compose(s)
+                        rt := (&amp;TypeConstant{Name: "int"}).apply(a.subst)
+                        return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil
+                }</span>
+                <span class="cov0" title="0">goto SCHEME</span>
+        case "empty?":<span class="cov0" title="0">
+                if len(args) != 1 </span><span class="cov0" title="0">{
+                        goto SCHEME</span>
+                }
+                <span class="cov0" title="0">arrT := a.typeFromValue(args[0]).apply(a.subst)
+                aVar := a.freshTypeVar()
+                if s, err := unify(arrT, &amp;TypeArray{Elem: aVar}); err == nil </span><span class="cov0" title="0">{
+                        a.subst = a.subst.compose(s)
+                        rt := (&amp;TypeConstant{Name: "bool"}).apply(a.subst)
+                        return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil
+                }</span>
+                <span class="cov0" title="0">goto SCHEME</span>
+        case "get":<span class="cov8" title="1">
+                if len(args) != 2 </span><span class="cov0" title="0">{
+                        goto SCHEME</span>
+                }
+                <span class="cov8" title="1">arrT := a.typeFromValue(args[0]).apply(a.subst)
+                idxT := a.typeFromValue(args[1]).apply(a.subst)
+                // index must be int
+                if sidx, err := unify(idxT, &amp;TypeConstant{Name: "int"}); err == nil </span><span class="cov8" title="1">{
+                        a.subst = a.subst.compose(sidx)
+                }</span> else<span class="cov0" title="0"> {
+                        line := ctx.GetStart().GetLine()
+                        column := ctx.GetStart().GetColumn()
+                        diag := diagnostics.New(diagnostics.CodeTypeIndex, diagnostics.SeverityError, "", line, column, nil)
+                        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                }</span>
+                <span class="cov8" title="1">elemVar := a.freshTypeVar()
+                if s, err := unify(arrT, &amp;TypeArray{Elem: elemVar}); err == nil </span><span class="cov8" title="1">{
+                        a.subst = a.subst.compose(s)
+                        rt := elemVar.apply(a.subst)
+                        return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil
+                }</span>
+                <span class="cov0" title="0">goto SCHEME</span>
+        case "slice":<span class="cov8" title="1">
+                if len(args) != 2 </span><span class="cov0" title="0">{
+                        goto SCHEME</span>
+                }
+                <span class="cov8" title="1">arrT := a.typeFromValue(args[0]).apply(a.subst)
+                idxT := a.typeFromValue(args[1]).apply(a.subst)
+                // index must be int
+                if sidx, err := unify(idxT, &amp;TypeConstant{Name: "int"}); err == nil </span><span class="cov8" title="1">{
+                        a.subst = a.subst.compose(sidx)
+                }</span> else<span class="cov0" title="0"> {
+                        line := ctx.GetStart().GetLine()
+                        column := ctx.GetStart().GetColumn()
+                        diag := diagnostics.New(diagnostics.CodeTypeIndex, diagnostics.SeverityError, "", line, column, nil)
+                        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                }</span>
+                <span class="cov8" title="1">elemVar := a.freshTypeVar()
+                if s, err := unify(arrT, &amp;TypeArray{Elem: elemVar}); err == nil </span><span class="cov8" title="1">{
+                        a.subst = a.subst.compose(s)
+                        rt := (&amp;TypeArray{Elem: elemVar}).apply(a.subst)
+                        return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil
+                }</span>
+                <span class="cov0" title="0">goto SCHEME</span>
+        case "append":<span class="cov8" title="1">
+                if len(args) != 2 </span><span class="cov0" title="0">{
+                        goto SCHEME</span>
+                }
+                <span class="cov8" title="1">arrT := a.typeFromValue(args[0]).apply(a.subst)
+                elsT := a.typeFromValue(args[1]).apply(a.subst)
+                elemVar := a.freshTypeVar()
+                // unify first arg as [a]
+                s1, err1 := unify(arrT, &amp;TypeArray{Elem: elemVar})
+                if err1 == nil </span><span class="cov8" title="1">{
+                        a.subst = a.subst.compose(s1)
+                }</span>
+                // unify second arg as [a]
+                <span class="cov8" title="1">if s2, err2 := unify(elsT.apply(a.subst), &amp;TypeArray{Elem: elemVar}); err2 == nil </span><span class="cov8" title="1">{
+                        a.subst = a.subst.compose(s2)
+                        rt := (&amp;TypeArray{Elem: elemVar}).apply(a.subst)
+                        return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil
+                }</span>
+                <span class="cov0" title="0">goto SCHEME</span>
+        }
+
+SCHEME:
+        // Check if function is defined
+        <span class="cov8" title="1">if _, exists := a.symbolTable.Lookup(funcName); !exists </span><span class="cov8" title="1">{
+                // Allow builtins or namespaced calls (fmt/Println) via isBuiltinFunction
+                if !isBuiltinFunction(funcName) </span><span class="cov8" title="1">{
+                        line := ctx.GetStart().GetLine()
+                        column := ctx.GetStart().GetColumn()
+                        diag := diagnostics.New(diagnostics.CodeTypeUndefined, diagnostics.SeverityError, "", line, column, map[string]any{"Name": funcName})
+                        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                        return NewBasicValue("call-result", "interface{}"), fmt.Errorf("undefined function: %s", funcName)
+                }</span>
+        }
+
+        // Attempt function typing via environment/symbols
+        <span class="cov8" title="1">var ft Type
+        if sch, ok := a.typeEnv[funcName]; ok </span><span class="cov8" title="1">{
+                ft = instantiate(sch, func() int </span><span class="cov0" title="0">{ a.freshId++; return a.freshId }</span>)
+        } else<span class="cov8" title="1"> if sym, ok := a.symbolTable.GetSymbol(funcName); ok </span><span class="cov0" title="0">{
+                if bv, okb := sym.Value.(*BasicValue); okb &amp;&amp; bv.getType() != nil </span><span class="cov0" title="0">{
+                        ft = bv.getType()
+                }</span>
+        }
+        <span class="cov8" title="1">if fn, ok := ft.(*TypeFunction); ok </span><span class="cov8" title="1">{
+                if len(fn.Params) != len(args) </span><span class="cov0" title="0">{
+                        line := ctx.GetStart().GetLine()
+                        column := ctx.GetStart().GetColumn()
+                        a.errorReporter.ReportTypedError(line, column, fmt.Sprintf("[VEX-ARI-ARGS]: %s expects %d arguments; got %d", funcName, len(fn.Params), len(args)), TypeError)
+                        return NewBasicValue("call-result", "interface{}"), nil
+                }</span>
+                <span class="cov8" title="1">subst := a.subst
+                for i := range fn.Params </span><span class="cov8" title="1">{
+                        pt := fn.Params[i].apply(subst)
+                        at := a.typeFromValue(args[i]).apply(subst)
+                        s, err := unify(pt, at)
+                        if err != nil </span><span class="cov0" title="0">{
+                                // Allow collection helpers to pass to codegen-level routing
+                                if isCollectionHelper(funcName) </span><span class="cov0" title="0">{
+                                        continue</span>
+                                }
+                                <span class="cov0" title="0">line := ctx.GetStart().GetLine()
+                                column := ctx.GetStart().GetColumn()
+                                a.errorReporter.ReportTypedError(line, column, fmt.Sprintf("[VEX-TYP-ARG]: argument %d type mismatch", i), TypeError)
+                                return NewBasicValue("call-result", "interface{}"), nil</span>
+                        }
+                        <span class="cov8" title="1">subst = subst.compose(s)</span>
+                }
+                <span class="cov8" title="1">a.subst = subst
+                rt := fn.Result.apply(a.subst)
+                return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil</span>
+        }
+        // If we have a non-function type (likely a type variable, e.g., parameter 'f'),
+        // synthesize a function type and unify with it
+        <span class="cov8" title="1">if ft != nil </span><span class="cov0" title="0">{
+                paramTVs := make([]Type, 0, len(args))
+                for range args </span><span class="cov0" title="0">{
+                        paramTVs = append(paramTVs, a.freshTypeVar())
+                }</span>
+                <span class="cov0" title="0">resultTV := a.freshTypeVar()
+                fnSynth := &amp;TypeFunction{Params: paramTVs, Result: resultTV}
+                subst := a.subst
+                if s, err := unify(ft.apply(subst), fnSynth); err == nil </span><span class="cov0" title="0">{
+                        subst = subst.compose(s)
+                        // unify params with args
+                        for i := range args </span><span class="cov0" title="0">{
+                                pt := fnSynth.Params[i].apply(subst)
+                                at := a.typeFromValue(args[i]).apply(subst)
+                                si, err := unify(pt, at)
+                                if err != nil </span><span class="cov0" title="0">{
+                                        line := ctx.GetStart().GetLine()
+                                        column := ctx.GetStart().GetColumn()
+                                        a.errorReporter.ReportTypedError(line, column, fmt.Sprintf("[VEX-TYP-ARG]: argument %d type mismatch", i), TypeError)
+                                        return NewBasicValue("call-result", "interface{}"), nil
+                                }</span>
+                                <span class="cov0" title="0">subst = subst.compose(si)</span>
+                        }
+                        <span class="cov0" title="0">a.subst = subst
+                        rt := fnSynth.Result.apply(a.subst)
+                        return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil</span>
+                }
+        }
+
+        // If it's a recognized builtin/external op, accept with unknown result type
+        <span class="cov8" title="1">if isBuiltinFunction(funcName) </span><span class="cov8" title="1">{
+                // For operators backed by schemes, attempt to get scheme and unify arity accordingly
+                if sch, ok := a.typeEnv[funcName]; ok </span><span class="cov0" title="0">{
+                        ft = instantiate(sch, func() int </span><span class="cov0" title="0">{ a.freshId++; return a.freshId }</span>)
+                        <span class="cov0" title="0">if fn, ok := ft.(*TypeFunction); ok </span><span class="cov0" title="0">{
+                                if len(fn.Params) != len(args) </span><span class="cov0" title="0">{
+                                        // For '+' handled earlier; others must match arity
+                                        line := ctx.GetStart().GetLine()
+                                        column := ctx.GetStart().GetColumn()
+                                        diag := diagnostics.New(diagnostics.CodeAriArgs, diagnostics.SeverityError, "", line, column, map[string]any{"Op": funcName, "Expected": len(fn.Params), "Got": len(args)})
+                                        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                                        return NewBasicValue("call-result", "interface{}"), nil
+                                }</span>
+                                <span class="cov0" title="0">subst := a.subst
+                                for i := range fn.Params </span><span class="cov0" title="0">{
+                                        pt := fn.Params[i].apply(subst)
+                                        at := a.typeFromValue(args[i]).apply(subst)
+                                        s, err := unify(pt, at)
+                                        if err != nil </span><span class="cov0" title="0">{
+                                                // Be tolerant for collection helpers to allow nested chaining
+                                                if isCollectionHelper(funcName) </span><span class="cov0" title="0">{
+                                                        continue</span>
+                                                }
+                                                <span class="cov0" title="0">line := ctx.GetStart().GetLine()
+                                                column := ctx.GetStart().GetColumn()
+                                                a.errorReporter.ReportTypedError(line, column, fmt.Sprintf("[VEX-TYP-ARG]: argument %d type mismatch", i), TypeError)
+                                                return NewBasicValue("call-result", "interface{}"), nil</span>
+                                        }
+                                        <span class="cov0" title="0">subst = subst.compose(s)</span>
+                                }
+                                <span class="cov0" title="0">a.subst = subst
+                                rt := fn.Result.apply(a.subst)
+                                return NewBasicValue("call-result", a.publicTypeString(rt)).WithType(rt), nil</span>
+                        }
+                }
+                <span class="cov8" title="1">return NewBasicValue("call-result", "interface{}"), nil</span>
+        }
+        // Unknown function: strict HM requires a definition or scheme
+        <span class="cov0" title="0">line := ctx.GetStart().GetLine()
+        column := ctx.GetStart().GetColumn()
+        diag := diagnostics.New(diagnostics.CodeTypeUndefined, diagnostics.SeverityError, "", line, column, map[string]any{"Name": funcName})
+        a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+        return NewBasicValue("call-result", "interface{}"), fmt.Errorf("undefined function: %s", funcName)</span>
+
+}
+
+// Helper methods
+func (a *AnalyzerImpl) visitNode(node antlr.Tree) (Value, error) <span class="cov8" title="1">{
+        switch n := node.(type) </span>{
+        case *parser.ListContext:<span class="cov8" title="1">
+                return a.VisitList(n)</span>
+        case *parser.ArrayContext:<span class="cov8" title="1">
+                return a.VisitArray(n)</span>
+        case antlr.TerminalNode:<span class="cov8" title="1">
+                return a.VisitTerminal(n)</span>
+        default:<span class="cov8" title="1">
+                // Unknown node kind in analysis is an internal condition; treat as undefined
+                return NewBasicValue("unknown", "undefined"), fmt.Errorf("unknown node in analysis")</span>
+        }
+}
+
+func (a *AnalyzerImpl) nodeToString(node antlr.Tree) string <span class="cov8" title="1">{
+        if terminal, ok := node.(antlr.TerminalNode); ok </span><span class="cov8" title="1">{
+                return terminal.GetText()
+        }</span>
+        <span class="cov0" title="0">return "unknown"</span>
+}
+
+// HM helpers
+func (a *AnalyzerImpl) freshTypeVar() *TypeVariable <span class="cov8" title="1">{
+        a.freshId++
+        return &amp;TypeVariable{ID: a.freshId}
+}</span>
+
+func (a *AnalyzerImpl) typeFromValue(v Value) Type <span class="cov8" title="1">{
+        if bv, ok := v.(*BasicValue); ok &amp;&amp; bv.getType() != nil </span><span class="cov8" title="1">{
+                return bv.getType()
+        }</span>
+        <span class="cov8" title="1">switch v.Type() </span>{
+        case "string", "bool", "number", "record", "func":<span class="cov8" title="1">
+                return &amp;TypeConstant{Name: v.Type()}</span>
+        case "[]interface{}":<span class="cov8" title="1">
+                return &amp;TypeArray{Elem: a.freshTypeVar()}</span>
+        case "map[interface{}]interface{}":<span class="cov8" title="1">
+                return &amp;TypeConstant{Name: v.Type()}</span>
+        case "symbol":<span class="cov8" title="1">
+                // Undefined/bare symbols are treated as fresh type variables for unification
+                return a.freshTypeVar()</span>
+        default:<span class="cov8" title="1">
+                return &amp;TypeConstant{Name: v.Type()}</span>
+        }
+}
+
+func (a *AnalyzerImpl) publicTypeString(t Type) string <span class="cov8" title="1">{
+        switch tt := t.(type) </span>{
+        case *TypeConstant:<span class="cov8" title="1">
+                switch tt.Name </span>{
+                case "string", "bool", "number":<span class="cov8" title="1">
+                        return tt.Name</span>
+                case "int", "float":<span class="cov8" title="1">
+                        return "number"</span>
+                default:<span class="cov8" title="1">
+                        // Treat unknown constants as nominal records for outward typing
+                        return "record"</span>
+                }
+        case *TypeArray:<span class="cov8" title="1">
+                return "[]interface{}"</span>
+        case *TypeMap:<span class="cov0" title="0">
+                return "map[interface{}]interface{}"</span>
+        case *TypeFunction:<span class="cov0" title="0">
+                return "func"</span>
+        default:<span class="cov0" title="0">
+                return "interface{}"</span>
+        }
+}
+
+// typeNameToType maps outward type string tokens to internal types
+func (a *AnalyzerImpl) typeNameToType(name string) Type <span class="cov8" title="1">{
+        switch name </span>{
+        case "int", "float":<span class="cov8" title="1">
+                return &amp;TypeConstant{Name: name}</span>
+        case "number":<span class="cov8" title="1">
+                return &amp;TypeConstant{Name: "number"}</span>
+        case "string", "bool", "record", "func":<span class="cov8" title="1">
+                return &amp;TypeConstant{Name: name}</span>
+        default:<span class="cov8" title="1">
+                // Record names map to record for now; future: distinct nominal types
+                return &amp;TypeConstant{Name: name}</span>
+        }
+}
+
+// parseParameterListWithTypes parses parameter list with required type annotations
+// Only supports explicit types: "x: int y: string z: bool" syntax
+func (a *AnalyzerImpl) parseParameterListWithTypes(paramListInner string) []Type <span class="cov8" title="1">{
+        paramTypes := make([]Type, 0)
+
+        // Split by whitespace but handle type annotations
+        tokens := strings.Fields(paramListInner)
+
+        for i := 0; i &lt; len(tokens); </span><span class="cov8" title="1">{
+                paramToken := tokens[i]
+
+                // Check if this token ends with ":" indicating type annotation follows
+                if strings.HasSuffix(paramToken, ":") &amp;&amp; i+1 &lt; len(tokens) </span><span class="cov8" title="1">{
+                        // param: type format - "x:" followed by "int"
+                        paramName := strings.TrimSuffix(paramToken, ":")
+                        typeStr := tokens[i+1]
+                        paramType := a.typeNameToType(typeStr)
+                        _ = a.symbolTable.Define(paramName, NewBasicValue(paramName, "interface{}").WithType(paramType))
+                        paramTypes = append(paramTypes, paramType)
+                        i += 2 // Skip param: and type
+                }</span> else<span class="cov8" title="1"> if strings.Contains(paramToken, ":") </span><span class="cov0" title="0">{
+                        // param:type format (no space) - "x:int"
+                        parts := strings.Split(paramToken, ":")
+                        if len(parts) == 2 &amp;&amp; parts[1] != "" </span><span class="cov0" title="0">{
+                                paramName := parts[0]
+                                typeStr := parts[1]
+                                paramType := a.typeNameToType(typeStr)
+                                _ = a.symbolTable.Define(paramName, NewBasicValue(paramName, "interface{}").WithType(paramType))
+                                paramTypes = append(paramTypes, paramType)
+                                i += 1 // Skip this combined token
+                        }</span> else<span class="cov0" title="0"> {
+                                return nil // Malformed type annotation
+                        }</span>
+                } else<span class="cov8" title="1"> {
+                        // param without type annotation - ERROR in explicit-only mode
+                        return nil
+                }</span>
+        }
+
+        <span class="cov8" title="1">return paramTypes</span>
+}
+
+// parseSingleExpression parses a Vex expression from a raw string into a parse tree node
+func (a *AnalyzerImpl) parseSingleExpression(expr string) antlr.Tree <span class="cov8" title="1">{
+        input := antlr.NewInputStream(expr)
+        lexer := parser.NewVexLexer(input)
+        tokenStream := antlr.NewCommonTokenStream(lexer, 0)
+        p := parser.NewVexParser(tokenStream)
+        // Try list first, then array, then program
+        if l := p.List(); l != nil &amp;&amp; l.GetChildCount() &gt; 0 </span><span class="cov8" title="1">{
+                return l
+        }</span>
+        <span class="cov0" title="0">if arr := p.Array(); arr != nil &amp;&amp; arr.GetChildCount() &gt; 0 </span><span class="cov0" title="0">{
+                return arr
+        }</span>
+        <span class="cov0" title="0">if prog := p.Program(); prog != nil &amp;&amp; prog.GetChildCount() &gt; 0 </span><span class="cov0" title="0">{
+                return prog
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// nodeToFlatText reconstructs a flat text for arrays, lists, and terminals
+func (a *AnalyzerImpl) nodeToFlatText(node antlr.Tree) string <span class="cov8" title="1">{
+        switch n := node.(type) </span>{
+        case antlr.TerminalNode:<span class="cov8" title="1">
+                return n.GetText()</span>
+        case *parser.ArrayContext:<span class="cov8" title="1">
+                var b strings.Builder
+                b.WriteString("[")
+                first := true
+                for i := 1; i &lt; n.GetChildCount()-1; i++ </span><span class="cov8" title="1">{
+                        child := n.GetChild(i)
+                        if child == nil </span><span class="cov0" title="0">{
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">if !first </span><span class="cov8" title="1">{
+                                b.WriteString(" ")
+                        }</span> else<span class="cov8" title="1"> {
+                                first = false
+                        }</span>
+                        <span class="cov8" title="1">b.WriteString(a.nodeToFlatText(child))</span>
+                }
+                <span class="cov8" title="1">b.WriteString("]")
+                return b.String()</span>
+        case *parser.ListContext:<span class="cov0" title="0">
+                var b strings.Builder
+                b.WriteString("(")
+                first := true
+                for i := 1; i &lt; n.GetChildCount()-1; i++ </span><span class="cov0" title="0">{
+                        child := n.GetChild(i)
+                        if child == nil </span><span class="cov0" title="0">{
+                                continue</span>
+                        }
+                        <span class="cov0" title="0">if !first </span><span class="cov0" title="0">{
+                                b.WriteString(" ")
+                        }</span> else<span class="cov0" title="0"> {
+                                first = false
+                        }</span>
+                        <span class="cov0" title="0">b.WriteString(a.nodeToFlatText(child))</span>
+                }
+                <span class="cov0" title="0">b.WriteString(")")
+                return b.String()</span>
+        default:<span class="cov0" title="0">
+                var b strings.Builder
+                for i := 0; i &lt; node.GetChildCount(); i++ </span><span class="cov0" title="0">{
+                        if i &gt; 0 </span><span class="cov0" title="0">{
+                                b.WriteString(" ")
+                        }</span>
+                        <span class="cov0" title="0">b.WriteString(a.nodeToFlatText(node.GetChild(i)))</span>
+                }
+                <span class="cov0" title="0">return b.String()</span>
+        }
+}
+
+
+
+// Enhanced numeric checks for internal typing
+func isInt(s string) bool <span class="cov8" title="1">{
+        if s == "" </span><span class="cov8" title="1">{
+                return false
+        }</span>
+        <span class="cov8" title="1">if s[0] == '-' || s[0] == '+' </span><span class="cov8" title="1">{
+                s = s[1:]
+        }</span>
+        <span class="cov8" title="1">if s == "" </span><span class="cov8" title="1">{
+                return false
+        }</span>
+        <span class="cov8" title="1">for _, r := range s </span><span class="cov8" title="1">{
+                if r &lt; '0' || r &gt; '9' </span><span class="cov8" title="1">{
+                        return false
+                }</span>
+        }
+        <span class="cov8" title="1">return true</span>
+}
+
+func isFloat(s string) bool <span class="cov8" title="1">{
+        if s == "" </span><span class="cov0" title="0">{
+                return false
+        }</span>
+        <span class="cov8" title="1">if s[0] == '-' || s[0] == '+' </span><span class="cov0" title="0">{
+                s = s[1:]
+        }</span>
+        <span class="cov8" title="1">if s == "" </span><span class="cov0" title="0">{
+                return false
+        }</span>
+        <span class="cov8" title="1">dot := false
+        digitsBefore := 0
+        digitsAfter := 0
+        for _, r := range s </span><span class="cov8" title="1">{
+                if r == '.' </span><span class="cov8" title="1">{
+                        if dot </span><span class="cov0" title="0">{
+                                return false
+                        }</span>
+                        <span class="cov8" title="1">dot = true
+                        continue</span>
+                }
+                <span class="cov8" title="1">if r &lt; '0' || r &gt; '9' </span><span class="cov8" title="1">{
+                        return false
+                }</span>
+                <span class="cov8" title="1">if !dot </span><span class="cov8" title="1">{
+                        digitsBefore++
+                }</span> else<span class="cov8" title="1"> {
+                        digitsAfter++
+                }</span>
+        }
+        <span class="cov8" title="1">return dot &amp;&amp; digitsBefore &gt; 0 &amp;&amp; digitsAfter &gt; 0</span>
+}
+
+// (numeric/equality helpers removed; rely on schemes and unification)
+
+
+
+// --- Record support ---
+
+// analyzeRecord registers a record type declaration: (record Name [field: Type ...])
+func (a *AnalyzerImpl) analyzeRecord(ctx *parser.ListContext, args []Value) (Value, error) <span class="cov8" title="1">{
+        // Expect: ( record Name [fields...] )
+        if ctx.GetChildCount() &lt; 4 </span><span class="cov8" title="1">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeRecArgs, diagnostics.SeverityError, "", line, column, nil).WithSuggestion("use (record Name [field: Type ...])")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid record")
+        }</span>
+        <span class="cov8" title="1">nameNode := ctx.GetChild(2)
+        name := a.nodeToString(nameNode)
+        if name == "" || isReservedWord(name) </span><span class="cov8" title="1">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeRecordName, diagnostics.SeverityError, "", line, column, nil)
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid record name")
+        }</span>
+
+        // Validate record naming convention
+        <span class="cov8" title="1">if !isValidSymbolName(name) </span><span class="cov0" title="0">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeSymNaming, diagnostics.SeverityError, "", line, column, map[string]any{"Name": name}).WithSuggestion("use kebab-case with dashes (e.g., 'my-record')")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid record name: %s", name)
+        }</span>
+        <span class="cov8" title="1">var fields map[string]string
+        var order []string
+        if arr, ok := ctx.GetChild(3).(*parser.ArrayContext); ok </span><span class="cov8" title="1">{
+                fm, ord, ferr := a.parseRecordFields(arr)
+                if ferr != nil </span><span class="cov8" title="1">{
+                        line := ctx.GetStart().GetLine()
+                        column := ctx.GetStart().GetColumn()
+                        a.errorReporter.ReportError(line, column, ferr.Error())
+                        return nil, ferr
+                }</span>
+                <span class="cov8" title="1">fields = fm
+                order = ord</span>
+        } else<span class="cov8" title="1"> {
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeRecordFields, diagnostics.SeverityError, "", line, column, nil)
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid record fields")
+        }</span>
+        <span class="cov8" title="1">rec := NewRecordValue(name, fields, order)
+        if err := a.symbolTable.Define(name, rec); err != nil </span><span class="cov0" title="0">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                a.errorReporter.ReportError(line, column, err.Error())
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return rec, nil</span>
+}
+
+// (duplicate placeholder removed; concrete implementations below)
+
+// parseRecordFields parses [name: Type ...] into a map
+func (a *AnalyzerImpl) parseRecordFields(arr *parser.ArrayContext) (map[string]string, []string, error) <span class="cov8" title="1">{
+        fields := make(map[string]string)
+        order := make([]string, 0)
+        tokens := make([]string, 0, arr.GetChildCount()-2)
+        for i := 1; i &lt; arr.GetChildCount()-1; i++ </span><span class="cov8" title="1">{ // skip '[' and ']'
+                child := arr.GetChild(i)
+                if child == nil </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov8" title="1">tokens = append(tokens, a.nodeToString(child))</span>
+        }
+        <span class="cov8" title="1">for i := 0; i &lt; len(tokens); </span><span class="cov8" title="1">{
+                if i &gt;= len(tokens) </span><span class="cov0" title="0">{
+                        break</span>
+                }
+                <span class="cov8" title="1">nameTok := tokens[i]
+                var typeTok string
+                if strings.HasSuffix(nameTok, ":") </span><span class="cov8" title="1">{
+                        nameTok = strings.TrimSuffix(nameTok, ":")
+                        if i+1 &gt;= len(tokens) </span><span class="cov8" title="1">{
+                                return nil, nil, fmt.Errorf("missing type for field '%s'", nameTok)
+                        }</span>
+                        <span class="cov8" title="1">typeTok = tokens[i+1]
+                        i += 2</span>
+                } else<span class="cov8" title="1"> {
+                        if i+2 &gt;= len(tokens) </span><span class="cov8" title="1">{
+                                return nil, nil, fmt.Errorf("invalid field format; expected name : Type")
+                        }</span>
+                        <span class="cov0" title="0">colonTok := tokens[i+1]
+                        if colonTok != ":" </span><span class="cov0" title="0">{
+                                return nil, nil, fmt.Errorf("invalid field format; missing ':' after %s", nameTok)
+                        }</span>
+                        <span class="cov0" title="0">typeTok = tokens[i+2]
+                        i += 3</span>
+                }
+                <span class="cov8" title="1">if nameTok == "" || isReservedWord(nameTok) </span><span class="cov0" title="0">{
+                        return nil, nil, fmt.Errorf("invalid field name '%s'", nameTok)
+                }</span>
+                <span class="cov8" title="1">if !isValidSymbolName(nameTok) </span><span class="cov0" title="0">{
+                        return nil, nil, fmt.Errorf("field name '%s' must use kebab-case (e.g., 'my-field')", nameTok)
+                }</span>
+                <span class="cov8" title="1">if typeTok == "" </span><span class="cov0" title="0">{
+                        return nil, nil, fmt.Errorf("missing type for field '%s'", nameTok)
+                }</span>
+                <span class="cov8" title="1">if _, exists := fields[nameTok]; exists </span><span class="cov8" title="1">{
+                        return nil, nil, fmt.Errorf("duplicate field '%s'", nameTok)
+                }</span>
+                <span class="cov8" title="1">fields[nameTok] = typeTok
+                order = append(order, nameTok)</span>
+        }
+        <span class="cov8" title="1">return fields, order, nil</span>
+}
+
+// analyzeRecordConstructor validates a record construction list against the record's fields
+// Syntax: (RecordName [key: value key: value ...])
+func (a *AnalyzerImpl) analyzeRecordConstructor(ctx *parser.ListContext, rec *RecordValue) (Value, error) <span class="cov8" title="1">{
+        if ctx.GetChildCount() &lt; 4 </span><span class="cov0" title="0">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeRecordConstruct, diagnostics.SeverityError, "", line, column, nil)
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                return nil, fmt.Errorf("invalid record construction")
+        }</span>
+        <span class="cov8" title="1">arr, ok := ctx.GetChild(2).(*parser.ArrayContext)
+        if !ok </span><span class="cov0" title="0">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeRecordConstruct, diagnostics.SeverityError, "", line, column, nil).WithMessage("record construction expects [fields]")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                return nil, fmt.Errorf("invalid record construction")
+        }</span>
+
+        <span class="cov8" title="1">fieldTypes := rec.GetFields()
+        // Walk children: name (with or without ':') ':' valueNode
+        for i := 1; i &lt; arr.GetChildCount()-1; </span><span class="cov8" title="1">{
+                if i &gt;= arr.GetChildCount()-1 </span><span class="cov0" title="0">{
+                        break</span>
+                }
+                <span class="cov8" title="1">nameNode := arr.GetChild(i)
+                if nameNode == nil </span><span class="cov0" title="0">{
+                        i++
+                        continue</span>
+                }
+                <span class="cov8" title="1">nameTok := a.nodeToString(nameNode)
+                var valNode antlr.Tree
+                // Handle name: or name : value
+                if strings.HasSuffix(nameTok, ":") </span><span class="cov8" title="1">{
+                        nameTok = strings.TrimSuffix(nameTok, ":")
+                        if i+1 &gt;= arr.GetChildCount()-1 </span><span class="cov0" title="0">{
+                                break</span>
+                        }
+                        <span class="cov8" title="1">valNode = arr.GetChild(i + 1)
+                        i += 2</span>
+                } else<span class="cov0" title="0"> {
+                        if i+2 &gt;= arr.GetChildCount()-1 </span><span class="cov0" title="0">{
+                                break</span>
+                        }
+                        <span class="cov0" title="0">colon := a.nodeToString(arr.GetChild(i + 1))
+                        if colon != ":" </span><span class="cov0" title="0">{
+                                i++
+                                continue</span>
+                        }
+                        <span class="cov0" title="0">valNode = arr.GetChild(i + 2)
+                        i += 3</span>
+                }
+                <span class="cov8" title="1">expected, ok := fieldTypes[nameTok]
+                if !ok </span><span class="cov0" title="0">{
+                        line := ctx.GetStart().GetLine()
+                        column := ctx.GetStart().GetColumn()
+                        a.errorReporter.ReportTypedError(line, column, fmt.Sprintf("unknown field '%s' for %s", nameTok, rec.String()), TypeError)
+                        continue</span>
+                }
+                // Visit value node to obtain HM type
+                <span class="cov8" title="1">val, err := a.visitNode(valNode)
+                if err != nil </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov8" title="1">valT := a.typeFromValue(val).apply(a.subst)
+                expT := a.typeNameToType(expected)
+                if s, err := unify(expT.apply(a.subst), valT); err == nil </span><span class="cov8" title="1">{
+                        a.subst = a.subst.compose(s)
+                }</span> else<span class="cov8" title="1"> {
+                        line := ctx.GetStart().GetLine()
+                        column := ctx.GetStart().GetColumn()
+                        a.errorReporter.ReportTypedError(line, column, fmt.Sprintf("field '%s' expects %s, got %s", nameTok, expected, a.publicTypeString(valT)), TypeError)
+                }</span>
+        }
+        <span class="cov8" title="1">return NewBasicValue(rec.String(), rec.Type()).WithType(&amp;TypeConstant{Name: rec.String()}), nil</span>
+}
+
+// analyzeRecordFieldCall supports (User :field) calls equivalent to (get-field User :field)
+func (a *AnalyzerImpl) analyzeRecordFieldCall(ctx *parser.ListContext, sym *Symbol) (Value, error) <span class="cov8" title="1">{
+        // Expect: (User :field)
+        if ctx.GetChildCount() &lt; 4 </span><span class="cov0" title="0">{ // '(', User, arg, ')'
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                diag := diagnostics.New(diagnostics.CodeRecordConstruct, diagnostics.SeverityError, "", line, column, nil).WithMessage("record field call requires one field argument")
+                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                return nil, fmt.Errorf("invalid record field call")
+        }</span>
+        <span class="cov8" title="1">argNode := ctx.GetChild(2)
+        fieldTok := a.nodeToString(argNode)
+        fieldName := strings.TrimPrefix(fieldTok, ":")
+        // Resolve record value
+        rv, ok := sym.Value.(*RecordValue)
+        if !ok </span><span class="cov0" title="0">{
+                return NewBasicValue("field", "interface{}"), nil
+        }</span>
+        <span class="cov8" title="1">if t, ok := rv.GetFields()[fieldName]; ok </span><span class="cov8" title="1">{
+                // Attach internal type when possible
+                return NewBasicValue("field", t).WithType(a.typeNameToType(t)), nil
+        }</span>
+        <span class="cov8" title="1">line := ctx.GetStart().GetLine()
+        column := ctx.GetStart().GetColumn()
+        a.errorReporter.ReportTypedError(line, column, fmt.Sprintf("unknown field '%s' for %s", fieldName, rv.String()), TypeError)
+        return NewBasicValue("field", "undefined"), nil</span>
+}
+
+// analyzeMap processes (map [k v k v ...]) constructing a map type
+func (a *AnalyzerImpl) analyzeMap(ctx *parser.ListContext, args []Value) (Value, error) <span class="cov8" title="1">{
+        if ctx.GetChildCount() &lt; 3 </span><span class="cov0" title="0">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                a.errorReporter.ReportDiagnosticBody(line, column, diagnostics.New(diagnostics.CodeMapArguments, diagnostics.SeverityError, "", line, column, nil).RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid map")
+        }</span>
+        <span class="cov8" title="1">arr, ok := ctx.GetChild(2).(*parser.ArrayContext)
+        if !ok </span><span class="cov0" title="0">{
+                line := ctx.GetStart().GetLine()
+                column := ctx.GetStart().GetColumn()
+                a.errorReporter.ReportDiagnosticBody(line, column, diagnostics.New(diagnostics.CodeMapArguments, diagnostics.SeverityError, "", line, column, nil).WithMessage("map expects [key value ...]").RenderBody(), SemanticError)
+                return nil, fmt.Errorf("invalid map")
+        }</span>
+        // HM: visit child nodes and unify key/value types across pairs
+        <span class="cov8" title="1">var keyT Type
+        var valT Type
+        pairIndex := 0
+        for i := 1; i &lt; arr.GetChildCount()-1; </span><span class="cov8" title="1">{
+                if i &gt;= arr.GetChildCount()-1 </span><span class="cov0" title="0">{
+                        break</span>
+                }
+                <span class="cov8" title="1">kNode := arr.GetChild(i)
+                if kNode == nil </span><span class="cov0" title="0">{
+                        break</span>
+                }
+                <span class="cov8" title="1">vIdx := i + 1
+                if vIdx &gt;= arr.GetChildCount()-1 </span><span class="cov8" title="1">{
+                        break</span>
+                }
+                <span class="cov8" title="1">vNode := arr.GetChild(vIdx)
+                kVal, _ := a.visitNode(kNode)
+                vVal, _ := a.visitNode(vNode)
+                kt := a.typeFromValue(kVal).apply(a.subst)
+                vt := a.typeFromValue(vVal).apply(a.subst)
+                if keyT == nil </span><span class="cov8" title="1">{
+                        keyT = kt
+                }</span> else<span class="cov8" title="1"> {
+                        if s, err := unify(keyT, kt); err == nil </span><span class="cov0" title="0">{
+                                a.subst = a.subst.compose(s)
+                                keyT = keyT.apply(a.subst)
+                        }</span> else<span class="cov8" title="1"> {
+                                line := ctx.GetStart().GetLine()
+                                column := ctx.GetStart().GetColumn()
+                                diag := diagnostics.New(diagnostics.CodeTypeMapKey, diagnostics.SeverityError, "", line, column, map[string]any{"Offender": fmt.Sprintf("pair %d", pairIndex)})
+                                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                        }</span>
+                }
+                <span class="cov8" title="1">if valT == nil </span><span class="cov8" title="1">{
+                        valT = vt
+                }</span> else<span class="cov8" title="1"> {
+                        if s, err := unify(valT, vt); err == nil </span><span class="cov0" title="0">{
+                                a.subst = a.subst.compose(s)
+                                valT = valT.apply(a.subst)
+                        }</span> else<span class="cov8" title="1"> {
+                                line := ctx.GetStart().GetLine()
+                                column := ctx.GetStart().GetColumn()
+                                diag := diagnostics.New(diagnostics.CodeTypeMapValue, diagnostics.SeverityError, "", line, column, map[string]any{"Offender": fmt.Sprintf("pair %d", pairIndex)})
+                                a.errorReporter.ReportDiagnosticBody(line, column, diag.RenderBody(), TypeError)
+                        }</span>
+                }
+                <span class="cov8" title="1">pairIndex++
+                i += 2</span>
+        }
+        <span class="cov8" title="1">if keyT == nil </span><span class="cov0" title="0">{
+                keyT = a.freshTypeVar()
+        }</span>
+        <span class="cov8" title="1">if valT == nil </span><span class="cov0" title="0">{
+                valT = a.freshTypeVar()
+        }</span>
+        <span class="cov8" title="1">tm := &amp;TypeMap{Key: keyT, Val: valT}
+        return NewBasicValue("map", "map[interface{}]interface{}").WithType(tm), nil</span>
+}
+
+func inferPrimitiveTypeString(tok string) string <span class="cov8" title="1">{
+        if strings.HasPrefix(tok, "\"") &amp;&amp; strings.HasSuffix(tok, "\"") </span><span class="cov0" title="0">{
+                return "string"
+        }</span>
+        <span class="cov8" title="1">if isFloat(tok) || isInt(tok) </span><span class="cov0" title="0">{
+                return "number"
+        }</span>
+        <span class="cov8" title="1">if tok == "true" || tok == "false" </span><span class="cov0" title="0">{
+                return "bool"
+        }</span>
+        <span class="cov8" title="1">return "interface{}"</span>
+}
+
+func isReservedWord(word string) bool <span class="cov8" title="1">{
+        reserved := []string{"if", "def", "fn", "let", "do", "when", "unless", "import"}
+        for _, r := range reserved </span><span class="cov8" title="1">{
+                if word == r </span><span class="cov8" title="1">{
+                        return true
+                }</span>
+        }
+        <span class="cov8" title="1">return false</span>
+}
+
+func isBuiltinFunction(name string) bool <span class="cov8" title="1">{
+        builtins := []string{
+                "+", "-", "*", "/", "&gt;", "&lt;", "=", "not", "and", "or", "len",
+                // Collections kept for codegen routing; typing comes from schemes above
+                "first", "rest", "cons", "count", "empty?", "len",
+        }
+        for _, b := range builtins </span><span class="cov8" title="1">{
+                if name == b </span><span class="cov8" title="1">{
+                        return true
+                }</span>
+        }
+        <span class="cov8" title="1">return strings.Contains(name, "/")</span> // Package functions like fmt/Println
+}
+
+// isCollectionHelper retained for future use; strict HM no longer tolerates mismatches
+func isCollectionHelper(name string) bool <span class="cov8" title="1">{
+        switch name </span>{
+        case "first", "rest", "cons", "count", "empty?", "len", "get", "slice", "append":<span class="cov8" title="1">
+                return true</span>
+        default:<span class="cov8" title="1">
+                return false</span>
+        }
+}
+
+// isValidSymbolName validates that symbol names use kebab-case (dashes, not underscores)
+func isValidSymbolName(name string) bool <span class="cov8" title="1">{
+        // Skip validation for reserved words, builtin functions, and package functions
+        if isReservedWord(name) || isBuiltinFunction(name) || strings.Contains(name, "/") </span><span class="cov0" title="0">{
+                return true
+        }</span>
+
+        // Symbol names should not contain underscores (use dashes instead)
+        <span class="cov8" title="1">return !strings.Contains(name, "_")</span>
+}
+
+// Interface implementations to satisfy the imports
+type AST interface {
+        Accept(visitor ASTVisitor) error
+}
+
+type ASTVisitor interface {
+        VisitProgram(ctx *parser.ProgramContext) error
+        VisitList(ctx *parser.ListContext) (Value, error)
+        VisitArray(ctx *parser.ArrayContext) (Value, error)
+        VisitTerminal(node antlr.TerminalNode) (Value, error)
+}
+
+type SymbolTable interface {
+        Define(name string, value Value) error
+        Lookup(name string) (Value, bool)
+        EnterScope()
+        ExitScope()
+}
+
+type ErrorReporter interface {
+        ReportError(line, column int, message string)
+        ReportWarning(line, column int, message string)
+        HasErrors() bool
+        GetErrors() []CompilerError
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package analysis
+
+import (
+        "fmt"
+        "sort"
+)
+
+// Adapter to accept structured diagnostics without breaking existing API
+// We avoid importing diagnostics in the type definitions to keep analysis decoupled.
+// A thin shim function is provided to map a pre-rendered body into the reporter.
+
+// ErrorType represents the type of error
+type ErrorType int
+
+const (
+        SyntaxError ErrorType = iota
+        SemanticError
+        MacroError
+        TypeError
+)
+
+func (et ErrorType) String() string <span class="cov8" title="1">{
+        switch et </span>{
+        case SyntaxError:<span class="cov8" title="1">
+                return "Syntax Error"</span>
+        case SemanticError:<span class="cov8" title="1">
+                return "Semantic Error"</span>
+        case MacroError:<span class="cov8" title="1">
+                return "Macro Error"</span>
+        case TypeError:<span class="cov8" title="1">
+                return "Type Error"</span>
+        default:<span class="cov8" title="1">
+                return "Unknown Error"</span>
+        }
+}
+
+// CompilerError represents a compilation error
+type CompilerError struct {
+        File    string
+        Line    int
+        Column  int
+        Message string
+        Type    ErrorType
+}
+
+func (e *CompilerError) String() string <span class="cov8" title="1">{
+        // Go-style: file:line:col: error: message (file optional)
+        if e.File != "" </span><span class="cov8" title="1">{
+                return fmt.Sprintf("%s:%d:%d: error: %s", e.File, e.Line, e.Column, e.Message)
+        }</span>
+        <span class="cov8" title="1">return fmt.Sprintf("%d:%d: error: %s", e.Line, e.Column, e.Message)</span>
+}
+
+// ErrorReporterImpl implements the ErrorReporter interface
+type ErrorReporterImpl struct {
+        errors   []CompilerError
+        warnings []CompilerError
+}
+
+// NewErrorReporter creates a new error reporter
+func NewErrorReporter() *ErrorReporterImpl <span class="cov8" title="1">{
+        return &amp;ErrorReporterImpl{
+                errors:   make([]CompilerError, 0),
+                warnings: make([]CompilerError, 0),
+        }
+}</span>
+
+// ReportError reports a compilation error
+func (er *ErrorReporterImpl) ReportError(line, column int, message string) <span class="cov8" title="1">{
+        er.ReportTypedError(line, column, message, SemanticError)
+}</span>
+
+// ReportWarning reports a compilation warning
+func (er *ErrorReporterImpl) ReportWarning(line, column int, message string) <span class="cov8" title="1">{
+        warning := CompilerError{
+                File:    "",
+                Line:    line,
+                Column:  column,
+                Message: message,
+                Type:    SemanticError, // Warnings are semantic by default
+        }
+        er.warnings = append(er.warnings, warning)
+}</span>
+
+// ReportTypedError reports an error with a specific type
+func (er *ErrorReporterImpl) ReportTypedError(line, column int, message string, errorType ErrorType) <span class="cov8" title="1">{
+        error := CompilerError{
+                File:    "",
+                Line:    line,
+                Column:  column,
+                Message: message,
+                Type:    errorType,
+        }
+        er.errors = append(er.errors, error)
+}</span>
+
+// ReportDiagnosticBody reports a diagnostic by taking the already-rendered body
+// e.g., "[VEX-TYP-IF-MISMATCH]: branch types differ\nExpected: ...\nGot: ..."
+// Callers should pass appropriate error type and position.
+func (er *ErrorReporterImpl) ReportDiagnosticBody(line, column int, body string, errorType ErrorType) <span class="cov8" title="1">{
+        er.ReportTypedError(line, column, body, errorType)
+}</span>
+
+// HasErrors returns true if any errors have been reported
+func (er *ErrorReporterImpl) HasErrors() bool <span class="cov8" title="1">{
+        return len(er.errors) &gt; 0
+}</span>
+
+// GetErrors returns all reported errors
+func (er *ErrorReporterImpl) GetErrors() []CompilerError <span class="cov8" title="1">{
+        // Sort errors by line number for consistent output
+        sorted := make([]CompilerError, len(er.errors))
+        copy(sorted, er.errors)
+
+        sort.Slice(sorted, func(i, j int) bool </span><span class="cov8" title="1">{
+                if sorted[i].Line == sorted[j].Line </span><span class="cov8" title="1">{
+                        return sorted[i].Column &lt; sorted[j].Column
+                }</span>
+                <span class="cov8" title="1">return sorted[i].Line &lt; sorted[j].Line</span>
+        })
+
+        <span class="cov8" title="1">return sorted</span>
+}
+
+// GetWarnings returns all reported warnings
+func (er *ErrorReporterImpl) GetWarnings() []CompilerError <span class="cov8" title="1">{
+        // Sort warnings by line number for consistent output
+        sorted := make([]CompilerError, len(er.warnings))
+        copy(sorted, er.warnings)
+
+        sort.Slice(sorted, func(i, j int) bool </span><span class="cov8" title="1">{
+                if sorted[i].Line == sorted[j].Line </span><span class="cov8" title="1">{
+                        return sorted[i].Column &lt; sorted[j].Column
+                }</span>
+                <span class="cov8" title="1">return sorted[i].Line &lt; sorted[j].Line</span>
+        })
+
+        <span class="cov8" title="1">return sorted</span>
+}
+
+// GetErrorCount returns the number of errors
+func (er *ErrorReporterImpl) GetErrorCount() int <span class="cov8" title="1">{
+        return len(er.errors)
+}</span>
+
+// GetWarningCount returns the number of warnings
+func (er *ErrorReporterImpl) GetWarningCount() int <span class="cov8" title="1">{
+        return len(er.warnings)
+}</span>
+
+// Clear removes all errors and warnings
+func (er *ErrorReporterImpl) Clear() <span class="cov8" title="1">{
+        er.errors = er.errors[:0]
+        er.warnings = er.warnings[:0]
+}</span>
+
+// FormatErrors returns a formatted string of all errors
+func (er *ErrorReporterImpl) FormatErrors() string <span class="cov8" title="1">{
+        if !er.HasErrors() </span><span class="cov8" title="1">{
+                return ""
+        }</span>
+
+        <span class="cov8" title="1">result := ""
+        for _, err := range er.GetErrors() </span><span class="cov8" title="1">{
+                result += err.String() + "\n"
+        }</span>
+
+        <span class="cov8" title="1">return result</span>
+}
+
+// FormatWarnings returns a formatted string of all warnings
+func (er *ErrorReporterImpl) FormatWarnings() string <span class="cov8" title="1">{
+        if len(er.warnings) == 0 </span><span class="cov8" title="1">{
+                return ""
+        }</span>
+
+        <span class="cov8" title="1">result := ""
+        for _, warning := range er.GetWarnings() </span><span class="cov8" title="1">{
+                // lowercase 'warning:' after position for consistency with Go style
+                if warning.File != "" </span><span class="cov0" title="0">{
+                        result += fmt.Sprintf("%s:%d:%d: warning: %s\n", warning.File, warning.Line, warning.Column, warning.Message)
+                }</span> else<span class="cov8" title="1"> {
+                        result += fmt.Sprintf("%d:%d: warning: %s\n", warning.Line, warning.Column, warning.Message)
+                }</span>
+        }
+
+        <span class="cov8" title="1">return result</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package analysis
+
+// TypeScheme represents a polymorphic type with quantified variables.
+// ForAll vars. Type
+type TypeScheme struct {
+        Quantified []int
+        Body       Type
+}
+
+// TypeEnv is a typing environment mapping names to schemes.
+type TypeEnv map[string]*TypeScheme
+
+// generalize produces a scheme by quantifying variables not free in the environment.
+func generalize(env TypeEnv, t Type) *TypeScheme <span class="cov8" title="1">{
+        freeInT := t.freeTypeVars()
+        freeInEnv := make(map[int]struct{})
+        for _, sch := range env </span><span class="cov8" title="1">{
+                // free vars of a scheme are free vars of the body minus quantified vars
+                bodyFree := sch.Body.freeTypeVars()
+                for _, q := range sch.Quantified </span><span class="cov8" title="1">{
+                        delete(bodyFree, q)
+                }</span>
+                <span class="cov8" title="1">for id := range bodyFree </span><span class="cov0" title="0">{
+                        freeInEnv[id] = struct{}{}
+                }</span>
+        }
+        <span class="cov8" title="1">vars := make([]int, 0)
+        for id := range freeInT </span><span class="cov8" title="1">{
+                if _, ok := freeInEnv[id]; !ok </span><span class="cov8" title="1">{
+                        vars = append(vars, id)
+                }</span>
+        }
+        <span class="cov8" title="1">return &amp;TypeScheme{Quantified: vars, Body: t}</span>
+}
+
+// instantiate replaces quantified variables by fresh type variables.
+func instantiate(sch *TypeScheme, fresh func() int) Type <span class="cov8" title="1">{
+        subst := Subst{}
+        for _, id := range sch.Quantified </span><span class="cov8" title="1">{
+                subst[id] = &amp;TypeVariable{ID: fresh()}
+        }</span>
+        <span class="cov8" title="1">return sch.Body.apply(subst)</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package analysis
+
+import (
+        "fmt"
+)
+
+// Symbol represents a defined symbol (variable, function, etc.)
+type Symbol struct {
+        Name  string
+        Type  string
+        Value Value
+        Scope int
+}
+
+// Value represents a value in the Vex language
+type Value interface {
+        String() string
+        Type() string
+}
+
+// BasicValue implements Value for basic types
+type BasicValue struct {
+        value string
+        typ   string
+        ty    Type
+        raw   bool
+}
+
+// NewBasicValue constructs a simple Value carrying a printable form and outward type.
+func NewBasicValue(value, typ string) *BasicValue <span class="cov8" title="1">{ return &amp;BasicValue{value: value, typ: typ} }</span>
+
+func (v *BasicValue) String() string <span class="cov8" title="1">{
+        return v.value
+}</span>
+
+func (v *BasicValue) Type() string <span class="cov8" title="1">{ return v.typ }</span>
+
+// WithType attaches internal type information without changing the public type string.
+func (v *BasicValue) WithType(t Type) *BasicValue <span class="cov8" title="1">{ v.ty = t; return v }</span>
+
+// getType returns the internal type if present; otherwise nil.
+func (v *BasicValue) getType() Type <span class="cov8" title="1">{ return v.ty }</span>
+
+// MarkRaw marks this value as originating from a raw macro/body fragment.
+func (v *BasicValue) MarkRaw() *BasicValue <span class="cov8" title="1">{ v.raw = true; return v }</span>
+
+
+
+// RecordValue represents a record type declaration
+type RecordValue struct {
+        name       string
+        fields     map[string]string
+        fieldOrder []string
+}
+
+// NewRecordValue creates a record declaration with a field map and order.
+func NewRecordValue(name string, fields map[string]string, order []string) *RecordValue <span class="cov8" title="1">{
+        return &amp;RecordValue{name: name, fields: fields, fieldOrder: order}
+}</span>
+
+func (r *RecordValue) String() string <span class="cov8" title="1">{ return r.name }</span>
+func (r *RecordValue) Type() string   <span class="cov8" title="1">{ return "record" }</span>
+
+func (r *RecordValue) GetFields() map[string]string <span class="cov8" title="1">{
+        cp := make(map[string]string, len(r.fields))
+        for k, v := range r.fields </span><span class="cov8" title="1">{
+                cp[k] = v
+        }</span>
+        <span class="cov8" title="1">return cp</span>
+}
+
+func (r *RecordValue) GetFieldOrder() []string <span class="cov8" title="1">{
+        out := make([]string, len(r.fieldOrder))
+        copy(out, r.fieldOrder)
+        return out
+}</span>
+
+// SymbolTableImpl implements the SymbolTable interface
+type SymbolTableImpl struct {
+        symbols      map[string]*Symbol
+        scopes       []map[string]*Symbol
+        currentScope int
+}
+
+// NewSymbolTable creates a new symbol table
+// NewSymbolTable initializes a scoped symbol table with a global scope.
+func NewSymbolTable() *SymbolTableImpl <span class="cov8" title="1">{
+        st := &amp;SymbolTableImpl{
+                symbols:      make(map[string]*Symbol),
+                scopes:       make([]map[string]*Symbol, 0),
+                currentScope: 0,
+        }
+
+        // Add global scope
+        st.scopes = append(st.scopes, make(map[string]*Symbol))
+
+        return st
+}</span>
+
+// Define adds a new symbol to the current scope
+func (st *SymbolTableImpl) Define(name string, value Value) error <span class="cov8" title="1">{
+        if name == "" </span><span class="cov8" title="1">{
+                return fmt.Errorf("symbol name cannot be empty")
+        }</span>
+
+        // Check if already defined in current scope
+        <span class="cov8" title="1">currentScopeSymbols := st.scopes[st.currentScope]
+        if _, exists := currentScopeSymbols[name]; exists </span><span class="cov8" title="1">{
+                return fmt.Errorf("[SYMBOL-DUPLICATE]: symbol '%s' already defined in current scope", name)
+        }</span>
+
+        // Create new symbol
+        <span class="cov8" title="1">symbol := &amp;Symbol{
+                Name:  name,
+                Type:  value.Type(),
+                Value: value,
+                Scope: st.currentScope,
+        }
+
+        // Add to current scope and global table
+        currentScopeSymbols[name] = symbol
+        st.symbols[name] = symbol
+
+        return nil</span>
+}
+
+// Lookup finds a symbol by name, searching from current scope upward
+func (st *SymbolTableImpl) Lookup(name string) (Value, bool) <span class="cov8" title="1">{
+        // Search from current scope back to global scope
+        for i := st.currentScope; i &gt;= 0; i-- </span><span class="cov8" title="1">{
+                if symbol, exists := st.scopes[i][name]; exists </span><span class="cov8" title="1">{
+                        return symbol.Value, true
+                }</span>
+        }
+
+        <span class="cov8" title="1">return nil, false</span>
+}
+
+// EnterScope creates a new scope level
+func (st *SymbolTableImpl) EnterScope() <span class="cov8" title="1">{
+        st.currentScope++
+        st.scopes = append(st.scopes, make(map[string]*Symbol))
+}</span>
+
+// ExitScope returns to the previous scope level
+func (st *SymbolTableImpl) ExitScope() <span class="cov8" title="1">{
+        if st.currentScope &gt; 0 </span><span class="cov8" title="1">{
+                // Remove symbols from global table that were defined in this scope
+                scopeToRemove := st.scopes[st.currentScope]
+                for name := range scopeToRemove </span><span class="cov8" title="1">{
+                        delete(st.symbols, name)
+                }</span>
+
+                // Remove the scope
+                <span class="cov8" title="1">st.scopes = st.scopes[:len(st.scopes)-1]
+                st.currentScope--</span>
+        }
+}
+
+// GetCurrentScope returns the current scope level
+func (st *SymbolTableImpl) GetCurrentScope() int <span class="cov8" title="1">{
+        return st.currentScope
+}</span>
+
+// GetSymbol retrieves symbol information by name
+func (st *SymbolTableImpl) GetSymbol(name string) (*Symbol, bool) <span class="cov8" title="1">{
+        // Search from current scope back to global scope
+        for i := st.currentScope; i &gt;= 0; i-- </span><span class="cov8" title="1">{
+                if symbol, exists := st.scopes[i][name]; exists </span><span class="cov8" title="1">{
+                        return symbol, true
+                }</span>
+        }
+
+        <span class="cov8" title="1">return nil, false</span>
+}
+
+// GetAllSymbols returns all symbols in the current scope
+func (st *SymbolTableImpl) GetAllSymbols() map[string]*Symbol <span class="cov8" title="1">{
+        result := make(map[string]*Symbol)
+
+        // Collect all symbols from global to current scope
+        for i := 0; i &lt;= st.currentScope; i++ </span><span class="cov8" title="1">{
+                for name, symbol := range st.scopes[i] </span><span class="cov8" title="1">{
+                        result[name] = symbol
+                }</span>
+        }
+
+        <span class="cov8" title="1">return result</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package analysis
+
+// Type represents a type in the type system.
+// Implementations include TypeVariable, TypeConstant, TypeFunction, TypeArray.
+type Type interface {
+        apply(s Subst) Type
+        freeTypeVars() map[int]struct{}
+}
+
+// Subst is a substitution mapping type variable IDs to types.
+type Subst map[int]Type
+
+func (s Subst) compose(other Subst) Subst <span class="cov8" title="1">{
+        // Apply s to all in other, then merge
+        out := make(Subst, len(other)+len(s))
+        for k, v := range other </span><span class="cov8" title="1">{
+                out[k] = v.apply(s)
+        }</span>
+        <span class="cov8" title="1">for k, v := range s </span><span class="cov8" title="1">{
+                out[k] = v
+        }</span>
+        <span class="cov8" title="1">return out</span>
+}
+
+// TypeVariable is a unification variable.
+type TypeVariable struct {
+        ID int
+}
+
+func (t *TypeVariable) apply(s Subst) Type <span class="cov8" title="1">{
+        if rep, ok := s[t.ID]; ok </span><span class="cov8" title="1">{
+                return rep
+        }</span>
+        <span class="cov8" title="1">return t</span>
+}
+
+func (t *TypeVariable) freeTypeVars() map[int]struct{} <span class="cov8" title="1">{
+        return map[int]struct{}{t.ID: {}}
+}</span>
+
+// TypeConstant is a named concrete type (e.g., number, string, bool, record name).
+type TypeConstant struct {
+        Name string
+}
+
+func (t *TypeConstant) apply(_ Subst) Type             <span class="cov8" title="1">{ return t }</span>
+func (t *TypeConstant) freeTypeVars() map[int]struct{} <span class="cov8" title="1">{ return map[int]struct{}{} }</span>
+
+// TypeFunction represents a function type arg1 -&gt; arg2 -&gt; ... -&gt; result.
+type TypeFunction struct {
+        Params []Type
+        Result Type
+}
+
+func (t *TypeFunction) apply(s Subst) Type <span class="cov8" title="1">{
+        ps := make([]Type, len(t.Params))
+        for i, p := range t.Params </span><span class="cov8" title="1">{
+                ps[i] = p.apply(s)
+        }</span>
+        <span class="cov8" title="1">return &amp;TypeFunction{Params: ps, Result: t.Result.apply(s)}</span>
+}
+
+func (t *TypeFunction) freeTypeVars() map[int]struct{} <span class="cov8" title="1">{
+        out := make(map[int]struct{})
+        for _, p := range t.Params </span><span class="cov8" title="1">{
+                for id := range p.freeTypeVars() </span><span class="cov8" title="1">{
+                        out[id] = struct{}{}
+                }</span>
+        }
+        <span class="cov8" title="1">for id := range t.Result.freeTypeVars() </span><span class="cov8" title="1">{
+                out[id] = struct{}{}
+        }</span>
+        <span class="cov8" title="1">return out</span>
+}
+
+// TypeArray represents homogeneous arrays.
+type TypeArray struct {
+        Elem Type
+}
+
+func (t *TypeArray) apply(s Subst) Type             <span class="cov8" title="1">{ return &amp;TypeArray{Elem: t.Elem.apply(s)} }</span>
+func (t *TypeArray) freeTypeVars() map[int]struct{} <span class="cov8" title="1">{ return t.Elem.freeTypeVars() }</span>
+
+// TypeMap represents homogeneous map types.
+type TypeMap struct {
+        Key Type
+        Val Type
+}
+
+func (t *TypeMap) apply(s Subst) Type <span class="cov8" title="1">{ return &amp;TypeMap{Key: t.Key.apply(s), Val: t.Val.apply(s)} }</span>
+func (t *TypeMap) freeTypeVars() map[int]struct{} <span class="cov8" title="1">{
+        out := t.Key.freeTypeVars()
+        for id := range t.Val.freeTypeVars() </span><span class="cov8" title="1">{
+                out[id] = struct{}{}
+        }</span>
+        <span class="cov8" title="1">return out</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package analysis
+
+import "fmt"
+
+// unify performs type unification with occur-check.
+func unify(a, b Type) (Subst, error) <span class="cov8" title="1">{
+        switch ta := a.(type) </span>{
+        case *TypeVariable:<span class="cov8" title="1">
+                return bindVar(ta, b)</span>
+        case *TypeConstant:<span class="cov8" title="1">
+                switch tb := b.(type) </span>{
+                case *TypeVariable:<span class="cov8" title="1">
+                        return bindVar(tb, a)</span>
+                case *TypeConstant:<span class="cov8" title="1">
+                        if ta.Name == tb.Name </span><span class="cov8" title="1">{
+                                return Subst{}, nil
+                        }</span>
+                        // Numeric family: allow int/float to unify with number
+                        <span class="cov8" title="1">if (ta.Name == "number" &amp;&amp; (tb.Name == "int" || tb.Name == "float")) ||
+                                (tb.Name == "number" &amp;&amp; (ta.Name == "int" || ta.Name == "float")) </span><span class="cov8" title="1">{
+                                return Subst{}, nil
+                        }</span>
+                        <span class="cov8" title="1">return nil, fmt.Errorf("cannot unify %v with %v", ta.Name, tb.Name)</span>
+                case *TypeFunction, *TypeArray:<span class="cov0" title="0">
+                        return nil, fmt.Errorf("cannot unify %T with %T", a, b)</span>
+                }
+        case *TypeFunction:<span class="cov8" title="1">
+                switch tb := b.(type) </span>{
+                case *TypeVariable:<span class="cov0" title="0">
+                        return bindVar(tb, a)</span>
+                case *TypeFunction:<span class="cov8" title="1">
+                        if len(ta.Params) != len(tb.Params) </span><span class="cov8" title="1">{
+                                return nil, fmt.Errorf("function arity mismatch")
+                        }</span>
+                        <span class="cov8" title="1">s := Subst{}
+                        for i := range ta.Params </span><span class="cov8" title="1">{
+                                si, err := unify(ta.Params[i].apply(s), tb.Params[i].apply(s))
+                                if err != nil </span><span class="cov0" title="0">{
+                                        return nil, err
+                                }</span>
+                                <span class="cov8" title="1">s = s.compose(si)</span>
+                        }
+                        <span class="cov8" title="1">sr, err := unify(ta.Result.apply(s), tb.Result.apply(s))
+                        if err != nil </span><span class="cov0" title="0">{
+                                return nil, err
+                        }</span>
+                        <span class="cov8" title="1">return s.compose(sr), nil</span>
+                case *TypeConstant, *TypeArray:<span class="cov8" title="1">
+                        return nil, fmt.Errorf("cannot unify %T with %T", a, b)</span>
+                }
+        case *TypeArray:<span class="cov8" title="1">
+                switch tb := b.(type) </span>{
+                case *TypeVariable:<span class="cov0" title="0">
+                        return bindVar(tb, a)</span>
+                case *TypeArray:<span class="cov8" title="1">
+                        return unify(ta.Elem, tb.Elem)</span>
+                default:<span class="cov0" title="0">
+                        return nil, fmt.Errorf("cannot unify %T with %T", a, b)</span>
+                }
+        case *TypeMap:<span class="cov8" title="1">
+                switch tb := b.(type) </span>{
+                case *TypeVariable:<span class="cov0" title="0">
+                        return bindVar(tb, a)</span>
+                case *TypeMap:<span class="cov8" title="1">
+                        s1, err := unify(ta.Key, tb.Key)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return nil, err
+                        }</span>
+                        <span class="cov8" title="1">s2, err := unify(ta.Val.apply(s1), tb.Val.apply(s1))
+                        if err != nil </span><span class="cov8" title="1">{
+                                return nil, err
+                        }</span>
+                        <span class="cov8" title="1">return s1.compose(s2), nil</span>
+                default:<span class="cov0" title="0">
+                        return nil, fmt.Errorf("cannot unify %T with %T", a, b)</span>
+                }
+        }
+        // Fallback: try symmetric
+        <span class="cov0" title="0">if _, ok := b.(*TypeVariable); ok </span><span class="cov0" title="0">{
+                return unify(b, a)
+        }</span>
+        <span class="cov0" title="0">return nil, fmt.Errorf("cannot unify %T with %T", a, b)</span>
+}
+
+func bindVar(v *TypeVariable, t Type) (Subst, error) <span class="cov8" title="1">{
+        if tv, ok := t.(*TypeVariable); ok &amp;&amp; tv.ID == v.ID </span><span class="cov0" title="0">{
+                return Subst{}, nil
+        }</span>
+        <span class="cov8" title="1">if occurs(v.ID, t) </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("occur-check failed: %v in %T", v.ID, t)
+        }</span>
+        <span class="cov8" title="1">return Subst{v.ID: t}, nil</span>
+}
+
+func occurs(id int, t Type) bool <span class="cov8" title="1">{
+        _, ok := t.freeTypeVars()[id]
+        return ok
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

@@ -207,51 +207,11 @@ func TestVexAST_Accept_InvalidRoot(t *testing.T) {
 	}
 }
 
-func TestBasicValue(t *testing.T) {
-	value := NewBasicValue("42", "int")
 
-	if value.String() != "42" {
-		t.Errorf("BasicValue.String() = %v, want %v", value.String(), "42")
-	}
 
-	if value.Type() != "int" {
-		t.Errorf("BasicValue.Type() = %v, want %v", value.Type(), "int")
-	}
-}
 
-func TestBasicValue_StringType(t *testing.T) {
-	value := NewBasicValue("\"hello\"", "string")
 
-	if value.String() != "\"hello\"" {
-		t.Errorf("BasicValue.String() = %v, want %v", value.String(), "\"hello\"")
-	}
 
-	if value.Type() != "string" {
-		t.Errorf("BasicValue.Type() = %v, want %v", value.Type(), "string")
-	}
-}
-
-func TestBasicValue_BoolType(t *testing.T) {
-	tests := []struct {
-		value string
-		want  string
-	}{
-		{"true", "true"},
-		{"false", "false"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.value, func(t *testing.T) {
-			basicValue := NewBasicValue(tt.value, "bool")
-			if basicValue.String() != tt.want {
-				t.Errorf("BasicValue.String() = %v, want %v", basicValue.String(), tt.want)
-			}
-			if basicValue.Type() != "bool" {
-				t.Errorf("BasicValue.Type() = %v, want %v", basicValue.Type(), "bool")
-			}
-		})
-	}
-}
 
 // Mock implementations for testing
 
@@ -269,17 +229,17 @@ func (m *MockASTVisitor) VisitProgram(ctx *parser.ProgramContext) error {
 
 func (m *MockASTVisitor) VisitList(ctx *parser.ListContext) (Value, error) {
 	m.visitListCalled = true
-	return NewBasicValue("list", "list"), nil
+	return &BasicValue{value: "list", typ: "list"}, nil
 }
 
 func (m *MockASTVisitor) VisitArray(ctx *parser.ArrayContext) (Value, error) {
 	m.visitArrayCalled = true
-	return NewBasicValue("array", "array"), nil
+	return &BasicValue{value: "array", typ: "array"}, nil
 }
 
 func (m *MockASTVisitor) VisitTerminal(node antlr.TerminalNode) (Value, error) {
 	m.visitTerminalCalled = true
-	return NewBasicValue(node.GetText(), "terminal"), nil
+	return &BasicValue{value: node.GetText(), typ: "terminal"}, nil
 }
 
 type mockInvalidTree struct{}

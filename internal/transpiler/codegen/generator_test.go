@@ -272,22 +272,4 @@ func TestGenerateFunctionCall_FallbackDotsConversion(t *testing.T) {
 	}
 }
 
-func TestGenerateImport_StringArgs(t *testing.T) {
-	g := NewGoCodeGenerator(Config{PackageName: "main"})
 
-	// Test import with quoted string argument
-	result, err := g.generateImport([]string{"\"fmt\""})
-	if err != nil {
-		t.Fatalf("generateImport failed: %v", err)
-	}
-
-	if result.String() == "" {
-		t.Fatalf("generateImport should return non-empty result")
-	}
-
-	// Test import with insufficient args
-	_, err = g.generateImport([]string{})
-	if err == nil {
-		t.Fatalf("generateImport should error with no args")
-	}
-}

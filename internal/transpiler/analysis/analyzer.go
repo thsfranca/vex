@@ -1272,15 +1272,7 @@ func (a *AnalyzerImpl) nodeToFlatText(node antlr.Tree) string {
 	}
 }
 
-// Helper functions
-func isNumber(s string) bool {
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return len(s) > 0
-}
+
 
 // Enhanced numeric checks for internal typing
 func isInt(s string) bool {
@@ -1336,10 +1328,7 @@ func isFloat(s string) bool {
 
 // (numeric/equality helpers removed; rely on schemes and unification)
 
-// isUnknownType allows interface{} and undefined to pass early checks in analyzer
-func isUnknownType(t string) bool {
-	return t == "interface{}" || t == "undefined"
-}
+
 
 // --- Record support ---
 

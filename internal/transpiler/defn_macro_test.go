@@ -83,7 +83,7 @@ func TestTranspiler_DefnMacro(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
 
 			if err != nil {
@@ -141,7 +141,7 @@ func TestTranspiler_DefnMacroTypeInference(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
 
 			if err != nil {
@@ -204,7 +204,7 @@ func TestTranspiler_DefnMacroErrorHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
 
 			if tt.expectedError {
@@ -247,7 +247,7 @@ func TestTranspiler_DefnMacroComplexBodies(t *testing.T) {
 			name:  "Function with array operations",
 			input: `(import "vex.core")
 (import "collections")
-(defn get-first [arr: [int]] -> int (get arr 0))`,
+(defn get-first [arr: [int]] -> int (first arr))`,
 			expected: []string{
 				"get_first := func(arr interface{}) interface{} { return func() interface{} { if len(arr) > 0 { return arr[0] } else",
 			},
@@ -256,7 +256,7 @@ func TestTranspiler_DefnMacroComplexBodies(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
 
 			if err != nil {

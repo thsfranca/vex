@@ -51,10 +51,6 @@ type BasicValue struct {
 	typ   string
 }
 
-func NewBasicValue(value, typ string) *BasicValue {
-	return &BasicValue{value: value, typ: typ}
-}
-
 func (v *BasicValue) String() string {
 	return v.value
 }

@@ -1205,36 +1205,7 @@ func downloadDependencies(vexDir string, verbose bool) error {
 	return cmd.Run()
 }
 
-func buildBinary(vexDir, genDir, binaryPath string, verbose bool) error {
-	// Build from the module directory using the relative path to main.go
-	relativeMainPath := "./gen/main.go"
-	relativeBinaryPath := "./bin/app" // Use relative path for output too
-	
-	cmd := exec.Command("go", "build", "-o", relativeBinaryPath, relativeMainPath)
-	cmd.Dir = vexDir
-	
-	if verbose {
-		cmd.Stdout = os.Stderr
-		cmd.Stderr = os.Stderr
-		fmt.Fprintf(os.Stderr, "🔨 Building binary: go build -o %s %s (in %s)\n", relativeBinaryPath, relativeMainPath, vexDir)
-	}
-	
-	// Always capture stderr for error reporting
-	var stderr bytes.Buffer
-	if !verbose {
-		cmd.Stderr = &stderr
-	}
-	
-		if err := cmd.Run(); err != nil {
-		if verbose {
-			return fmt.Errorf("build failed: %v", err)
-		} else {
-			return fmt.Errorf("build failed: %v\n%s", err, stderr.String())
-		}
-	}
 
-	return nil
-}
 
 // generateEnhancedCoverageReport creates a sophisticated function-level coverage analysis
 func (tf *TestFramework) generateEnhancedCoverageReport() {

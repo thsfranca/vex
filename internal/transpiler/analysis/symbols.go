@@ -44,8 +44,7 @@ func (v *BasicValue) getType() Type { return v.ty }
 // MarkRaw marks this value as originating from a raw macro/body fragment.
 func (v *BasicValue) MarkRaw() *BasicValue { v.raw = true; return v }
 
-// isRaw reports whether this value is raw.
-func (v *BasicValue) isRaw() bool { return v.raw }
+
 
 // RecordValue represents a record type declaration
 type RecordValue struct {

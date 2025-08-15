@@ -1,0 +1,98 @@
+;; Collection Operations Test Suite (Self-hosted Vex Tests)
+;; Following ADR-0018: Minimal Go Implementation principle
+
+(import "vex.core")
+(import "collections")
+
+;; Test first operation
+(deftest test-first []
+  (do
+    ;; Test first with non-empty array
+    (assert (= (first [1 2 3]) 1) "first should return first element")
+    
+    ;; Test first with single element
+    (assert (= (first [42]) 42) "first should work with single element")
+    
+    ;; Test first with empty array (should return nil)
+    (assert (= (first []) nil) "first should return nil for empty array")))
+
+;; Test rest operation  
+(deftest test-rest []
+  (do
+    ;; Test rest with multiple elements
+    (assert (= (rest [1 2 3]) [2 3]) "rest should return all but first element")
+    
+    ;; Test rest with single element
+    (assert (= (rest [42]) []) "rest should return empty array for single element")
+    
+    ;; Test rest with empty array
+    (assert (= (rest []) []) "rest should return empty array for empty input")))
+
+;; Test count operation
+(deftest test-count []
+  (do
+    ;; Test count with multiple elements
+    (assert (= (count [1 2 3 4 5]) 5) "count should return number of elements")
+    
+    ;; Test count with empty array
+    (assert (= (count []) 0) "count should return 0 for empty array")
+    
+    ;; Test count with single element
+    (assert (= (count [42]) 1) "count should return 1 for single element")))
+
+;; Test empty? operation
+(deftest test-empty? []
+  (do
+    ;; Test empty? with empty array
+    (assert (empty? []) "empty? should return true for empty array")
+    
+    ;; Test empty? with non-empty array
+    (assert (not (empty? [1 2 3])) "empty? should return false for non-empty array")))
+
+;; Test cons operation
+(deftest test-cons []
+  (do
+    ;; Test cons with empty array
+    (assert (= (cons 1 []) [1]) "cons should prepend to empty array")
+    
+    ;; Test cons with non-empty array
+    (assert (= (cons 0 [1 2 3]) [0 1 2 3]) "cons should prepend to non-empty array")))
+
+;; Test get operation
+(deftest test-get []
+  (do
+    ;; Test get with valid index
+    (assert (= (get [10 20 30] 0) 10) "get should return element at index 0")
+    (assert (= (get [10 20 30] 1) 20) "get should return element at index 1")
+    (assert (= (get [10 20 30] 2) 30) "get should return element at index 2")
+    
+    ;; Test get with out-of-bounds index
+    (assert (= (get [10 20 30] 5) nil) "get should return nil for out-of-bounds index")
+    (assert (= (get [10 20 30] -1) nil) "get should return nil for negative index")))
+
+;; Test slice operation
+(deftest test-slice []
+  (do
+    ;; Test slice from beginning
+    (assert (= (slice [1 2 3 4 5] 0) [1 2 3 4 5]) "slice from 0 should return full array")
+    
+    ;; Test slice from middle
+    (assert (= (slice [1 2 3 4 5] 2) [3 4 5]) "slice from 2 should return elements from index 2")
+    
+    ;; Test slice from end
+    (assert (= (slice [1 2 3 4 5] 5) []) "slice from end should return empty array")
+    
+    ;; Test slice with out-of-bounds
+    (assert (= (slice [1 2 3] 10) []) "slice with out-of-bounds should return empty array")))
+
+;; Run all tests
+(defn run-collection-tests [] -> bool
+  (do
+    (test-first)
+    (test-rest) 
+    (test-count)
+    (test-empty?)
+    (test-cons)
+    (test-get)
+    (test-slice)
+    true))

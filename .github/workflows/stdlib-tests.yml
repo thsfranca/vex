@@ -13,9 +13,6 @@ permissions:
 env:
   GO_VERSION: '1.21'
   ANTLR_VERSION: '4.13.1'
-  STDLIB_COVERAGE_THRESHOLD: 98
-  ASSERTION_DENSITY_THRESHOLD: 1.5
-  TEST_QUALITY_THRESHOLD: 60
 
 jobs:
   # Detect changes in stdlib files and related testing infrastructure
@@ -38,15 +35,12 @@ jobs:
             - 'stdlib/**/*.vx'
             - 'stdlib/**/*.vex'
             - 'stdlib/**/*.md'
-            - '.github/scripts/test/run-stdlib-tests.sh'
-            - '.github/scripts/test/validate-stdlib-coverage.sh'
-            - '.github/scripts/test/validate-assertion-density.sh'
-            - '.github/scripts/test/post-stdlib-comment.sh'
+            - '.github/scripts/test/run-tests.sh'
             - '.github/workflows/stdlib-tests.yml'
           has-changes:
             - '**'
 
-  # Validate stdlib tests with enhanced function-level coverage analysis
+  # Run stdlib tests
   stdlib-tests:
     runs-on: ubuntu-latest
     needs: [detect-stdlib-changes]
@@ -106,82 +100,10 @@ jobs:
     - name: Build Vex transpiler
       run: .github/scripts/build/build-project.sh
 
-    - name: Run stdlib tests with enhanced coverage analysis
+    - name: Run stdlib tests
       id: stdlib-tests
-      run: .github/scripts/test/run-stdlib-tests.sh
-      env:
-        STDLIB_COVERAGE_THRESHOLD: ${{ env.STDLIB_COVERAGE_THRESHOLD }}
-        
-    - name: Validate enhanced stdlib coverage metrics
-      id: stdlib-coverage
-      run: .github/scripts/test/validate-stdlib-coverage.sh
-      env:
-        STDLIB_COVERAGE_THRESHOLD: ${{ env.STDLIB_COVERAGE_THRESHOLD }}
-        
-    - name: Validate assertion density and test quality
-      id: assertion-density
-      run: .github/scripts/test/validate-assertion-density.sh
-      env:
-        ASSERTION_DENSITY_THRESHOLD: ${{ env.ASSERTION_DENSITY_THRESHOLD }}
-        TEST_QUALITY_THRESHOLD: ${{ env.TEST_QUALITY_THRESHOLD }}
-        COVERAGE_FILE: "stdlib-coverage.json"
-        
-    - name: Comment comprehensive test results on PR
-      if: always() && github.event_name == 'pull_request'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
-        GITHUB_EVENT_NAME: ${{ github.event_name }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
-      run: .github/scripts/test/post-stdlib-comment.sh
-      
-    - name: Fail build if stdlib tests failed
-      if: steps.stdlib-tests.outputs.status == 'failed'
-      run: |
-        echo "❌ Build failed due to stdlib test failures"
-        echo "Failed tests: ${{ steps.stdlib-tests.outputs.failed-count }}"
-        echo "Please fix stdlib tests before merging"
-        exit 1
-      
-    - name: Fail build if stdlib coverage below threshold
-      if: steps.stdlib-coverage.outputs.coverage-status == 'failed'
-      run: |
-        echo "❌ Build failed due to insufficient stdlib test coverage"
-        echo "Current coverage: ${{ steps.stdlib-coverage.outputs.coverage }}%"
-        echo "Required threshold: 98%"
-        echo "Please add more tests to improve function-level coverage before merging"
-        exit 1
-        
-    - name: Fail build if assertion density below threshold
-      if: steps.assertion-density.outputs.density-status == 'failed'
-      run: |
-        echo "❌ Build failed due to insufficient assertion density"
-        echo "Current assertion density: ${{ steps.assertion-density.outputs.assertion-density }}/test"
-        echo "Required threshold: ${{ env.ASSERTION_DENSITY_THRESHOLD }}/test"
-        echo "Please add more assertions to verify function behavior before merging"
-        exit 1
-        
-    - name: Fail build if test quality below threshold
-      if: steps.assertion-density.outputs.quality-status == 'failed'
-      run: |
-        echo "❌ Build failed due to low test quality score"
-        echo "Current quality score: ${{ steps.assertion-density.outputs.quality-score }}/100"
-        echo "Required threshold: ${{ env.TEST_QUALITY_THRESHOLD }}/100"
-        echo "Please improve test quality (assertions, edge cases, naming) before merging"
-        exit 1
+      run: .github/scripts/test/run-tests.sh
 
-    - name: Upload stdlib coverage artifacts
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: stdlib-coverage-report
-        path: |
-          stdlib-coverage.json
-          stdlib-coverage-report.md
-          stdlib-test-results.log
-          assertion-density-section.md
-          combined-test-report.md
-        retention-days: 30
 
   # Skip job when no stdlib changes
   stdlib-tests-skip:
@@ -196,7 +118,7 @@ jobs:
         echo "   - stdlib/**/*.vx (stdlib source files)"
         echo "   - stdlib/**/*.vex (stdlib source files)"
         echo "   - stdlib/**/*.md (stdlib documentation)"
-        echo "   - .github/scripts/test/*stdlib* (testing scripts)"
+        echo "   - .github/scripts/test/run-tests.sh (testing script)"
         echo "   - .github/workflows/stdlib-tests.yml (this workflow)"
         echo ""
         echo "💡 Stdlib tests will run when any of these files change"

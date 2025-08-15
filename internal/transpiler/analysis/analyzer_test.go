@@ -1044,29 +1044,7 @@ func TestAnalyzer_ErrorMessages_IncludeSuggestions(t *testing.T) {
 
 // Helper functions for testing
 
-func TestHelper_isNumber(t *testing.T) {
-	tests := []struct {
-		input string
-		want  bool
-	}{
-		{"42", true},
-		{"0", true},
-		{"123", true},
-		{"", false},
-		{"abc", false},
-		{"12a", false},
-		{"a12", false},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := isNumber(tt.input)
-			if got != tt.want {
-				t.Errorf("isNumber(%q) = %v, want %v", tt.input, got, tt.want)
-			}
-		})
-	}
-}
 
 func TestHelper_isReservedWord(t *testing.T) {
 	tests := []struct {
@@ -1126,20 +1104,7 @@ func TestHelper_isBuiltinFunction(t *testing.T) {
 	}
 }
 
-func TestBasicValue_isRaw_and_MarkRaw(t *testing.T) {
-	val := NewBasicValue("test", "string")
 
-	// Initially not raw
-	if val.isRaw() {
-		t.Fatalf("new BasicValue should not be raw")
-	}
-
-	// Mark as raw
-	val.MarkRaw()
-	if !val.isRaw() {
-		t.Fatalf("BasicValue should be raw after MarkRaw()")
-	}
-}
 
 func TestRecordValue_GetFieldOrder(t *testing.T) {
 	fields := map[string]string{"name": "string", "age": "int"}

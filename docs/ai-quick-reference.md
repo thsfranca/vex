@@ -1,25 +1,25 @@
 ---
-title: "Vex Language - AI Quick Reference"
+title: "Vex Language - Quick Reference"
 version: "0.4.0"
 compatibility: "Go 1.21+"
-ai-model-compatibility: "GPT-4, Claude-3+, and similar models"
-purpose: "Machine-readable reference for AI code generation"
+purpose: "Comprehensive language reference for developers"
 ---
 
-# Vex Language AI Quick Reference
+# Vex Language Quick Reference
 
 ## Core Language Model
 
+**Data Engineering Focus**: Specialized for ETL pipelines, stream processing, and real-time analytics with functional programming excellence  
 **Execution Pipeline**: Parse S-expressions → AST → Macro expansion → HM type inference → Semantic analysis → Go code generation → Compile & execute  
-**Syntax Pattern**: `(operation arg1 arg2 ...)`  
-**Output Target**: Type-checked Go source code with proper imports and main function  
-**Type System**: Complete Hindley-Milner Algorithm W with unification, generalization/instantiation, value restriction, and strict type checking  
-**Package System**: Directory-based packages with automatic discovery, dependency resolution, circular dependency detection, and export enforcement  
-**Concurrency**: Automatic via Go goroutines (HTTP requests scale naturally)  
-**Macro System**: Advanced user-defined macros with template expansion, parameter validation, and core macro bootstrapping  
-**Diagnostics**: Structured error codes (VEX-TYP-*) with AI-friendly formatting and suggestions  
-**Implementation Philosophy**: Minimal Go runtime with maximum self-hosting - language features, standard library, and development tools implemented in Vex wherever feasible  
-**Project Status**: Multi-stage compilation pipeline complete; HM type system implemented; package discovery operational; CLI commands fully functional  
+**Syntax Pattern**: `(operation arg1 arg2 ...)` - optimized for data transformation readability  
+**Output Target**: High-performance Go code for data processing workloads with proper imports and main function  
+**Type System**: Complete Hindley-Milner Algorithm W ensures type-safe data transformations and prevents runtime pipeline failures  
+**Package System**: Directory-based packages with automatic discovery, perfect for organizing data transformation libraries and stream processing modules  
+**Performance**: Excellent performance via Go's runtime - essential for high-throughput data processing and real-time analytics  
+**Macro System**: Advanced user-defined macros enable clean data pipeline definitions and transformation patterns  
+**Diagnostics**: Structured error codes (VEX-TYP-*) prevent data pipeline errors before deployment  
+**Data Engineering Philosophy**: Functional programming paradigm ensures immutable data transformations, making ETL pipelines reliable and debuggable  
+**Project Status**: Complete foundation ready for data engineering specialization; stream processing and real-time analytics capabilities planned  
 
 ## Language Specification
 
@@ -133,7 +133,45 @@ Status: ✅ IMPLEMENTED (discovery, resolution, exports)
 Purpose: Modular code organization with dependency management
 ```
 
-## AI Code Generation Patterns
+## Data Engineering Patterns
+
+### ETL Pipeline Patterns
+```vex
+;; Data transformation pipeline
+(defn process-customer-events [events]
+  (-> events
+      (filter valid-event?)
+      (map enrich-with-geo-data)
+      (aggregate-by :customer-id)
+      (emit-to data-warehouse)))
+
+;; Stream processing with windowing
+(defn user-session-analytics [click-stream]
+  (-> click-stream
+      (window-tumbling (minutes 5))
+      (aggregate session-metrics)
+      (filter anomaly-threshold?)
+      (real-time-alert)))
+```
+
+### Real-time Analytics
+```vex
+;; Fraud detection pipeline
+(defn detect-fraud [transaction-stream]
+  (-> transaction-stream
+      (window-by :account-id (minutes 5))
+      (aggregate suspicious-patterns)
+      (score-risk-level)
+      (alert-if-high-risk)))
+
+;; Real-time dashboard metrics
+(defanalytics user-engagement
+  :metrics [active-users conversion-rate page-views]
+  :refresh-rate (seconds 5)
+  :alerts [(threshold :conversion-rate < 0.03)])
+```
+
+## Common Programming Patterns
 
 ### Basic Variable Assignment
 ```vex
@@ -157,22 +195,23 @@ Purpose: Modular code organization with dependency management
 (defn is-valid [input] (> (len input) 0))
 ```
 
-### HTTP Service Pattern (Planned)
+### Data Processing Pattern (Planned)
 ```vex
-;; Pattern: AI-friendly HTTP endpoint
-(defn api-endpoint
-  ^{:http-endpoint "/api/path"
-    :method "GET"
-    :auth-required true}
-  [request]
-  (-> request validate-input process-data format-response))
+;; Pattern: AI-friendly data pipeline
+(defn process-dataset
+  ^{:data-pipeline "transform"
+    :input-type "csv"
+    :output-type "json"}
+  [data]
+  (-> data validate-input transform-data format-output))
 
-;; Pattern: HTTP server
-(http-server
-  :port 8080
-  :routes [
-    (GET "/users" list-users)
-    (POST "/users" create-user)
+;; Pattern: Data processing workflow
+(data-pipeline
+  :input "data.csv"
+  :transformations [
+    (filter valid-record?)
+    (map extract-features)
+    (reduce aggregate-results)
   ])
 ```
 
@@ -185,7 +224,7 @@ Purpose: Modular code organization with dependency management
     (process-result result)))
 ```
 
-## Decision Tree for AI Code Generation
+## Decision Tree for Code Development
 
 ```
 Need to store a value?
@@ -207,6 +246,10 @@ Need conditional behavior?
 Need to process data?
 ├─ Single operation → (operation data)
 └─ Pipeline → (-> data op1 op2 op3)
+
+Need to handle collections?
+├─ Transform → (map function collection)
+└─ Filter → (filter predicate collection)
 ```
 
 ## Common Patterns & Idioms
@@ -256,10 +299,10 @@ Constants: ALL-CAPS (MAX-RETRIES, DEFAULT-PORT)
 | **Symbol tables** | ✅ | Variable scoping | Automatic | Proper scoping |
 | **Error handling** | ✅ | Parse/compile errors | Comprehensive | Error reporting |
 | **Types** | ⏳ | `[x: int]` | Future | Type annotations |
-| **HTTP** | ⏳ | `(http-server)` | Future | Web services |
+| **Data Processing** | ⏳ | `(data-pipeline)` | Future | Data transformation |
 | **Loops** | ⏳ | `(for x in xs)` | Future | Iteration |
 
-## HM Typing Diagnostics (for AI)
+## HM Typing Diagnostics
 
 Common diagnostic codes to detect and fix:
 
@@ -270,7 +313,7 @@ Common diagnostic codes to detect and fix:
 - `VEX-TYP-MAP-KEY` / `VEX-TYP-MAP-VAL`: Map key/value types mismatch across pairs
 - `VEX-TYP-REC-NOMINAL`: Nominal record mismatch (A vs B)
 
-## Test Message Standards for AI
+## Test Message Standards
 
 ### Test Definition Patterns
 ```vex
@@ -296,7 +339,7 @@ FAIL: invalid-credentials-fail-authentication
 
 > **📖 Reference**: See [test-message-standards.md](test-message-standards.md) for complete standards
 
-## Error Prevention for AI
+## Error Prevention
 
 ### Invalid Syntax (Avoid)
 ```vex
@@ -333,13 +376,13 @@ FAIL: invalid-credentials-fail-authentication
 (def process-data-fn (fn [x] x))
 ```
 
-## CLI Usage for AI Testing
+## CLI Usage
 
 ```bash
 # Build transpiler
 go build -o vex cmd/vex-transpiler/main.go
 
-# Test AI-generated code
+# Test Vex code
 echo '(def x (+ 5 3))' > test.vx
 ./vex transpile -input test.vx -output test.go
 ./vex run -input test.vx
@@ -353,13 +396,13 @@ echo '(record Person [name: string age: number])' > rec.vx
 ./vex run -input rec.vx
 ```
 
-## AI Model Integration Notes
+## Development Best Practices
 
-**Best Practices for AI Code Generation**:
+**Best Practices for Vex Development**:
 1. Always wrap complete expressions in parentheses
 2. Use descriptive symbol names with kebab-case (all variables, functions, records)
 3. Prefer function composition over complex nesting
-4. Test generated code with `vex run` command
+4. Test code with `vex run` command
 5. Use macros for repetitive code patterns
 
 **Current Capabilities**:
@@ -376,16 +419,16 @@ echo '(record Person [name: string age: number])' > rec.vx
 - No loops (use recursion or Go interop)
 - No immutable data structures (use Go types)
 
-**Future AI Enhancements** (Planned):
+**Future Enhancements** (Planned):
 - Advanced type inference and checking
 - Package discovery and dependency management
-- Semantic annotations for intent-based generation
-- Type-aware code completion
-- Automatic HTTP endpoint generation
+- Enhanced IDE support with language server
+- Type-aware code completion and IntelliSense
+- Advanced data processing patterns
 - Structured error handling patterns
 - Performance optimization hints
 
-**Codebase AI/Human Friendliness** (Phase 4.6 - Planned):
+**Codebase Developer Experience** (Phase 4.6 - Planned):
 - Domain-driven package organization for clearer navigation
 - Rich domain types (`SourceCode`, `GoCode`, `SymbolName`) replacing generic strings
 - Simplified interfaces with unified compilation results

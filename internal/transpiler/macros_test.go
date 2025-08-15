@@ -43,7 +43,7 @@ func TestTranspiler_MacroRegistration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
 
 			if err != nil {
@@ -85,7 +85,7 @@ func TestTranspiler_MacroExpansion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
 
 			if err != nil {
@@ -126,7 +126,7 @@ func TestTranspiler_BuiltinMacros(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
 
 			if err != nil {
@@ -171,7 +171,7 @@ func TestTranspiler_MacroErrorHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			_, err := tr.TranspileFromInput(tt.input)
 
 			if tt.expectError {
@@ -212,7 +212,7 @@ func TestTranspiler_MacroParameterMismatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			_, err := tr.TranspileFromInput(tt.input)
 
 			if err == nil {
@@ -253,7 +253,7 @@ func TestTranspiler_MacroParameterSubstitution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
 
 			if err != nil {
@@ -296,7 +296,7 @@ func TestTranspiler_MacroWithFunctionCalls(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := New()
+			tr, _ := NewBuilder().Build()
 			result, err := tr.TranspileFromInput(tt.input)
 
 			if err != nil {

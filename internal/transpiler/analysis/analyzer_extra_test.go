@@ -7,10 +7,7 @@ import (
 	"github.com/thsfranca/vex/internal/transpiler/parser"
 )
 
-func TestAnalyzer_isUnknownType_And_RecordFieldCall(t *testing.T) {
-	if !isUnknownType("interface{}") || !isUnknownType("undefined") || isUnknownType("string") {
-		t.Fatalf("isUnknownType logic mismatch")
-	}
+func TestAnalyzer_RecordFieldCall(t *testing.T) {
 
 	a := NewAnalyzer()
 	// Seed a record symbol

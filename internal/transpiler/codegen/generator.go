@@ -361,14 +361,7 @@ func (g *GoCodeGenerator) generateFn(args []string) (Value, error) {
 	return analysis.NewBasicValue(code, "func"), nil
 }
 
-func (g *GoCodeGenerator) generateImport(args []string) (Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("import requires package path")
-	}
-	importPath := strings.Trim(args[0], "\"")
-	g.AddImport(importPath)
-	return analysis.NewBasicValue("\"import completed\" // Import statement result", "string"), nil
-}
+
 
 func (g *GoCodeGenerator) generateImportFromCtx(ctx *parser.ListContext) (Value, error) {
 	if ctx.GetChildCount() < 3 {

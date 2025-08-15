@@ -1,50 +1,36 @@
-# Vex Language Implementation Requirements
+# Vex Language Implementation Requirements - Data Engineering Specialization
 
 ## Overview
 
-Vex is a statically-typed functional programming language designed specifically for **AI code generation** and high-performance backend services. The language transpiles to Go to achieve maximum performance while maintaining excellent Go ecosystem interoperability and providing uniform, predictable syntax patterns that AI models can reliably understand and generate. This document outlines the complete implementation roadmap.
+Vex is a statically-typed functional programming language specialized for data engineering, ETL pipelines, stream processing, and real-time analytics. It transpiles to Go for excellent performance while providing clean S-expression syntax optimized for data transformation workflows. This document outlines the complete implementation roadmap focused on data engineering excellence.
 
 ## Core Design Principles
 
-**🤖 AI-First Design**: Every language feature must be optimized for AI code generation. Uniform S-expression syntax, predictable patterns, and semantic clarity take priority over syntactic convenience.
+**🚀 Data Engineering Excellence**: Specialized for ETL pipelines, stream processing, and real-time analytics with functional programming paradigms that ensure safe, predictable data transformations.
 
-**🎯 Scalable HTTP Specialization**: Language features specifically designed so that every program naturally handles multiple HTTP requests simultaneously, with JWT authentication and scalable web API development - the most market-valuable use cases.
+**⚡ High-Performance Data Processing**: Go's concurrency and performance characteristics optimized for high-throughput data workloads and sub-millisecond real-time analytics.
 
-**⚡ Scalable Performance First**: Every design decision ensures that all programs automatically achieve high performance and scalability, naturally handling thousands of simultaneous HTTP requests through Go's goroutines.
+**🔒 Type-Safe Data Pipelines**: Compile-time type checking prevents runtime failures in production data workflows, ensuring reliable ETL operations and stream processing.
 
-**🔒 Static Type Safety**: Compile-time type checking prevents runtime errors and enables aggressive optimization through Go transpilation.
+**🌊 Stream Processing Focus**: Built-in support for real-time data streams, windowing operations, backpressure handling, and complex event processing using Go's goroutines.
 
-**🔗 Go Ecosystem Integration**: Seamless interoperability with existing Go libraries, frameworks, and infrastructure.
+**🔗 Data Ecosystem Integration**: Seamless interoperability with databases, message queues, data warehouses, and analytics platforms through Go's excellent ecosystem.
 
-**🧩 Functional Programming**: Immutable data structures, pure functions, and functional composition as primary paradigms that AI can reliably generate and that provide automatic thread-safety for all programs.
+**🎯 Operational Simplicity**: Single binary deployment vs. complex cluster management (Kafka, Spark, Flink), reducing operational overhead for data engineering teams.
 
-**🔗 Minimal Go Implementation**: Vex maintains the smallest possible Go runtime implementation, with all language features, standard library components, and development tools self-hosted in Vex whenever feasible.
+**🧩 Functional Data Transformations**: Immutable data structures and pure functions create reliable, debuggable data transformation pipelines with clear audit trails.
 
-**🚀 Self-Hosting Philosophy**: Everything that can be implemented in Vex should be implemented in Vex, reducing dependency on Go implementation details and maximizing the language's self-sufficiency.
+### Data Engineering Language Goals
 
-### AI-Friendly Design Goals
+**Pipeline Clarity**: S-expressions make complex ETL and stream processing workflows readable and maintainable, with `(-> data transform1 transform2)` patterns expressing data flow naturally.
 
-**Uniform Syntax**: S-expressions provide consistent `(operation args...)` structure with no precedence rules or special cases.
+**Data Transformation Excellence**: Function names and operations clearly express data operations, making pipelines self-documenting and easier to debug in production.
 
-**Semantic Clarity**: Function names and operations clearly express intent, making AI generation more reliable.
+**Composable Data Operations**: Simple transformation building blocks that data engineers can combine into complex ETL workflows, stream processing, and real-time analytics.
 
-**Composable Patterns**: Simple building blocks that AI can combine into complex systems.
+**Predictable Data Flow**: Consistent patterns for data ingestion, transformation, and emission that create reliable, production-ready data pipelines.
 
-**Predictable Structure**: Consistent patterns that AI models can learn once and apply everywhere.
-
-**Minimal Cognitive Load**: Fewer syntax rules mean AI can focus on business logic rather than parsing complexity, while immutable-by-default design eliminates all concurrency complexity.
-
-### Automatic Scalability Design Goals
-
-**Thread-Safe by Default**: Immutable data structures make it impossible to have race conditions - all programs safely handle multiple simultaneous requests.
-
-**Automatic Parallelization**: Every HTTP request runs in its own lightweight Go goroutine without any special syntax or configuration.
-
-**Natural Statelessness**: Functional design inherently creates stateless request handling, perfect for horizontal scaling.
-
-**Built-in Non-Blocking**: All I/O operations are naturally non-blocking through Go's runtime and standard libraries.
-
-**Zero-Configuration Scaling**: No pools to configure, no limits to set - programs automatically scale to available resources.
+**Minimal Operational Complexity**: Fewer moving parts than traditional data platforms (no JVM tuning, cluster configuration, or complex dependencies), allowing teams to focus on data logic rather than infrastructure management.
 
 ## Phase 1: Core Language Foundation ✅ **COMPLETE**
 
@@ -216,7 +202,7 @@ Integration with Go standard library:
 - ✅ Function call generation with clean syntax
 - ✅ Basic module detection for third-party packages
 - ✅ Proper package structure generation
-- ⏳ HTTP handling through net/http (planned)
+- ⏳ Network I/O through Go standard library (planned)
 - ⏳ JSON processing with encoding/json (planned)
 - ⏳ Database operations via database/sql (planned)
 
@@ -225,7 +211,7 @@ Integration with Go standard library:
 **Advanced Package Discovery System**
 Fully implemented package system following Go's proven directory model:
 - **Directory-based package structure**: Each directory represents a package with automatic name inference
-- **Advanced import resolution**: Support for strings, arrays, and alias pairs: `(import ["a" "fmt" ["net/http" http]])`
+- **Advanced import resolution**: Support for strings, arrays, and alias pairs: `(import ["a" "fmt" ["encoding/json" json]])`
 - **Automatic dependency scanning**: Build complete dependency graph with topological sorting for proper build order
 - **Circular dependency detection**: Compile-time cycle detection with detailed error chains and file location hints
 - **Module root detection**: `vex.pkg` file detection by walking up directory hierarchy from entry file
@@ -241,7 +227,7 @@ Fully implemented package system following Go's proven directory model:
 **Directory Hierarchy and Namespace Management**
 Strict directory-based namespace system - **FOUNDATION FOR LARGE PROJECTS**:
 - **Package name inference**: Package names automatically derived from directory names
-- **Nested package support**: Multi-level package hierarchies (`utils/http/client`, `services/auth/jwt`)
+- **Nested package support**: Multi-level package hierarchies (`utils/string/parser`, `data/transform/json`)
 - **Explicit exports**: `(export [sym1 sym2 ...])` parsed; codegen enforces cross-package access to exported symbols; analyzer enforcement planned
 - **Private symbol enforcement**: Compile-time enforcement currently in codegen; analyzer-level checks planned
 - **Cross-package visibility**: Controlled access between packages in the same module
@@ -291,213 +277,600 @@ The defn macro provides comprehensive function definition capabilities:
 
 This metaprogramming capability enables sophisticated AI code generation patterns and demonstrates advanced language design concepts through uniform macro syntax.
 
-## Phase 4.5: Transpiler Performance Baseline — HIGH PRIORITY — IMMEDIATE IMPLEMENTATION
+## Phase 5: Data Engineering Foundation — HIGH PRIORITY — IMMEDIATE IMPLEMENTATION
 
 ### Goals
 
-- Establish a low-overhead baseline for the transpilation pipeline used by CLI (`transpile`, `run`, `build`) and APIs.
-- Reduce per-call allocations and avoid repeated I/O and object construction work.
-- Improve macro expansion efficiency without sacrificing correctness.
+- Establish core data engineering capabilities with stream processing, data transformation, and real-time analytics
+- Build fundamental data pipeline abstractions optimized for functional programming
+- Create essential data source connectors and transformation libraries
+- Implement basic stream processing with windowing and backpressure
 
-### Tasks
+### Phase 5.1: Core Language Extensions (3-4 months)
 
-- Transpiler instance reuse
-  - Keep a long-lived `VexTranspiler` instance in the CLI and public API when processing multiple files; avoid rebuilding parser/analyzer/codegen and re-loading core macros on every call.
-  - Ensure `GetDetectedModules()` and other per-call state are explicitly reset between invocations.
+**Priority 0: Core Stream Processing (Built into Vex)**
+```vex
+;; Core stream definition syntax (built-in)
+(defstream user-events
+  :source (kafka "user-clicks")  ; Note: kafka is external connector
+  :format :json
+  :backpressure-strategy :drop-oldest
+  :batch-size 1000)
 
-- Core macro caching
-  - Make core macro loading a process-wide singleton cache to eliminate repeated `core/core.vx` reads and parsing.
-  - Provide an override for tests to force reload when needed.
+;; Core pipeline orchestration (built-in)
+(defpipeline fraud-detection
+  :sources [(database "transactions") (stream "user-activity")]
+  :transforms [detect-anomalies calculate-risk-score]
+  :sinks [(alerts "security") (database "risk-analysis")]
+  :schedule :real-time
+  :error-strategy :retry-with-backoff)
 
-- Parser/analyzer pooling
-  - Introduce `sync.Pool` for ANTLR lexer/parser/token streams and analyzer symbol tables to amortize allocations across calls.
+;; Core data transformation chains (built-in)
+(defn process-events [events]
+  (-> events
+      (filter valid-event?)        ; Built-in core operation
+      (map enrich-with-user-data)  ; Built-in core operation
+      (aggregate-by :user-id)      ; Built-in core operation
+      (emit-to analytics-sink)))   ; Built-in core operation
+```
 
-- Macro expansion without re-parsing
-  - Replace reconstruct+reparse loops with AST-level parameter substitution during macro expansion.
-  - Where parsing is still necessary, use a lightweight S-expression tokenizer instead of a full ANTLR roundtrip.
+**Priority 0: Core Windowing Operations (Built into Vex)**
+```vex
+;; Time-based windowing (built-in)
+(defn session-analytics [click-stream]
+  (-> click-stream
+      (window-tumbling (minutes 5))    ; Built-in windowing
+      (aggregate session-metrics)      ; Built-in aggregation
+      (filter anomaly-threshold?)      ; Built-in filtering
+      (emit-alerts)))                  ; Built-in emission
 
-- String building efficiency
-  - Replace string concatenations in macro reconstruction paths with `strings.Builder` to reduce temporary strings and GC pressure.
+;; Complex event processing patterns (built-in)
+(defpattern suspicious-login
+  [:failed-login :location-change :password-reset]
+  :within (minutes 10)
+  :per-user true
+  :action (alert security-team))
+```
 
-- Reduce adapter churn
-  - Align `Value` and `SymbolTable` interfaces across analysis and codegen to avoid creating wrapper objects per visit.
-  - If full alignment is not yet feasible, introduce zero-allocation thin adapters.
+**Priority 0: Core Flow Control (Built into Vex)**
+```vex
+;; Built-in backpressure and error handling
+(defn process-high-volume [stream]
+  (-> stream
+      (with-backpressure 1000)         ; Built-in flow control
+      (parallel-map transform-fn)      ; Built-in parallelization
+      (emit-when condition?)           ; Built-in conditional emission
+      (handle-errors retry-policy)))   ; Built-in error handling
+```
 
-- Resolver graph cache
-  - Cache discovered package graphs keyed by module root and input file mtimes; skip re-walking stable trees.
+**Implementation Focus**
+- Core language syntax for streams, pipelines, and patterns
+- Type-safe windowing and aggregation operations
+- Built-in flow control and error handling
+- Performance optimization for core operations
+- Deep integration with HM type system
 
-- CLI build-cache reuse
-  - Use a stable temporary module directory and prefer `go` build cache pathways, especially when only stdlib imports are present, to maximize compile-time reuse for `run`/`build`.
+### Phase 5.2: Standard Library & Essential Connectors (4-5 months)
 
-### Expected Impact
+**Priority 1: Standard Library Packages (Vex Packages)**
+```vex
+;; stdlib/vex/stats - Statistical operations
+(import ["vex.stats" stats])
 
-- Significant reduction in per-transpile allocations and time, especially in macro-heavy code.
-- Fewer filesystem accesses and object constructions per CLI invocation.
+(defn calculate-metrics [values]
+  (-> values
+      (stats/mean)                     ; Standard library
+      (stats/percentile 95)            ; Standard library
+      (stats/moving-average (minutes 10)) ; Standard library
+      (stats/anomaly-detection baseline))) ; Standard library
+
+;; stdlib/vex/time - Advanced time operations
+(import ["vex.time" time])
+
+(defn process-timestamps [events]
+  (-> events
+      (map (fn [e] (time/parse-iso8601 (:timestamp e))))
+      (time/extract-features [:hour :day-of-week])
+      (time/business-hours-filter timezone)))
+
+;; stdlib/vex/data - Data manipulation utilities
+(import ["vex.data" data])
+
+(defn enrich-data [events customer-db]
+  (-> events
+      (data/join customer-db :inner :on [:customer-id])
+      (data/deduplicate :by :transaction-id)
+      (data/validate event-schema)))
+```
+
+**Priority 1: Essential Connectors (External Libraries)**
+```vex
+;; vex.connectors.kafka - Message queue integration
+(import ["vex.connectors.kafka" kafka])
+
+(def kafka-config
+  {:brokers ["broker1:9092" "broker2:9092"]
+   :consumer-group "analytics-pipeline"
+   :auto-offset-reset :earliest})
+
+;; vex.connectors.postgres - Database connectivity
+(import ["vex.connectors.postgres" pg])
+
+(def db-config 
+  {:host "localhost" 
+   :database "analytics" 
+   :pool-size 10
+   :timeout (seconds 30)})
+
+(defn load-customer-data []
+  (-> (pg/query db-config "SELECT * FROM customers")
+      (pg/stream-results 1000)
+      (map normalize-customer-record)))
+
+;; vex.connectors.redis - Caching and state
+(import ["vex.connectors.redis" redis])
+
+;; vex.connectors.s3 - File storage
+(import ["vex.connectors.s3" s3])
+
+;; vex.connectors.http - REST APIs
+(import ["vex.connectors.http" http])
+```
+
+**Implementation Architecture**
+- **Core Language**: Stream syntax, windowing, flow control (built-in)
+- **Standard Library**: Common operations used across domains
+- **External Connectors**: Specific integrations with infrastructure
+- **Certification Process**: Quality standards for external libraries
+
+### Phase 5.3: Real-time Analytics Core (3-4 months)
+
+**Priority 1: Core Analytics Syntax (Built into Vex)**
+```vex
+;; Core analytics definition syntax (built-in)
+(defanalytics user-engagement
+  :metrics [active-users conversion-rate page-views]  ; Built-in metrics syntax
+  :refresh-rate (seconds 5)                          ; Built-in time specification
+  :retention (hours 24)                              ; Built-in retention policy
+  :alerts [(threshold :conversion-rate < 0.03)])     ; Built-in alerting syntax
+
+;; Core real-time computation patterns (built-in)
+(defn real-time-fraud-detection [transaction-stream]
+  (-> transaction-stream
+      (window-by :account-id (minutes 5))     ; Built-in windowing
+      (aggregate suspicious-indicators)       ; Built-in aggregation
+      (score-risk-level)                     ; Custom function
+      (alert-if-high-risk)))                 ; Built-in alerting
+```
+
+**Priority 2: Advanced Analytics (Standard Library)**
+```vex
+;; stdlib/vex/analytics - Advanced analytics operations
+(import ["vex.analytics" analytics])
+
+(defn trend-analysis [metrics-stream]
+  (-> metrics-stream
+      (analytics/moving-average (minutes 15))    ; Standard library
+      (analytics/detect-seasonality)             ; Standard library  
+      (analytics/forecast-next-period)           ; Standard library
+      (analytics/confidence-intervals 0.95)))    ; Standard library
+
+;; stdlib/vex/ml - Machine learning integration
+(import ["vex.ml" ml])
+
+(defn anomaly-detection [data]
+  (-> data
+      (ml/feature-extraction feature-config)
+      (ml/anomaly-model anomaly-detector)
+      (ml/threshold-analysis 0.95)))
+```
+
+**Implementation Strategy**
+- **Core Language**: Analytics syntax, real-time computation patterns
+- **Standard Library**: Statistical functions, ML integration helpers
+- **External Libraries**: Specialized ML models, domain-specific analytics
+
+### Implementation Strategy
+
+**Technical Architecture**
+- Leverage Go's goroutines for concurrent stream processing
+- Use channels for backpressure and flow control
+- Implement efficient buffering strategies
+- Create type-safe APIs for all data operations
+
+**Performance Targets**
+- Process 100K+ events/second per node
+- Sub-millisecond latency for simple transformations
+- Memory usage under 512MB for typical workloads
+- Horizontal scaling with stateless processing nodes
 
 ### Acceptance Criteria
 
-- Benchmarks (guidelines; adjust with hardware):
-  - `internal/transpiler`: `BenchmarkTranspileSimple` < 40µs/op, < 40KB/op, < 600 allocs/op; macro-heavy cases show proportional improvements.
-  - `internal/transpiler/macro`: `BenchmarkMacro_ExpandChained` < 3µs/op, < 5KB/op, < 100 allocs/op.
-  - `internal/transpiler/packages`: Resolver benchmark shows cached steady-state in sub-10µs/op on repeated runs within the same process.
+**Functional Requirements**
+- Complete stream processing API with windowing
+- 10+ essential data source connectors
+- Real-time analytics with sub-second refresh
+- Production-ready error handling and monitoring
 
-## Phase 4.6: Minimal Go Runtime — Self-Hosting Strategy — HIGH PRIORITY
+**Performance Requirements**
+- Handle high-throughput data streams (100K+ msgs/sec)
+- Low-latency processing (< 1ms for simple transforms)
+- Efficient memory usage with backpressure
+- Reliable exactly-once processing guarantees
+
+## Phase 6: Advanced Data Engineering Features — PRODUCTION READINESS
 
 ### Goals
 
-Implement a progressive Go code reduction strategy aligned with the **Minimal Go Implementation** and **Self-Hosting Philosophy** design principles. Reduce the Go codebase from ~20,719 lines to achieve maximum language independence while demonstrating Vex's capabilities for real-world development.
+- Implement production-grade data engineering capabilities for enterprise use
+- Add advanced stream processing features (exactly-once processing, state management)
+- Create comprehensive data quality and observability framework
+- Build enterprise deployment and scaling capabilities
 
-### Phased Implementation Strategy
+### Phase 6.1: Production Stream Processing (4-5 months)
 
-#### Phase 4.6.1: Self-Hosted Development Tools (6-8 weeks)
-**Target: 23% Go code reduction (~1,155 lines)**
-
-**Move to Vex:**
-- **Coverage analysis tools** (`internal/transpiler/coverage/`) → `stdlib/vex/coverage/`
-- **Build automation** (`tools/release-manager/`, `tools/change-detector/`) → Vex scripts with Go interop
-- **File processing utilities** (`tools/extension-tester/`, `tools/debug-helper/`) → Vex with `os` package
-- **Grammar validation** (`tools/grammar-validator/`) → Vex test framework integration
-
-**Implementation Example:**
+**State Management**
 ```vex
-;; Coverage analysis in Vex (already started in stdlib/vex/coverage/)
-(import ["os" "encoding/json" "fmt"])
+;; Stateful stream processing with checkpointing
+(defstateful user-session-tracker
+  :state-type UserSessionState
+  :checkpointing (seconds 30)
+  :recovery-strategy :replay-from-checkpoint)
 
-(defn analyze-package-coverage [package-dir: string] -> interface{}
-  (-> package-dir
-      (discover-functions)
-      (correlate-with-tests)
-      (calculate-metrics)))
-
-(defn generate-coverage-report [coverage-data: interface{}] -> string
-  (-> coverage-data
-      (format-enhanced-report)
-      (add-visual-indicators)
-      (create-json-export)))
+(defn track-user-sessions [events state]
+  (-> events
+      (update-session-state state)
+      (detect-session-boundaries)
+      (emit-session-metrics)))
 ```
 
-**Benefits:**
-- **Immediate measurable progress** - 1,155 fewer lines of Go code
-- **Dogfooding demonstration** - development tools written in Vex
-- **AI-friendly tooling** - uniform S-expression syntax for all tools
-- **Foundation for advanced self-hosting** - proves Vex capabilities
-
-#### Phase 4.6.2: Self-Hosted Standard Library Extensions (8-12 weeks)
-**Target: Enhanced Vex stdlib capabilities**
-
-**Expand Vex capabilities:**
-- **Advanced string processing** - regex patterns, text manipulation
-- **File system operations** - directory traversal, file analysis
-- **Data structure libraries** - collections, maps, sets with functional operations
-- **JSON/data processing** - parsing, transformation, serialization
-
-**Implementation Example:**
+**Exactly-Once Processing**
 ```vex
-;; String processing library
-(defn analyze-source-file [file-path: string] -> interface{}
-  (-> file-path
-      (read-file-content)
-      (extract-function-definitions)
-      (parse-test-correlations)
-      (build-coverage-map)))
-
-;; File operations
-(defn walk-directory [dir: string filter-fn: function] -> []string
-  (-> dir
-      (list-directory-contents)
-      (filter filter-fn)
-      (map get-absolute-path)))
+;; Transactional stream processing
+(deftransaction payment-processing
+  :sources [(kafka "payments")]
+  :sinks [(database "transactions") (kafka "notifications")]
+  :isolation-level :read-committed
+  :timeout (seconds 30))
 ```
 
-#### Phase 4.6.3: Self-Hosted Analysis Components (12-16 weeks)
-**Target: 15-20% additional reduction (~2,000-3,000 lines)**
+**Advanced Windowing**
+- Session windows with dynamic gaps
+- Custom windows with business logic
+- Late data handling strategies
+- Window result triggering policies
 
-**Move to Vex:**
-- **Macro expansion logic** (`internal/transpiler/macro/`) → Vex metaprogramming
-- **Symbol table management** (`internal/transpiler/analysis/symbols.go`) → Vex data structures
-- **Package resolution** (`internal/transpiler/packages/`) → Vex with filesystem operations
-- **Error formatting** (`internal/transpiler/diagnostics/`) → Vex string processing
+### Phase 6.2: Data Quality & Observability (3-4 months)
 
-**Implementation Example:**
+**Data Quality Framework**
 ```vex
-;; Macro system in Vex
-(record Macro [name params body])
-(record Registry [macros loaded-modules])
+;; Comprehensive data validation
+(defquality customer-data-quality
+  :schema customer-schema
+  :rules [(completeness-check 0.95)
+          (uniqueness-check :customer-id)
+          (range-check :age 0 150)
+          (pattern-check :email email-regex)]
+  :actions [(alert data-team) (quarantine-record)])
 
-(defn expand-macro [registry: Registry macro-name: string args: []string] -> string
-  (-> (get-macro registry macro-name)
-      (validate-arity args)
-      (substitute-parameters args)
-      (recursively-expand registry)))
-
-;; Symbol table management
-(defn analyze-symbols [ast: interface{} env: interface{}] -> interface{}
-  (match ast
-    [:def name value] (register-symbol env name (infer-type value))
-    [:defn name params body] (register-function env name params (analyze-body body env))
-    [:call func args] (validate-call env func args)))
+;; Anomaly detection
+(defn detect-anomalies [metric-stream baseline]
+  (-> metric-stream
+      (statistical-process-control baseline)
+      (detect-outliers :threshold 3.0)
+      (classify-anomaly-type)))
 ```
 
-#### Phase 4.6.4: Evaluation Phase (Future)
-**Target: Assess code generation self-hosting (~20-25% more reduction)**
+**Comprehensive Observability**
+```vex
+;; Pipeline monitoring and alerting
+(defmonitoring fraud-detection-pipeline
+  :metrics [throughput latency error-rate data-freshness]
+  :alerts [(threshold :error-rate > 0.01)
+           (threshold :latency > (seconds 5))
+           (data-drift-detection customer-profile-model)]
+  :dashboards [real-time-ops business-metrics])
+```
 
-Based on lessons learned from previous phases, evaluate moving:
-- **Go code templates** → Vex string manipulation
-- **AST traversal logic** → Vex tree operations  
-- **Import management** → Vex data processing
-- **Type-aware generation** → Vex pattern matching
+### Phase 6.3: Enterprise Deployment (2-3 months)
 
-### Expected Impact by Phase
+**Multi-Cloud Deployment**
+```vex
+;; Infrastructure as code
+(definfra data-platform
+  :cloud [:aws :gcp :azure]
+  :regions ["us-east-1" "eu-west-1" "asia-southeast-1"]
+  :scaling [:auto-scale :load-balancer :circuit-breaker]
+  :storage [:s3 :bigquery :azure-data-lake])
+```
 
-| Phase | Go Lines Reduced | Cumulative Reduction | Risk Level | Benefits |
-|-------|------------------|---------------------|------------|----------|
-| **4.6.1 Tools** | 1,155 (23%) | 23% | Low | Immediate wins, dogfooding |
-| **4.6.2 Stdlib** | +stdlib expansion | Enhanced capabilities | Low | Foundation for complex self-hosting |
-| **4.6.3 Analysis** | +2,000-3,000 (35% total) | ~35% | Medium | Advanced language features |
-| **4.6.4 Evaluation** | +2,000-4,000 (50%+ total) | 50%+ | High | Major architectural change |
+**High Availability & Disaster Recovery**
+- Multi-region deployment with failover
+- Automatic backup and restoration
+- Zero-downtime updates and rollbacks
+- Cross-region data replication
 
-### Implementation Principles
+## Phase 7: Advanced Analytics & ML Integration — INTELLIGENCE LAYER
 
-**Progressive Migration:**
-- Start with lowest-risk, highest-visibility components
-- Maintain backward compatibility during transition
-- Implement comprehensive testing for self-hosted components
-- Document migration patterns for future reference
+### Goals
 
-**Performance Considerations:**
-- Benchmark self-hosted components against Go equivalents
-- Use Go interop for performance-critical paths when needed
-- Optimize Vex implementations through iterative improvement
-- Maintain CLI responsiveness as primary constraint
+- Integrate machine learning capabilities for real-time predictions
+- Add advanced statistical and mathematical operations
+- Create feature engineering and model deployment framework
+- Build AI-powered data quality and anomaly detection
 
-**Quality Standards:**
-- Self-hosted tools must match or exceed Go tool functionality
-- Comprehensive error handling and validation
-- AI-friendly code patterns throughout
-- Extensive documentation and examples
+### Phase 7.1: Real-time ML Integration (4-6 months)
 
-### Acceptance Criteria
+**Model Serving**
+```vex
+;; Real-time model inference
+(defmodel fraud-detection-model
+  :type :xgboost
+  :version "v2.1.0"
+  :input-schema transaction-features
+  :output-schema fraud-score
+  :latency-sla (milliseconds 100))
 
-**Phase 4.6.1 (Tools):**
-- All development tools successfully migrated to Vex
-- CLI functionality unchanged from user perspective
-- Performance impact < 10% for tool operations
-- 1,155+ lines of Go code removed
+(defn real-time-fraud-scoring [transactions]
+  (-> transactions
+      (feature-engineering)
+      (model-inference fraud-detection-model)
+      (threshold-based-decision 0.8)
+      (emit-decisions)))
+```
 
-**Phase 4.6.3 (Analysis):**
-- Macro system fully operational in Vex
-- Symbol analysis maintains type checking accuracy
-- Package resolution performance acceptable
-- 3,000+ total lines of Go code removed
+**Feature Engineering**
+```vex
+;; Advanced feature engineering
+(deffeatures customer-behavior-features
+  :window (days 30)
+  :features [(rolling-average :transaction-amount (days 7))
+             (count-distinct :merchant-category (days 14))
+             (time-since-last :login)
+             (categorical-encoding :device-type)])
+```
 
-### Strategic Value
+### Phase 7.2: Advanced Statistical Operations (3-4 months)
 
-This approach advances multiple project goals simultaneously:
-- **Demonstrates language maturity** through self-hosting capabilities
-- **Reduces Go maintenance burden** by eliminating code
-- **Showcases AI-friendly development** with uniform syntax patterns
-- **Validates functional programming approach** for complex systems
-- **Provides educational value** in language implementation techniques
+**Time Series Analysis**
+```vex
+;; Advanced time series processing
+(defn forecast-demand [sales-data]
+  (-> sales-data
+      (seasonal-decomposition)
+      (trend-analysis)
+      (arima-forecasting)
+      (confidence-intervals 0.95)))
+```
+
+**A/B Testing Framework**
+```vex
+;; Statistical significance testing
+(deftest conversion-rate-test
+  :variants ["control" "treatment"]
+  :metric :conversion-rate
+  :significance-level 0.05
+  :power 0.8
+  :minimum-effect-size 0.02)
+```
+
+## Phase 8: Domain-Specific Extensions — SPECIALIZATION
+
+### Goals
+
+- Create industry-specific extensions and libraries
+- Build domain-specific language patterns
+- Develop vertical solutions for key markets
+- Establish ecosystem partnerships
+
+### Phase 8.1: Financial Services Extensions (3-4 months)
+
+**Risk Management**
+```vex
+;; Real-time risk calculations
+(defrisk portfolio-var
+  :confidence-level 0.99
+  :time-horizon (days 1)
+  :calculation-method :monte-carlo
+  :scenarios 10000)
+
+;; Compliance monitoring
+(defcompliance trading-surveillance
+  :rules [wash-trade-detection front-running-detection]
+  :reporting :real-time
+  :jurisdiction [:us :eu :asia])
+```
+
+### Phase 8.2: E-commerce & Retail Extensions (3-4 months)
+
+**Recommendation Systems**
+```vex
+;; Real-time recommendations
+(defrecs product-recommendations
+  :algorithm :collaborative-filtering
+  :features [purchase-history browsing-behavior demographics]
+  :update-frequency :real-time
+  :personalization-level :individual)
+```
+
+**Inventory Optimization**
+```vex
+;; Demand forecasting and inventory optimization
+(definventory stock-optimization
+  :demand-forecast lstm-demand-model
+  :constraints [warehouse-capacity budget-limits supplier-lead-times]
+  :objective :minimize-cost-maximize-availability)
+```
+
+## Phase 9: Performance Optimization & Production Excellence — SCALE
+
+### Goals
+
+- Achieve industry-leading performance benchmarks
+- Implement advanced optimization techniques
+- Create auto-scaling and performance management
+- Build comprehensive monitoring and debugging tools
+
+### Phase 9.1: Performance Optimization (3-4 months)
+
+**Code Generation Improvements**
+- Inline small functions to reduce call overhead
+- Eliminate unnecessary allocations through escape analysis
+- Generate specialized functions for common type combinations
+- Optimize tail-recursive functions into loops
+
+**Runtime Optimizations**
+- Object pooling for high-frequency allocations
+- Adaptive batching based on system load
+- Memory-mapped I/O for large datasets
+- SIMD optimizations for mathematical operations
+
+### Phase 9.2: Auto-scaling & Management (2-3 months)
+
+**Intelligent Scaling**
+```vex
+;; Adaptive scaling based on data patterns
+(defscaling adaptive-pipeline-scaling
+  :metrics [cpu-usage memory-usage queue-depth latency]
+  :scaling-policies [scale-out scale-up scale-down]
+  :prediction-horizon (minutes 15)
+  :cost-optimization true)
+```
+
+## Phase 10: Ecosystem & Community — ADOPTION
+
+### Goals
+
+- Build comprehensive ecosystem of connectors and integrations
+- Create developer community and contribution framework
+- Establish enterprise support and services
+- Drive adoption through education and content
+
+### Phase 10.1: Ecosystem Development (6+ months)
+
+**Connector Marketplace**
+- 100+ data source connectors
+- Integration with major cloud platforms
+- Third-party connector development framework
+- Certified connector program
+
+**Community Building**
+- Open source contributor guidelines
+- Documentation and tutorial framework
+- Conference talks and workshops
+- Industry partnerships and integrations
+
+## Success Criteria & Timeline
+
+**Phase 5 (Data Foundation)**: 12 months - Core stream processing and transformation capabilities
+**Phase 6 (Production)**: 8 months - Enterprise-ready features and deployment
+**Phase 7 (Intelligence)**: 10 months - ML integration and advanced analytics
+**Phase 8 (Specialization)**: 8 months - Domain-specific solutions
+**Phase 9 (Scale)**: 6 months - Performance optimization and management
+**Phase 10 (Ecosystem)**: Ongoing - Community and marketplace development
+
+**Total Timeline**: ~3.5 years to become the leading functional programming platform for data engineering
+
+## Phase 4.5: Performance Foundation — OPTIMIZATION BASELINE
+
+### Goals
+
+- Establish transpiler performance baseline for data engineering workloads
+- Optimize stream processing and data transformation pipeline performance  
+- Reduce allocation overhead for high-throughput data processing
+- Improve macro expansion efficiency for data pipeline definitions
+
+### Core Optimizations
+
+**Data Processing Performance**
+- Optimize transpiler for high-frequency data transformation code generation
+- Reduce allocations in stream processing pipeline compilation
+- Cache data schema and transformation templates
+- Efficient code generation for mathematical and statistical operations
+
+**Stream Processing Optimizations**
+- Minimize GC pressure in continuous stream processing
+- Optimize channel operations and goroutine management
+- Efficient memory pooling for data transformation objects
+- Fast path compilation for common data pipeline patterns
+
+### Implementation Tasks
+
+**Transpiler Instance Reuse for Data Pipelines**
+- Long-lived transpiler instances for continuous pipeline compilation
+- Cached pipeline templates and transformation patterns
+- Optimized macro expansion for data engineering constructs
+
+**Data-Focused Macro Caching**
+- Specialized caching for data transformation macros
+- Stream processing pattern templates
+- Statistical operation macro optimizations
+
+**Performance Targets for Data Engineering**
+- Stream processing pipeline compilation: < 100ms for typical ETL jobs
+- Data transformation function generation: < 10ms per function
+- Memory usage: < 256MB for standard data pipeline compilation
+- Throughput: Support 100K+ events/second code generation efficiency
+
+This phase ensures Vex can handle the performance demands of real-time data processing and high-throughput ETL workloads that are essential for production data engineering use cases.
+
+## Implementation Architecture Guidelines
+
+### **Hybrid Implementation Strategy**
+
+Vex adopts a **hybrid approach** that strategically divides functionality between core language features and external libraries:
+
+- **Core Language (20% of features, 80% of usage)**: Essential data engineering primitives built into Vex
+- **External Libraries (80% of features, 20% of critical path)**: Specialized connectors and domain-specific functionality
+
+For comprehensive implementation guidelines, see [Implementation Guidelines](implementation-guidelines.md).
+
+### **Core vs. External Decision Framework**
+
+| Component Type | Implementation | Rationale | Examples |
+|----------------|----------------|-----------|----------|
+| **Stream Processing Primitives** | Core Language | Fundamental to data engineering | `defstream`, `defpipeline`, `defpattern` |
+| **Windowing Operations** | Core Language | Essential for real-time processing | `window-tumbling`, `window-sliding` |
+| **Data Flow Control** | Core Language | Performance critical | `with-backpressure`, `parallel-map` |
+| **Statistical Functions** | Standard Library | Common but specialized | `mean`, `percentile`, `moving-average` |
+| **Database Connectors** | External Libraries | Multiple vendors/protocols | `vex.connectors.postgres` |
+| **Cloud Integrations** | External Libraries | Platform-specific | `vex.cloud.aws` |
+| **ML Models** | External Libraries | Rapidly evolving field | `vex.ml.sklearn` |
+| **Industry Solutions** | External Libraries | Domain-specific | `vex.finance.risk` |
+
+### **Quality Standards Summary**
+
+**Core Language Requirements:**
+- Full HM type system integration
+- Performance within 5% of equivalent Go
+- Structured diagnostics with error codes
+- Comprehensive benchmarking
+
+**Standard Library Requirements:**
+- Test coverage > 95%
+- Consistent API patterns
+- Performance competitive with specialized libraries
+- Comprehensive documentation
+
+**External Library Requirements:**  
+- Test coverage > 90%
+- Performance within 10% of native implementations
+- Security audit for data handling
+- Certification process compliance
+
+### **Ecosystem Development Strategy**
+
+**Community Building:**
+- Open source connector framework with standardized interfaces
+- Certification program for quality assurance
+- Developer tools for connector creation and testing
+- Partnership strategy with technology vendors
+
+**Migration Support:**
+- Clear migration paths from existing tools (Kafka Streams, Spark)
+- Learning resources and documentation
+- Performance comparison benchmarks
+- Production deployment guides
 
 ## Phase 4.7: Codebase AI/Human Friendliness — DEVELOPER EXPERIENCE
 
@@ -700,20 +1073,20 @@ Implement immutable state management patterns:
 - Event sourcing support for audit trails
 - CQRS pattern implementation for read/write separation
 
-### HTTP Service Framework
+### Data Processing Framework
 
-**Request Handling Pipeline**
-Built-in support for HTTP service development:
-- Middleware composition for cross-cutting concerns
-- Route definition with pattern matching
-- Request/response transformation functions
-- Automatic JSON serialization/deserialization
+**Processing Pipeline**
+Built-in support for data transformation and processing:
+- Pipeline composition for data flow
+- Pattern matching for data structures
+- Transformation functions with type safety
+- Automatic serialization/deserialization
 
 **Performance Optimizations**
-- Request pooling to reduce allocation overhead
-- Response caching with TTL support
-- Connection pooling for database operations
-- Metrics collection for observability
+- Object pooling to reduce allocation overhead
+- Memoization for expensive computations
+- Lazy evaluation for large datasets
+- Metrics collection for performance analysis
 
 ## Phase 8: Development Tooling and Developer Experience ⏳ **PLANNED**
 
@@ -774,12 +1147,12 @@ AI-friendly generative testing:
 - Shrinking capabilities to find minimal failing cases
 - Integration with Go's testing.T for seamless CI/CD workflows
 
-**HTTP Service Testing**
-Specialized testing for backend services:
-- `(defservice-test service-name endpoint-tests...)` for API testing
-- Built-in HTTP client with authentication support
-- Mock server capabilities for dependency isolation
-- Load testing primitives for performance validation
+**Data Processing Testing**
+Specialized testing for data transformation:
+- `(defdata-test transform-name input-output-tests...)` for pipeline testing
+- Built-in data generators for property testing
+- Mock data sources for dependency isolation
+- Performance testing primitives for large dataset validation
 
 **Macro and Transpilation Testing**
 Developer tooling for language extension:
@@ -818,12 +1191,12 @@ Comprehensive standard library covering:
 - Date/time handling with timezone support
 - File system operations and path manipulation
 
-**HTTP and Web Services**
-Specialized libraries for backend development:
-- HTTP client with connection pooling
-- WebSocket support for real-time communication
-- Template engines for response generation
-- Authentication and authorization helpers
+**Data and I/O Libraries**
+Specialized libraries for data-intensive applications:
+- File I/O with streaming support
+- Network communication primitives
+- Template engines for code generation
+- Data validation and transformation helpers
 
 ### Package Management
 
@@ -868,9 +1241,9 @@ Note: Baseline transpiler performance work (instance reuse, macro caching, pooli
 ## Success Criteria
 
 **Performance Targets**
-- HTTP request handling latency within 10% of equivalent Go code
+- Computation latency within 10% of equivalent Go code
 - Memory usage comparable to idiomatic Go implementations
-- Successful deployment in production handling 10K+ requests per second
+- Successful deployment for data processing handling large datasets
 - Compilation time under 500ms for medium-sized projects
 
 **Developer Experience Metrics**

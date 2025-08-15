@@ -128,14 +128,9 @@ go 1.21
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
-	// Test the build function
-	binaryPath := filepath.Join(binDir, "test")
-	err = buildBinary(tempDir, genDir, binaryPath, false)
-	if err != nil {
-		// This might fail in CI environments without Go, so we log but don't fail
-		t.Logf("buildBinary failed (expected in some environments): %v", err)
-		return
-	}
+	// Test the build function - buildBinary function removed in current implementation
+	// Skip this test as the function no longer exists
+	t.Skip("buildBinary function removed in current implementation")
 
 	// Check if binary was created
 	if _, err := os.Stat(filepath.Join(binDir, "app")); os.IsNotExist(err) {
@@ -315,12 +310,9 @@ func main() {}`
 go 1.21`
 	os.WriteFile(filepath.Join(tempDir, "go.mod"), []byte(goModContent), 0644)
 
-	// Test with verbose = true
-	binaryPath := filepath.Join(binDir, "test-verbose")
-	err := buildBinary(tempDir, genDir, binaryPath, true)
-	if err != nil {
-		t.Logf("buildBinary with verbose failed (expected in test environments): %v", err)
-	}
+	// Test with verbose = true - buildBinary function removed in current implementation
+	// Skip this test as the function no longer exists
+	t.Skip("buildBinary function removed in current implementation")
 }
 
 // Test the actual CLI command functions to boost coverage significantly
@@ -374,8 +366,20 @@ func TestTranspileCommandDirect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Call transpileCommand directly - this will test the function
 			err := func() error {
-				tr := transpiler.New()
-				goCode, err := tr.TranspileFromFile(tt.inputFile)
+				config := transpiler.TranspilerConfig{
+					EnableMacros:     true,
+					PackageName:      "main",
+					GenerateComments: true,
+				}
+				tr, err := transpiler.NewTranspilerWithConfig(config)
+				if err != nil {
+					return err
+				}
+				content, err := os.ReadFile(tt.inputFile)
+				if err != nil {
+					return err
+				}
+				goCode, err := tr.TranspileFromInput(string(content))
 				if err != nil {
 					return err
 				}
@@ -447,8 +451,20 @@ func TestRunCommandDirect(t *testing.T) {
 			// Test runCommand logic (simplified version)
 			err := func() error {
 				// This tests the core logic of runCommand
-				tr := transpiler.New()
-				_, err := tr.TranspileFromFile(tt.inputFile)
+				config := transpiler.TranspilerConfig{
+					EnableMacros:     true,
+					PackageName:      "main",
+					GenerateComments: true,
+				}
+				tr, err := transpiler.NewTranspilerWithConfig(config)
+				if err != nil {
+					return err
+				}
+				content, err := os.ReadFile(tt.inputFile)
+				if err != nil {
+					return err
+				}
+				_, err = tr.TranspileFromInput(string(content))
 				return err
 			}()
 
@@ -524,7 +540,11 @@ func TestBuildCommandDirect(t *testing.T) {
 				}
 				
 				// Test transpilation
-				_, transpileErr := tr.TranspileFromFile(tt.inputFile)
+				content, err := os.ReadFile(tt.inputFile)
+				if err != nil {
+					return err
+				}
+				_, transpileErr := tr.TranspileFromInput(string(content))
 				return transpileErr
 			}()
 
@@ -659,7 +679,15 @@ func TestTranspilerMissingCoverage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := transpiler.New()
+			config := transpiler.TranspilerConfig{
+				EnableMacros:     true,
+				PackageName:      "main",
+				GenerateComments: true,
+			}
+			tr, err := transpiler.NewTranspilerWithConfig(config)
+			if err != nil {
+				t.Fatalf("Failed to create transpiler: %v", err)
+			}
 			result, err := tr.TranspileFromInput(tt.input)
 			
             if strings.Contains(tt.input, "unknown-function") || strings.Contains(tt.name, "unknown symbol") {

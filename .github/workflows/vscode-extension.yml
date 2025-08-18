@@ -17,7 +17,7 @@ jobs:
       extension-files: ${{ steps.changes.outputs.extension-files }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Detect VSCode extension file changes
       uses: dorny/paths-filter@v3
@@ -34,7 +34,7 @@ jobs:
     needs: detect-changes
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Skip when no extension changes
       if: needs.detect-changes.outputs.extension-files == 'false'

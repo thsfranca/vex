@@ -24,7 +24,7 @@ jobs:
       has-changes: ${{ steps.changes.outputs.has-changes || 'false' }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Detect file changes
       uses: dorny/paths-filter@v3
@@ -62,7 +62,7 @@ jobs:
     needs: [detect-changes]
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -131,7 +131,7 @@ jobs:
     needs: [detect-changes]
     steps:
     - name: Checkout code with history
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 0
         
@@ -210,7 +210,7 @@ jobs:
     needs: [detect-changes]
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Skip when no Go changes
       if: ${{ needs.detect-changes.outputs.go-files == 'false' }}
@@ -273,7 +273,7 @@ jobs:
     if: always()
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Report CI Results
       run: .github/scripts/utils/generate-summary.sh "${{ needs.detect-changes.outputs.go-files }}" "${{ needs.build-and-test.result }}" "${{ needs.test-coverage.result }}" "${{ needs.lint-and-quality.result }}"

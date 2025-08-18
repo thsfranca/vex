@@ -19,7 +19,7 @@ jobs:
       needs-validation: ${{ steps.decision.outputs.needs-validation }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         
       - name: Check for relevant changes
         uses: dorny/paths-filter@v3
@@ -39,7 +39,7 @@ jobs:
     needs: detect-changes
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         
       - name: Skip when no grammar changes
         if: ${{ needs.detect-changes.outputs.needs-validation == 'false' }}
@@ -102,7 +102,7 @@ jobs:
     if: always()
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Evaluate results
       run: .github/scripts/utils/evaluate-grammar-results.sh "${{ needs.detect-changes.outputs.grammar-changed || 'false' }}" "${{ needs.detect-changes.outputs.needs-validation || 'false' }}" "${{ needs.validate-grammar.result || 'skipped' }}"

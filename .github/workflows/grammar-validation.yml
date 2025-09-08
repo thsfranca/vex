@@ -56,7 +56,7 @@ jobs:
 
       - name: Set up Go
         if: ${{ needs.detect-changes.outputs.needs-validation == 'true' }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.21'
 

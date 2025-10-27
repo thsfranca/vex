@@ -98,7 +98,7 @@ jobs:
         
     - name: Upload VSCode extension artifact
       if: needs.detect-changes.outputs.extension-files == 'true'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: vex-vscode-extension-build
         path: vscode-extension/vex-test-build.vsix

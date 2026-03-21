@@ -19,7 +19,7 @@ Vex uses S-expression syntax with compile-time type checking, targeting networke
 
 ## Current Status
 
-The first milestone is complete — the hello world program compiles to a working native binary.
+Records (`deftype`) are implemented — define product types with named fields, construct instances, and access fields.
 
 | Phase | Status |
 |-------|--------|
@@ -32,6 +32,8 @@ The first milestone is complete — the hello world program compiles to a workin
 | `typechecker.rs` — AST → HIR | Done |
 | `codegen.rs` — HIR → Go source | Done |
 | `lib.rs` / `main.rs` — Full pipeline, CLI | Done |
+
+**Implemented features:** integers, floats, strings, booleans, nil, `defn`, `def`, `if`, `cond`, `let`, `fn` (lambdas), higher-order functions, records (`deftype`), field access (`.`), record constructors, arithmetic/comparison/logical operators, `println`, `str`, `mod`.
 
 ## Architecture
 

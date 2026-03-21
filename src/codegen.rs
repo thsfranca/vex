@@ -195,6 +195,7 @@ impl Generator {
                 body,
                 ..
             } => self.emit_lambda(params, return_type, body),
+            hir::Expr::FieldAccess { .. } => {}
         }
     }
 
@@ -405,6 +406,9 @@ fn collect_builtin_calls_expr(expr: &hir::Expr, names: &mut Vec<String>) {
             for expr in body {
                 collect_builtin_calls_expr(expr, names);
             }
+        }
+        hir::Expr::FieldAccess { object, .. } => {
+            collect_builtin_calls_expr(object, names);
         }
     }
 }

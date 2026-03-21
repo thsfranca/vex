@@ -59,6 +59,13 @@ pub enum Expr {
         span: Span,
         ty: VexType,
     },
+
+    FieldAccess {
+        object: Box<Expr>,
+        field: String,
+        span: Span,
+        ty: VexType,
+    },
 }
 
 impl Expr {
@@ -73,7 +80,8 @@ impl Expr {
             | Expr::If { span, .. }
             | Expr::Let { span, .. }
             | Expr::Lambda { span, .. }
-            | Expr::Call { span, .. } => *span,
+            | Expr::Call { span, .. }
+            | Expr::FieldAccess { span, .. } => *span,
         }
     }
 
@@ -88,7 +96,8 @@ impl Expr {
             | Expr::If { ty, .. }
             | Expr::Let { ty, .. }
             | Expr::Lambda { ty, .. }
-            | Expr::Call { ty, .. } => ty,
+            | Expr::Call { ty, .. }
+            | Expr::FieldAccess { ty, .. } => ty,
         }
     }
 }
@@ -355,6 +364,34 @@ mod tests {
         assert_eq!(module.top_forms.len(), 2);
         assert!(matches!(&module.top_forms[0], TopForm::Deftype { .. }));
         assert!(matches!(&module.top_forms[1], TopForm::Defn { .. }));
+    }
+
+    #[test]
+    fn field_access_type() {
+        let expr = Expr::FieldAccess {
+            object: Box::new(Expr::Var {
+                name: "point".into(),
+                span: span(3, 8),
+                ty: VexType::Record {
+                    name: "Point".into(),
+                    fields: vec![
+                        RecordField {
+                            name: "x".into(),
+                            ty: VexType::Float,
+                        },
+                        RecordField {
+                            name: "y".into(),
+                            ty: VexType::Float,
+                        },
+                    ],
+                },
+            }),
+            field: "x".into(),
+            span: span(0, 11),
+            ty: VexType::Float,
+        };
+        assert_eq!(expr.ty(), &VexType::Float);
+        assert_eq!(expr.span(), span(0, 11));
     }
 
     #[test]

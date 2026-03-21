@@ -200,7 +200,9 @@ impl Generator {
                 self.write(".");
                 self.write(&vex_to_go_public_name(field));
             }
-            hir::Expr::RecordConstructor { .. } => {}
+            hir::Expr::RecordConstructor { name, args, ty, .. } => {
+                self.emit_record_constructor(name, args, ty);
+            }
         }
     }
 
@@ -357,6 +359,24 @@ impl Generator {
 
         self.indent -= 1;
         self.write_indent();
+        self.write("}");
+    }
+
+    fn emit_record_constructor(&mut self, name: &str, args: &[hir::Expr], ty: &VexType) {
+        let fields = match ty {
+            VexType::Record { fields, .. } => fields,
+            _ => return,
+        };
+        self.write(&vex_to_go_public_name(name));
+        self.write("{");
+        for (i, (field, arg)) in fields.iter().zip(args.iter()).enumerate() {
+            if i > 0 {
+                self.write(", ");
+            }
+            self.write(&vex_to_go_public_name(&field.name));
+            self.write(": ");
+            self.emit_expr(arg);
+        }
         self.write("}");
     }
 }
@@ -1134,5 +1154,56 @@ mod tests {
         };
         let output = generate(&module);
         assert!(output.contains("cfg.MaxRetries"));
+    }
+
+    #[test]
+    fn expr_record_constructor() {
+        let point_ty = VexType::Record {
+            name: "Point".into(),
+            fields: vec![
+                RecordField {
+                    name: "x".into(),
+                    ty: VexType::Float,
+                },
+                RecordField {
+                    name: "y".into(),
+                    ty: VexType::Float,
+                },
+            ],
+        };
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Expr(hir::Expr::RecordConstructor {
+                name: "Point".into(),
+                args: vec![
+                    hir::Expr::Float(1.0, span(7, 10)),
+                    hir::Expr::Float(2.0, span(11, 14)),
+                ],
+                span: span(0, 15),
+                ty: point_ty,
+            })],
+        };
+        let output = generate(&module);
+        assert!(output.contains("Point{X: 1.0, Y: 2.0}"));
+    }
+
+    #[test]
+    fn expr_record_constructor_kebab_names() {
+        let rec_ty = VexType::Record {
+            name: "tool-input".into(),
+            fields: vec![RecordField {
+                name: "full-name".into(),
+                ty: VexType::String,
+            }],
+        };
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Expr(hir::Expr::RecordConstructor {
+                name: "tool-input".into(),
+                args: vec![hir::Expr::String("test".into(), span(12, 18))],
+                span: span(0, 19),
+                ty: rec_ty,
+            })],
+        };
+        let output = generate(&module);
+        assert!(output.contains("ToolInput{FullName: \"test\"}"));
     }
 }

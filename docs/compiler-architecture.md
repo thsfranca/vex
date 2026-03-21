@@ -615,6 +615,23 @@ Build bottom-up, one phase at a time, each immediately testable.
 
 **First milestone:** `(defn main [] (println "Hello, World!"))` compiles to a working Go binary via `go build`.
 
+### Development Process
+
+The compiler is built incrementally through small PRs — each one adds a testable piece of the pipeline. This keeps progress visible and makes it easy to revisit decisions later.
+
+Planned PR sequence:
+
+| PR | Branch | Contents |
+|----|--------|----------|
+| 1 | `source-diagnostics` | `source.rs` + `diagnostics.rs` — FileId, Span, SourceMap, Diagnostic types |
+| 2 | `lexer` | `lexer.rs` — tokenizer for hello world |
+| 3 | `ast` | `ast.rs` — untyped AST types |
+| 4 | `parser` | `parser.rs` — recursive descent parser |
+| 5 | `types-hir-builtins` | `types.rs` + `hir.rs` + `builtins.rs` — type representations and built-in registry |
+| 6 | `typechecker` | `typechecker.rs` — AST → HIR |
+| 7 | `codegen` | `codegen.rs` — HIR → Go source |
+| 8 | `pipeline` | `lib.rs` + `main.rs` — wire full pipeline, CLI |
+
 ---
 
 ## 13. Developer Experience

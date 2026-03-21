@@ -170,7 +170,7 @@ The MVP is built bottom-up. Each step is independently testable.
 | `lexer.rs` | Tokenizer: source → token stream |
 | `ast.rs` | Untyped AST types for all MVP forms |
 | `parser.rs` | Recursive descent parser: tokens → AST |
-| `expand.rs` | Compiler-internal macro expansion: `cond`, `&&`, `\|\|` → primitive forms |
+| `macro_expand.rs` | Compiler-internal macro expansion: `cond`, `and`, `or` → primitive forms |
 | `types.rs`, `hir.rs`, `builtins.rs` | Type representations, typed AST, built-in function registry |
 | `typechecker.rs` | Type inference and checking: expanded AST → HIR |
 | `codegen.rs` | Go code generation: HIR → `.go` source |

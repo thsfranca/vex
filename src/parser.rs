@@ -94,8 +94,10 @@ impl<'a> Parser<'a> {
 
     fn parse_expr(&mut self) -> Option<Expr> {
         if self.at_end() {
-            self.diagnostics
-                .push(Diagnostic::error("unexpected end of input", self.eof_span()));
+            self.diagnostics.push(Diagnostic::error(
+                "unexpected end of input",
+                self.eof_span(),
+            ));
             return None;
         }
 
@@ -191,7 +193,11 @@ mod tests {
 
     fn parse_source(source: &str) -> (Vec<TopForm>, Vec<Diagnostic>) {
         let (tokens, lex_diags) = lex(source, FileId::new(0));
-        assert!(lex_diags.is_empty(), "unexpected lexer errors: {:?}", lex_diags);
+        assert!(
+            lex_diags.is_empty(),
+            "unexpected lexer errors: {:?}",
+            lex_diags
+        );
         parse(&tokens)
     }
 
@@ -214,7 +220,9 @@ mod tests {
     fn literal_float() {
         let (forms, diags) = parse_source("3.14");
         assert!(diags.is_empty());
-        assert!(matches!(&forms[0], TopForm::Expr(Expr::Float(f, _)) if (*f - 3.14).abs() < f64::EPSILON));
+        assert!(
+            matches!(&forms[0], TopForm::Expr(Expr::Float(f, _)) if (*f - 3.14).abs() < f64::EPSILON)
+        );
     }
 
     #[test]

@@ -12,9 +12,15 @@ pub mod types;
 use diagnostics::Diagnostic;
 use source::SourceMap;
 
+pub struct VexrtFiles {
+    pub option_go: String,
+    pub result_go: String,
+}
+
 pub struct CompileResult {
     pub go_source: String,
     pub go_mod: String,
+    pub vexrt: Option<VexrtFiles>,
     pub diagnostics: Vec<Diagnostic>,
     pub source_map: SourceMap,
 }
@@ -28,6 +34,7 @@ pub fn compile(source: &str, file_name: &str) -> CompileResult {
         return CompileResult {
             go_source: String::new(),
             go_mod: String::new(),
+            vexrt: None,
             diagnostics: lex_diags,
             source_map,
         };
@@ -39,6 +46,7 @@ pub fn compile(source: &str, file_name: &str) -> CompileResult {
         return CompileResult {
             go_source: String::new(),
             go_mod: String::new(),
+            vexrt: None,
             diagnostics: parse_diags,
             source_map,
         };
@@ -50,6 +58,7 @@ pub fn compile(source: &str, file_name: &str) -> CompileResult {
         return CompileResult {
             go_source: String::new(),
             go_mod: String::new(),
+            vexrt: None,
             diagnostics: check_diags,
             source_map,
         };
@@ -58,9 +67,19 @@ pub fn compile(source: &str, file_name: &str) -> CompileResult {
     let go_source = codegen::generate(&hir_module);
     let go_mod = codegen::generate_go_mod();
 
+    let vexrt = if codegen::needs_vexrt(&hir_module) {
+        Some(VexrtFiles {
+            option_go: codegen::generate_vexrt_option(),
+            result_go: codegen::generate_vexrt_result(),
+        })
+    } else {
+        None
+    };
+
     CompileResult {
         go_source,
         go_mod,
+        vexrt,
         diagnostics: Vec::new(),
         source_map,
     }

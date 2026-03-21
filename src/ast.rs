@@ -260,6 +260,7 @@ pub enum TopForm {
     DefMacro {
         name: String,
         params: Vec<Param>,
+        rest_param: Option<String>,
         body: Vec<Expr>,
         span: Span,
     },
@@ -949,6 +950,7 @@ mod tests {
                     span: span(22, 26),
                 },
             ],
+            rest_param: None,
             body: vec![Expr::Call {
                 func: Box::new(Expr::Symbol("list".into(), span(30, 34))),
                 args: vec![

@@ -9,7 +9,7 @@ use crate::source::{FileId, Span};
 use crate::types::{SyntaxValue, expr_to_syntax, syntax_to_expr};
 
 const MAX_EXPANSION_DEPTH: usize = 64;
-const PRELUDE_SOURCE: &str = include_str!("prelude.vx");
+const PRELUDE_SOURCE: &str = include_str!("../stdlib/prelude.vx");
 
 static GENSYM_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -20,6 +20,7 @@ fn gensym(base: &str) -> String {
 
 struct MacroDef {
     params: Vec<String>,
+    rest_param: Option<String>,
     body: Vec<Expr>,
 }
 
@@ -45,13 +46,18 @@ fn load_prelude(registry: &mut HashMap<String, MacroDef>) {
     let (forms, _) = parser::parse(&tokens);
     for form in forms {
         if let TopForm::DefMacro {
-            name, params, body, ..
+            name,
+            params,
+            rest_param,
+            body,
+            ..
         } = form
         {
             registry.insert(
                 name,
                 MacroDef {
                     params: params.into_iter().map(|p| p.name).collect(),
+                    rest_param,
                     body,
                 },
             );
@@ -67,13 +73,18 @@ pub fn expand(program: Vec<TopForm>) -> (Vec<TopForm>, Vec<Diagnostic>) {
 
     for form in &program {
         if let TopForm::DefMacro {
-            name, params, body, ..
+            name,
+            params,
+            rest_param,
+            body,
+            ..
         } = form
         {
             registry.insert(
                 name.clone(),
                 MacroDef {
                     params: params.iter().map(|p| p.name.clone()).collect(),
+                    rest_param: rest_param.clone(),
                     body: body.clone(),
                 },
             );
@@ -152,12 +163,28 @@ fn expand_expr(
             if let Expr::Symbol(ref name, _) = *func
                 && let Some(macro_def) = registry.get(name.as_str())
             {
-                if args.len() != macro_def.params.len() {
+                let min_args = macro_def.params.len();
+                let is_variadic = macro_def.rest_param.is_some();
+
+                if is_variadic {
+                    if args.len() < min_args {
+                        diagnostics.push(Diagnostic::error(
+                            format!(
+                                "macro '{}' expects at least {} arguments, got {}",
+                                name,
+                                min_args,
+                                args.len()
+                            ),
+                            span,
+                        ));
+                        return Expr::Nil(span);
+                    }
+                } else if args.len() != min_args {
                     diagnostics.push(Diagnostic::error(
                         format!(
                             "macro '{}' expects {} arguments, got {}",
                             name,
-                            macro_def.params.len(),
+                            min_args,
                             args.len()
                         ),
                         span,
@@ -168,6 +195,14 @@ fn expand_expr(
                 let mut env: HashMap<String, MacroVal> = HashMap::new();
                 for (param, arg) in macro_def.params.iter().zip(args.iter()) {
                     env.insert(param.clone(), MacroVal::CallSite(expr_to_syntax(arg)));
+                }
+                if let Some(rest_name) = &macro_def.rest_param {
+                    let rest_vals: Vec<SyntaxValue> =
+                        args[min_args..].iter().map(expr_to_syntax).collect();
+                    env.insert(
+                        rest_name.clone(),
+                        MacroVal::CallSite(SyntaxValue::List(rest_vals)),
+                    );
                 }
 
                 let mut result = MacroVal::Intro(SyntaxValue::Nil);
@@ -467,6 +502,30 @@ fn eval_macro_builtin(name: &str, args: Vec<MacroVal>) -> Result<MacroVal, Strin
                 }
                 _ => Err("syntax-concat: both arguments must be lists".into()),
             }
+        }
+
+        "empty?" => {
+            if args.len() != 1 {
+                return Err("empty? requires 1 argument".into());
+            }
+            match mval_to_list_items(&args[0]) {
+                Some(items) => Ok(MacroVal::Intro(SyntaxValue::Bool(items.is_empty()))),
+                None => Ok(MacroVal::Intro(SyntaxValue::Bool(matches!(
+                    macro_val_to_syntax(&args[0]),
+                    SyntaxValue::Nil
+                )))),
+            }
+        }
+
+        "keyword?" => {
+            if args.len() != 1 {
+                return Err("keyword? requires 1 argument".into());
+            }
+            let s = macro_val_to_syntax(&args[0]);
+            Ok(MacroVal::Intro(SyntaxValue::Bool(matches!(
+                s,
+                SyntaxValue::Kw(_)
+            ))))
         }
 
         _ => Err(format!("unknown function in macro body: {}", name)),
@@ -956,6 +1015,7 @@ mod tests {
                         span: s,
                     },
                 ],
+                rest_param: None,
                 body: vec![Expr::Call {
                     func: Box::new(Expr::Symbol("list".into(), s)),
                     args: vec![
@@ -1017,6 +1077,7 @@ mod tests {
             TopForm::DefMacro {
                 name: "noop".into(),
                 params: vec![],
+                rest_param: None,
                 body: vec![Expr::Quote {
                     expr: Box::new(Expr::Nil(s)),
                     span: s,
@@ -1043,6 +1104,7 @@ mod tests {
                     type_ann: None,
                     span: s,
                 }],
+                rest_param: None,
                 body: vec![Expr::Symbol("x".into(), s)],
                 span: s,
             },
@@ -1075,6 +1137,7 @@ mod tests {
                         span: s,
                     },
                 ],
+                rest_param: None,
                 body: vec![Expr::Let {
                     bindings: vec![Binding {
                         name: "result".into(),
@@ -1125,6 +1188,7 @@ mod tests {
                     type_ann: None,
                     span: s,
                 }],
+                rest_param: None,
                 body: vec![Expr::Call {
                     func: Box::new(Expr::Symbol("list".into(), s)),
                     args: vec![
@@ -1175,6 +1239,7 @@ mod tests {
                     type_ann: None,
                     span: s,
                 }],
+                rest_param: None,
                 body: vec![Expr::Call {
                     func: Box::new(Expr::Symbol("list".into(), s)),
                     args: vec![
@@ -1241,6 +1306,7 @@ mod tests {
             TopForm::DefMacro {
                 name: "make-fn".into(),
                 params: vec![],
+                rest_param: None,
                 body: vec![Expr::Call {
                     func: Box::new(Expr::Symbol("list".into(), s)),
                     args: vec![
@@ -1293,6 +1359,326 @@ mod tests {
             }
         } else {
             panic!("expected lambda, got: {:?}", result[0]);
+        }
+    }
+
+    #[test]
+    fn variadic_defmacro_collects_rest_args() {
+        let s = span(0, 1);
+        let input = vec![
+            TopForm::DefMacro {
+                name: "wrap-all".into(),
+                params: vec![],
+                rest_param: Some("args".into()),
+                body: vec![Expr::Call {
+                    func: Box::new(Expr::Symbol("cons".into(), s)),
+                    args: vec![
+                        Expr::Quote {
+                            expr: Box::new(Expr::Symbol("println".into(), s)),
+                            span: s,
+                        },
+                        Expr::Symbol("args".into(), s),
+                    ],
+                    span: s,
+                }],
+                span: s,
+            },
+            TopForm::Expr(Expr::Call {
+                func: Box::new(Expr::Symbol("wrap-all".into(), s)),
+                args: vec![Expr::String("a".into(), s), Expr::String("b".into(), s)],
+                span: s,
+            }),
+        ];
+
+        let (result, diags) = expand(input);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(result.len(), 1);
+        if let TopForm::Expr(Expr::Call { func, args, .. }) = &result[0] {
+            assert!(matches!(func.as_ref(), Expr::Symbol(s, _) if s == "println"));
+            assert_eq!(args.len(), 2);
+            assert!(matches!(&args[0], Expr::String(s, _) if s == "a"));
+            assert!(matches!(&args[1], Expr::String(s, _) if s == "b"));
+        } else {
+            panic!("expected call expression, got: {:?}", result[0]);
+        }
+    }
+
+    #[test]
+    fn variadic_defmacro_empty_rest() {
+        let s = span(0, 1);
+        let input = vec![
+            TopForm::DefMacro {
+                name: "id-list".into(),
+                params: vec![],
+                rest_param: Some("args".into()),
+                body: vec![Expr::Symbol("args".into(), s)],
+                span: s,
+            },
+            TopForm::Expr(Expr::Call {
+                func: Box::new(Expr::Symbol("id-list".into(), s)),
+                args: vec![],
+                span: s,
+            }),
+        ];
+
+        let (result, diags) = expand(input);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(result.len(), 1);
+        assert!(matches!(&result[0], TopForm::Expr(Expr::Nil(_))));
+    }
+
+    #[test]
+    fn variadic_defmacro_with_fixed_params() {
+        let s = span(0, 1);
+        let input = vec![
+            TopForm::DefMacro {
+                name: "if-else".into(),
+                params: vec![
+                    ast::Param {
+                        name: "test".into(),
+                        type_ann: None,
+                        span: s,
+                    },
+                    ast::Param {
+                        name: "then-val".into(),
+                        type_ann: None,
+                        span: s,
+                    },
+                ],
+                rest_param: Some("rest".into()),
+                body: vec![Expr::Call {
+                    func: Box::new(Expr::Symbol("list".into(), s)),
+                    args: vec![
+                        Expr::Quote {
+                            expr: Box::new(Expr::Symbol("if".into(), s)),
+                            span: s,
+                        },
+                        Expr::Symbol("test".into(), s),
+                        Expr::Symbol("then-val".into(), s),
+                        Expr::Quote {
+                            expr: Box::new(Expr::Nil(s)),
+                            span: s,
+                        },
+                    ],
+                    span: s,
+                }],
+                span: s,
+            },
+            TopForm::Expr(Expr::Call {
+                func: Box::new(Expr::Symbol("if-else".into(), s)),
+                args: vec![
+                    Expr::Bool(true, s),
+                    Expr::Int(1, s),
+                    Expr::Int(2, s),
+                    Expr::Int(3, s),
+                ],
+                span: s,
+            }),
+        ];
+
+        let (result, diags) = expand(input);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(result.len(), 1);
+        assert!(matches!(&result[0], TopForm::Expr(Expr::If { .. })));
+    }
+
+    #[test]
+    fn variadic_defmacro_too_few_args() {
+        let s = span(0, 1);
+        let input = vec![
+            TopForm::DefMacro {
+                name: "needs-two".into(),
+                params: vec![
+                    ast::Param {
+                        name: "a".into(),
+                        type_ann: None,
+                        span: s,
+                    },
+                    ast::Param {
+                        name: "b".into(),
+                        type_ann: None,
+                        span: s,
+                    },
+                ],
+                rest_param: Some("rest".into()),
+                body: vec![Expr::Quote {
+                    expr: Box::new(Expr::Nil(s)),
+                    span: s,
+                }],
+                span: s,
+            },
+            TopForm::Expr(Expr::Call {
+                func: Box::new(Expr::Symbol("needs-two".into(), s)),
+                args: vec![Expr::Int(1, s)],
+                span: s,
+            }),
+        ];
+
+        let (_, diags) = expand(input);
+        assert!(!diags.is_empty());
+    }
+
+    #[test]
+    fn empty_helper() {
+        let s = span(0, 1);
+        let input = vec![
+            TopForm::DefMacro {
+                name: "is-empty".into(),
+                params: vec![ast::Param {
+                    name: "xs".into(),
+                    type_ann: None,
+                    span: s,
+                }],
+                rest_param: None,
+                body: vec![Expr::Call {
+                    func: Box::new(Expr::Symbol("list".into(), s)),
+                    args: vec![
+                        Expr::Quote {
+                            expr: Box::new(Expr::Symbol("if".into(), s)),
+                            span: s,
+                        },
+                        Expr::Call {
+                            func: Box::new(Expr::Symbol("empty?".into(), s)),
+                            args: vec![Expr::Symbol("xs".into(), s)],
+                            span: s,
+                        },
+                        Expr::Quote {
+                            expr: Box::new(Expr::Bool(true, s)),
+                            span: s,
+                        },
+                        Expr::Quote {
+                            expr: Box::new(Expr::Bool(false, s)),
+                            span: s,
+                        },
+                    ],
+                    span: s,
+                }],
+                span: s,
+            },
+            TopForm::Expr(Expr::Call {
+                func: Box::new(Expr::Symbol("is-empty".into(), s)),
+                args: vec![Expr::Quote {
+                    expr: Box::new(Expr::Call {
+                        func: Box::new(Expr::Symbol("x".into(), s)),
+                        args: vec![],
+                        span: s,
+                    }),
+                    span: s,
+                }],
+                span: s,
+            }),
+        ];
+
+        let (result, diags) = expand(input);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let TopForm::Expr(Expr::If {
+            test,
+            then_branch,
+            else_branch,
+            ..
+        }) = &result[0]
+        {
+            assert!(matches!(test.as_ref(), Expr::Bool(false, _)));
+            assert!(matches!(then_branch.as_ref(), Expr::Bool(true, _)));
+            assert!(matches!(else_branch.as_ref(), Expr::Bool(false, _)));
+        } else {
+            panic!("expected if expression");
+        }
+    }
+
+    #[test]
+    fn keyword_helper() {
+        let s = span(0, 1);
+        let input = vec![
+            TopForm::DefMacro {
+                name: "check-kw".into(),
+                params: vec![ast::Param {
+                    name: "x".into(),
+                    type_ann: None,
+                    span: s,
+                }],
+                rest_param: None,
+                body: vec![Expr::Call {
+                    func: Box::new(Expr::Symbol("list".into(), s)),
+                    args: vec![
+                        Expr::Quote {
+                            expr: Box::new(Expr::Symbol("if".into(), s)),
+                            span: s,
+                        },
+                        Expr::Call {
+                            func: Box::new(Expr::Symbol("keyword?".into(), s)),
+                            args: vec![Expr::Symbol("x".into(), s)],
+                            span: s,
+                        },
+                        Expr::Quote {
+                            expr: Box::new(Expr::Bool(true, s)),
+                            span: s,
+                        },
+                        Expr::Quote {
+                            expr: Box::new(Expr::Bool(false, s)),
+                            span: s,
+                        },
+                    ],
+                    span: s,
+                }],
+                span: s,
+            },
+            TopForm::Expr(Expr::Call {
+                func: Box::new(Expr::Symbol("check-kw".into(), s)),
+                args: vec![Expr::Keyword("else".into(), s)],
+                span: s,
+            }),
+        ];
+
+        let (result, diags) = expand(input);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let TopForm::Expr(Expr::If { test, .. }) = &result[0] {
+            assert!(matches!(test.as_ref(), Expr::Bool(true, _)));
+        } else {
+            panic!("expected if expression");
+        }
+    }
+
+    #[test]
+    fn parser_defmacro_rest_param() {
+        let source = "(defmacro my-list [& items] items)";
+        let file = FileId::new(0);
+        let (tokens, _) = lexer::lex(source, file);
+        let (forms, diags) = parser::parse(&tokens);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(forms.len(), 1);
+        if let TopForm::DefMacro {
+            name,
+            params,
+            rest_param,
+            ..
+        } = &forms[0]
+        {
+            assert_eq!(name, "my-list");
+            assert!(params.is_empty());
+            assert_eq!(rest_param.as_deref(), Some("items"));
+        } else {
+            panic!("expected DefMacro");
+        }
+    }
+
+    #[test]
+    fn parser_defmacro_fixed_and_rest_params() {
+        let source = "(defmacro my-macro [a b & rest] (list a b))";
+        let file = FileId::new(0);
+        let (tokens, _) = lexer::lex(source, file);
+        let (forms, diags) = parser::parse(&tokens);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let TopForm::DefMacro {
+            params, rest_param, ..
+        } = &forms[0]
+        {
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0].name, "a");
+            assert_eq!(params[1].name, "b");
+            assert_eq!(rest_param.as_deref(), Some("rest"));
+        } else {
+            panic!("expected DefMacro");
         }
     }
 }

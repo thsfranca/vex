@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::ast::{self, Binding, Expr, TopForm};
 use crate::diagnostics::Diagnostic;
@@ -7,9 +8,32 @@ use crate::types::{SyntaxValue, expr_to_syntax, syntax_to_expr};
 
 const MAX_EXPANSION_DEPTH: usize = 64;
 
+static GENSYM_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+fn gensym(base: &str) -> String {
+    let id = GENSYM_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("__{}_{}", base, id)
+}
+
 struct MacroDef {
     params: Vec<String>,
     body: Vec<Expr>,
+}
+
+#[derive(Debug, Clone)]
+enum MacroVal {
+    Intro(SyntaxValue),
+    CallSite(SyntaxValue),
+    MList(Vec<MacroVal>),
+}
+
+fn macro_val_to_syntax(val: &MacroVal) -> SyntaxValue {
+    match val {
+        MacroVal::Intro(s) | MacroVal::CallSite(s) => s.clone(),
+        MacroVal::MList(items) => {
+            SyntaxValue::List(items.iter().map(macro_val_to_syntax).collect())
+        }
+    }
 }
 
 pub fn expand(program: Vec<TopForm>) -> (Vec<TopForm>, Vec<Diagnostic>) {
@@ -123,12 +147,12 @@ fn expand_expr(
                                 return Expr::Nil(span);
                             }
 
-                            let mut env: HashMap<String, SyntaxValue> = HashMap::new();
+                            let mut env: HashMap<String, MacroVal> = HashMap::new();
                             for (param, arg) in macro_def.params.iter().zip(args.iter()) {
-                                env.insert(param.clone(), expr_to_syntax(arg));
+                                env.insert(param.clone(), MacroVal::CallSite(expr_to_syntax(arg)));
                             }
 
-                            let mut result = SyntaxValue::Nil;
+                            let mut result = MacroVal::Intro(SyntaxValue::Nil);
                             for body_expr in &macro_def.body {
                                 match eval_macro_expr(body_expr, &env) {
                                     Ok(val) => result = val,
@@ -142,7 +166,9 @@ fn expand_expr(
                                 }
                             }
 
-                            let expanded_ast = syntax_to_expr(&result, span);
+                            let renamed = rename_in_macro_val(result);
+                            let result_syntax = macro_val_to_syntax(&renamed);
+                            let expanded_ast = syntax_to_expr(&result_syntax, span);
                             return expand_expr(expanded_ast, registry, diagnostics, depth + 1);
                         }
                     }
@@ -278,21 +304,21 @@ fn expand_expr(
     }
 }
 
-fn eval_macro_expr(expr: &Expr, env: &HashMap<String, SyntaxValue>) -> Result<SyntaxValue, String> {
+fn eval_macro_expr(expr: &Expr, env: &HashMap<String, MacroVal>) -> Result<MacroVal, String> {
     match expr {
-        Expr::Int(n, _) => Ok(SyntaxValue::Int(*n)),
-        Expr::Float(n, _) => Ok(SyntaxValue::Float(*n)),
-        Expr::String(s, _) => Ok(SyntaxValue::Str(s.clone())),
-        Expr::Bool(b, _) => Ok(SyntaxValue::Bool(*b)),
-        Expr::Nil(_) => Ok(SyntaxValue::Nil),
-        Expr::Keyword(s, _) => Ok(SyntaxValue::Kw(s.clone())),
+        Expr::Int(n, _) => Ok(MacroVal::Intro(SyntaxValue::Int(*n))),
+        Expr::Float(n, _) => Ok(MacroVal::Intro(SyntaxValue::Float(*n))),
+        Expr::String(s, _) => Ok(MacroVal::Intro(SyntaxValue::Str(s.clone()))),
+        Expr::Bool(b, _) => Ok(MacroVal::Intro(SyntaxValue::Bool(*b))),
+        Expr::Nil(_) => Ok(MacroVal::Intro(SyntaxValue::Nil)),
+        Expr::Keyword(s, _) => Ok(MacroVal::Intro(SyntaxValue::Kw(s.clone()))),
 
         Expr::Symbol(name, _) => env
             .get(name)
             .cloned()
             .ok_or_else(|| format!("undefined variable in macro body: {}", name)),
 
-        Expr::Quote { expr, .. } => Ok(expr_to_syntax(expr)),
+        Expr::Quote { expr, .. } => Ok(MacroVal::Intro(expr_to_syntax(expr))),
 
         Expr::If {
             test,
@@ -301,7 +327,7 @@ fn eval_macro_expr(expr: &Expr, env: &HashMap<String, SyntaxValue>) -> Result<Sy
             ..
         } => {
             let cond = eval_macro_expr(test, env)?;
-            match cond {
+            match macro_val_to_syntax(&cond) {
                 SyntaxValue::Bool(true) => eval_macro_expr(then_branch, env),
                 SyntaxValue::Bool(false) => eval_macro_expr(else_branch, env),
                 _ => Err("if condition must be Bool in macro body".into()),
@@ -314,7 +340,7 @@ fn eval_macro_expr(expr: &Expr, env: &HashMap<String, SyntaxValue>) -> Result<Sy
                 let val = eval_macro_expr(&binding.value, &local_env)?;
                 local_env.insert(binding.name.clone(), val);
             }
-            let mut result = SyntaxValue::Nil;
+            let mut result = MacroVal::Intro(SyntaxValue::Nil);
             for e in body {
                 result = eval_macro_expr(e, &local_env)?;
             }
@@ -340,22 +366,36 @@ fn eval_macro_expr(expr: &Expr, env: &HashMap<String, SyntaxValue>) -> Result<Sy
     }
 }
 
-fn eval_macro_builtin(name: &str, args: Vec<SyntaxValue>) -> Result<SyntaxValue, String> {
+fn mval_to_list_items(val: &MacroVal) -> Option<Vec<MacroVal>> {
+    match val {
+        MacroVal::MList(items) => Some(items.clone()),
+        MacroVal::Intro(SyntaxValue::List(items)) => {
+            Some(items.iter().map(|s| MacroVal::Intro(s.clone())).collect())
+        }
+        MacroVal::CallSite(SyntaxValue::List(items)) => Some(
+            items
+                .iter()
+                .map(|s| MacroVal::CallSite(s.clone()))
+                .collect(),
+        ),
+        _ => None,
+    }
+}
+
+fn eval_macro_builtin(name: &str, args: Vec<MacroVal>) -> Result<MacroVal, String> {
     match name {
-        "syntax-list" => Ok(SyntaxValue::List(args)),
+        "syntax-list" => Ok(MacroVal::MList(args)),
 
         "syntax-cons" => {
             if args.len() != 2 {
                 return Err("syntax-cons requires 2 arguments".into());
             }
-            let head = args[0].clone();
-            match &args[1] {
-                SyntaxValue::List(items) => {
-                    let mut result = vec![head];
-                    result.extend(items.iter().cloned());
-                    Ok(SyntaxValue::List(result))
+            match mval_to_list_items(&args[1]) {
+                Some(mut items) => {
+                    items.insert(0, args[0].clone());
+                    Ok(MacroVal::MList(items))
                 }
-                _ => Err("syntax-cons: second argument must be a list".into()),
+                None => Err("syntax-cons: second argument must be a list".into()),
             }
         }
 
@@ -363,10 +403,9 @@ fn eval_macro_builtin(name: &str, args: Vec<SyntaxValue>) -> Result<SyntaxValue,
             if args.len() != 1 {
                 return Err("syntax-first requires 1 argument".into());
             }
-            match &args[0] {
-                SyntaxValue::List(items) if !items.is_empty() => Ok(items[0].clone()),
-                SyntaxValue::List(_) => Err("syntax-first: empty list".into()),
-                _ => Err("syntax-first: argument must be a list".into()),
+            match mval_to_list_items(&args[0]) {
+                Some(items) if !items.is_empty() => Ok(items[0].clone()),
+                _ => Err("syntax-first: argument must be a non-empty list".into()),
             }
         }
 
@@ -374,12 +413,9 @@ fn eval_macro_builtin(name: &str, args: Vec<SyntaxValue>) -> Result<SyntaxValue,
             if args.len() != 1 {
                 return Err("syntax-rest requires 1 argument".into());
             }
-            match &args[0] {
-                SyntaxValue::List(items) if !items.is_empty() => {
-                    Ok(SyntaxValue::List(items[1..].to_vec()))
-                }
-                SyntaxValue::List(_) => Err("syntax-rest: empty list".into()),
-                _ => Err("syntax-rest: argument must be a list".into()),
+            match mval_to_list_items(&args[0]) {
+                Some(items) if !items.is_empty() => Ok(MacroVal::MList(items[1..].to_vec())),
+                _ => Err("syntax-rest: argument must be a non-empty list".into()),
             }
         }
 
@@ -387,25 +423,32 @@ fn eval_macro_builtin(name: &str, args: Vec<SyntaxValue>) -> Result<SyntaxValue,
             if args.len() != 1 {
                 return Err("syntax-symbol? requires 1 argument".into());
             }
-            Ok(SyntaxValue::Bool(matches!(&args[0], SyntaxValue::Sym(_))))
+            let s = macro_val_to_syntax(&args[0]);
+            Ok(MacroVal::Intro(SyntaxValue::Bool(matches!(
+                s,
+                SyntaxValue::Sym(_)
+            ))))
         }
 
         "syntax-list?" => {
             if args.len() != 1 {
                 return Err("syntax-list? requires 1 argument".into());
             }
-            Ok(SyntaxValue::Bool(matches!(&args[0], SyntaxValue::List(_))))
+            let s = macro_val_to_syntax(&args[0]);
+            Ok(MacroVal::Intro(SyntaxValue::Bool(matches!(
+                s,
+                SyntaxValue::List(_)
+            ))))
         }
 
         "syntax-concat" => {
             if args.len() != 2 {
                 return Err("syntax-concat requires 2 arguments".into());
             }
-            match (&args[0], &args[1]) {
-                (SyntaxValue::List(a), SyntaxValue::List(b)) => {
-                    let mut result = a.clone();
-                    result.extend(b.iter().cloned());
-                    Ok(SyntaxValue::List(result))
+            match (mval_to_list_items(&args[0]), mval_to_list_items(&args[1])) {
+                (Some(mut a), Some(b)) => {
+                    a.extend(b);
+                    Ok(MacroVal::MList(a))
                 }
                 _ => Err("syntax-concat: both arguments must be lists".into()),
             }
@@ -413,6 +456,198 @@ fn eval_macro_builtin(name: &str, args: Vec<SyntaxValue>) -> Result<SyntaxValue,
 
         _ => Err(format!("unknown function in macro body: {}", name)),
     }
+}
+
+fn rename_in_macro_val(val: MacroVal) -> MacroVal {
+    let mut renames: HashMap<String, String> = HashMap::new();
+    rename_mval(val, &mut renames)
+}
+
+fn rename_mval(val: MacroVal, renames: &mut HashMap<String, String>) -> MacroVal {
+    match val {
+        MacroVal::CallSite(_) => val,
+        MacroVal::Intro(s) => MacroVal::Intro(rename_syntax(s, renames)),
+        MacroVal::MList(items) => {
+            if is_mlist_let_form(&items) {
+                rename_mlist_let(items, renames)
+            } else if is_mlist_fn_form(&items) {
+                rename_mlist_fn(items, renames)
+            } else {
+                MacroVal::MList(items.into_iter().map(|v| rename_mval(v, renames)).collect())
+            }
+        }
+    }
+}
+
+fn is_mlist_let_form(items: &[MacroVal]) -> bool {
+    if items.len() < 3 {
+        return false;
+    }
+    matches!(macro_val_to_syntax(&items[0]), SyntaxValue::Sym(ref s) if s == "let")
+}
+
+fn is_mlist_fn_form(items: &[MacroVal]) -> bool {
+    if items.len() < 3 {
+        return false;
+    }
+    matches!(macro_val_to_syntax(&items[0]), SyntaxValue::Sym(ref s) if s == "fn")
+}
+
+fn rename_mlist_let(items: Vec<MacroVal>, renames: &mut HashMap<String, String>) -> MacroVal {
+    let mut result = vec![items[0].clone()];
+    let mut body_renames = renames.clone();
+
+    if let Some(binding_items) = mval_to_list_items(&items[1]) {
+        let mut new_bindings = Vec::new();
+        let mut i = 0;
+        while i + 1 < binding_items.len() {
+            let name_val = &binding_items[i];
+            let value_val = &binding_items[i + 1];
+            if let MacroVal::Intro(SyntaxValue::Sym(name)) = name_val {
+                let new_name = gensym(name);
+                body_renames.insert(name.clone(), new_name.clone());
+                new_bindings.push(MacroVal::Intro(SyntaxValue::Sym(new_name)));
+                new_bindings.push(rename_mval(value_val.clone(), renames));
+            } else {
+                new_bindings.push(rename_mval(name_val.clone(), renames));
+                new_bindings.push(rename_mval(value_val.clone(), renames));
+            }
+            i += 2;
+        }
+        result.push(MacroVal::MList(new_bindings));
+    } else {
+        result.push(rename_mval(items[1].clone(), renames));
+    }
+
+    for item in items.into_iter().skip(2) {
+        result.push(rename_mval(item, &mut body_renames));
+    }
+
+    MacroVal::MList(result)
+}
+
+fn rename_mlist_fn(items: Vec<MacroVal>, renames: &mut HashMap<String, String>) -> MacroVal {
+    let mut result = vec![items[0].clone()];
+    let mut body_renames = renames.clone();
+
+    if let Some(param_items) = mval_to_list_items(&items[1]) {
+        let new_params: Vec<MacroVal> = param_items
+            .into_iter()
+            .map(|p| {
+                if let MacroVal::Intro(SyntaxValue::Sym(name)) = &p {
+                    let new_name = gensym(name);
+                    body_renames.insert(name.clone(), new_name.clone());
+                    MacroVal::Intro(SyntaxValue::Sym(new_name))
+                } else {
+                    rename_mval(p, renames)
+                }
+            })
+            .collect();
+        result.push(MacroVal::MList(new_params));
+    } else {
+        result.push(rename_mval(items[1].clone(), renames));
+    }
+
+    for item in items.into_iter().skip(2) {
+        result.push(rename_mval(item, &mut body_renames));
+    }
+
+    MacroVal::MList(result)
+}
+
+fn rename_syntax(syntax: SyntaxValue, renames: &HashMap<String, String>) -> SyntaxValue {
+    match syntax {
+        SyntaxValue::Sym(ref name) => {
+            if let Some(new_name) = renames.get(name) {
+                SyntaxValue::Sym(new_name.clone())
+            } else {
+                syntax
+            }
+        }
+        SyntaxValue::List(items) => {
+            if is_syntax_let_form(&items) {
+                rename_syntax_let(items, renames)
+            } else if is_syntax_fn_form(&items) {
+                rename_syntax_fn(items, renames)
+            } else {
+                SyntaxValue::List(
+                    items
+                        .into_iter()
+                        .map(|s| rename_syntax(s, renames))
+                        .collect(),
+                )
+            }
+        }
+        other => other,
+    }
+}
+
+fn is_syntax_let_form(items: &[SyntaxValue]) -> bool {
+    items.len() >= 3 && matches!(&items[0], SyntaxValue::Sym(s) if s == "let")
+}
+
+fn is_syntax_fn_form(items: &[SyntaxValue]) -> bool {
+    items.len() >= 3 && matches!(&items[0], SyntaxValue::Sym(s) if s == "fn")
+}
+
+fn rename_syntax_let(items: Vec<SyntaxValue>, renames: &HashMap<String, String>) -> SyntaxValue {
+    let mut result = vec![items[0].clone()];
+    let mut body_renames = renames.clone();
+
+    if let SyntaxValue::List(bindings) = &items[1] {
+        let mut new_bindings = Vec::new();
+        let mut i = 0;
+        while i + 1 < bindings.len() {
+            if let SyntaxValue::Sym(name) = &bindings[i] {
+                let new_name = gensym(name);
+                body_renames.insert(name.clone(), new_name.clone());
+                new_bindings.push(SyntaxValue::Sym(new_name));
+                new_bindings.push(rename_syntax(bindings[i + 1].clone(), renames));
+            } else {
+                new_bindings.push(rename_syntax(bindings[i].clone(), renames));
+                new_bindings.push(rename_syntax(bindings[i + 1].clone(), renames));
+            }
+            i += 2;
+        }
+        result.push(SyntaxValue::List(new_bindings));
+    } else {
+        result.push(rename_syntax(items[1].clone(), renames));
+    }
+
+    for item in items.into_iter().skip(2) {
+        result.push(rename_syntax(item, &body_renames));
+    }
+
+    SyntaxValue::List(result)
+}
+
+fn rename_syntax_fn(items: Vec<SyntaxValue>, renames: &HashMap<String, String>) -> SyntaxValue {
+    let mut result = vec![items[0].clone()];
+    let mut body_renames = renames.clone();
+
+    if let SyntaxValue::List(params) = &items[1] {
+        let new_params: Vec<SyntaxValue> = params
+            .iter()
+            .map(|p| {
+                if let SyntaxValue::Sym(name) = p {
+                    let new_name = gensym(name);
+                    body_renames.insert(name.clone(), new_name.clone());
+                    SyntaxValue::Sym(new_name)
+                } else {
+                    rename_syntax(p.clone(), renames)
+                }
+            })
+            .collect();
+        result.push(SyntaxValue::List(new_params));
+    } else {
+        result.push(rename_syntax(items[1].clone(), renames));
+    }
+
+    for item in items.into_iter().skip(2) {
+        result.push(rename_syntax(item, &body_renames));
+    }
+
+    SyntaxValue::List(result)
 }
 
 fn expand_cond(
@@ -949,6 +1184,138 @@ mod tests {
             );
         } else {
             panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn hygiene_renames_let_bindings() {
+        let s = span(0, 1);
+        let input = vec![
+            TopForm::DefMacro {
+                name: "with-temp".into(),
+                params: vec![ast::Param {
+                    name: "body".into(),
+                    type_ann: None,
+                    span: s,
+                }],
+                body: vec![Expr::Call {
+                    func: Box::new(Expr::Symbol("syntax-list".into(), s)),
+                    args: vec![
+                        Expr::Quote {
+                            expr: Box::new(Expr::Symbol("let".into(), s)),
+                            span: s,
+                        },
+                        Expr::Call {
+                            func: Box::new(Expr::Symbol("syntax-list".into(), s)),
+                            args: vec![
+                                Expr::Quote {
+                                    expr: Box::new(Expr::Symbol("tmp".into(), s)),
+                                    span: s,
+                                },
+                                Expr::Quote {
+                                    expr: Box::new(Expr::Int(0, s)),
+                                    span: s,
+                                },
+                            ],
+                            span: s,
+                        },
+                        Expr::Symbol("body".into(), s),
+                    ],
+                    span: s,
+                }],
+                span: s,
+            },
+            TopForm::Expr(Expr::Call {
+                func: Box::new(Expr::Symbol("with-temp".into(), s)),
+                args: vec![Expr::Symbol("tmp".into(), s)],
+                span: s,
+            }),
+        ];
+
+        let (result, diags) = expand(input);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(result.len(), 1);
+
+        if let TopForm::Expr(Expr::Let { bindings, body, .. }) = &result[0] {
+            assert_eq!(bindings.len(), 1);
+            assert!(
+                bindings[0].name.starts_with("__tmp_"),
+                "expected renamed binding, got: {}",
+                bindings[0].name
+            );
+            assert_ne!(bindings[0].name, "tmp");
+            if let Expr::Symbol(body_name, _) = &body[0] {
+                assert_eq!(
+                    body_name, "tmp",
+                    "call-site reference should keep original name"
+                );
+            } else {
+                panic!("expected symbol in body");
+            }
+        } else {
+            panic!("expected let expression");
+        }
+    }
+
+    #[test]
+    fn hygiene_renames_lambda_params() {
+        let s = span(0, 1);
+        let input = vec![
+            TopForm::DefMacro {
+                name: "make-fn".into(),
+                params: vec![],
+                body: vec![Expr::Call {
+                    func: Box::new(Expr::Symbol("syntax-list".into(), s)),
+                    args: vec![
+                        Expr::Quote {
+                            expr: Box::new(Expr::Symbol("fn".into(), s)),
+                            span: s,
+                        },
+                        Expr::Call {
+                            func: Box::new(Expr::Symbol("syntax-list".into(), s)),
+                            args: vec![Expr::Quote {
+                                expr: Box::new(Expr::Symbol("x".into(), s)),
+                                span: s,
+                            }],
+                            span: s,
+                        },
+                        Expr::Quote {
+                            expr: Box::new(Expr::Symbol("x".into(), s)),
+                            span: s,
+                        },
+                    ],
+                    span: s,
+                }],
+                span: s,
+            },
+            TopForm::Expr(Expr::Call {
+                func: Box::new(Expr::Symbol("make-fn".into(), s)),
+                args: vec![],
+                span: s,
+            }),
+        ];
+
+        let (result, diags) = expand(input);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(result.len(), 1);
+
+        if let TopForm::Expr(Expr::Lambda { params, body, .. }) = &result[0] {
+            assert_eq!(params.len(), 1);
+            assert!(
+                params[0].name.starts_with("__x_"),
+                "expected renamed param, got: {}",
+                params[0].name
+            );
+            if let Expr::Symbol(body_name, _) = &body[0] {
+                assert_eq!(
+                    body_name, &params[0].name,
+                    "reference in body should match renamed param"
+                );
+            } else {
+                panic!("expected symbol in body");
+            }
+        } else {
+            panic!("expected lambda, got: {:?}", result[0]);
         }
     }
 }

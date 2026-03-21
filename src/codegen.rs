@@ -195,7 +195,11 @@ impl Generator {
                 body,
                 ..
             } => self.emit_lambda(params, return_type, body),
-            hir::Expr::FieldAccess { .. } => {}
+            hir::Expr::FieldAccess { object, field, .. } => {
+                self.emit_expr(object);
+                self.write(".");
+                self.write(&vex_to_go_public_name(field));
+            }
         }
     }
 
@@ -1058,5 +1062,71 @@ mod tests {
         assert!(output.contains("import \"fmt\""));
         assert!(output.contains("func main() {\n"));
         assert!(output.contains("fmt.Println(\"Hello, World!\")"));
+    }
+
+    #[test]
+    fn expr_field_access() {
+        let point_ty = VexType::Record {
+            name: "Point".into(),
+            fields: vec![
+                RecordField {
+                    name: "x".into(),
+                    ty: VexType::Float,
+                },
+                RecordField {
+                    name: "y".into(),
+                    ty: VexType::Float,
+                },
+            ],
+        };
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Defn {
+                name: "get-x".into(),
+                params: vec![hir::Param {
+                    name: "p".into(),
+                    ty: point_ty.clone(),
+                    span: span(14, 24),
+                }],
+                return_type: VexType::Float,
+                body: vec![hir::Expr::FieldAccess {
+                    object: Box::new(hir::Expr::Var {
+                        name: "p".into(),
+                        span: span(40, 41),
+                        ty: point_ty,
+                    }),
+                    field: "x".into(),
+                    span: span(38, 44),
+                    ty: VexType::Float,
+                }],
+                span: span(0, 45),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("p.X"));
+    }
+
+    #[test]
+    fn expr_field_access_kebab_case() {
+        let rec_ty = VexType::Record {
+            name: "Config".into(),
+            fields: vec![RecordField {
+                name: "max-retries".into(),
+                ty: VexType::Int,
+            }],
+        };
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Expr(hir::Expr::FieldAccess {
+                object: Box::new(hir::Expr::Var {
+                    name: "cfg".into(),
+                    span: span(3, 6),
+                    ty: rec_ty,
+                }),
+                field: "max-retries".into(),
+                span: span(0, 20),
+                ty: VexType::Int,
+            })],
+        };
+        let output = generate(&module);
+        assert!(output.contains("cfg.MaxRetries"));
     }
 }

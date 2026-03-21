@@ -5,6 +5,7 @@ pub mod diagnostics;
 pub mod hir;
 pub mod interpreter;
 pub mod lexer;
+pub mod macro_expand;
 pub mod parser;
 pub mod source;
 pub mod typechecker;
@@ -119,6 +120,8 @@ fn compile_single(
         return Err(parse_diags);
     }
 
+    let ast = macro_expand::expand(ast);
+
     let (hir_module, check_diags) = typechecker::check_with_imports(&ast, imported_symbols);
     if !check_diags.is_empty() {
         return Err(check_diags);
@@ -160,6 +163,8 @@ pub fn compile(source: &str, file_name: &str) -> CompileResult {
             source_map,
         };
     }
+
+    let main_ast = macro_expand::expand(main_ast);
 
     let imports = collect_imports(&main_ast);
     for (module_path, symbols) in &imports {

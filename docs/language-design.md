@@ -364,7 +364,7 @@ foo   bar_baz   handle-tool-call   empty?   set!   _unused
 **Operator symbols** are sequences of one or more operator characters:
 
 ```
-+   -   *   /   <   >   =   !=   >=   <=   &&   ||
++   -   *   /   <   >   =   !=   >=   <=
 ```
 
 Operator characters: `+` `-` `*` `/` `<` `>` `=` `!` `&` `|` `%` `^` `~`
@@ -684,6 +684,11 @@ Source (.vx)
 └────┬────┘
      │ AST
      ▼
+┌─────────────────┐
+│ Macro Expansion │    Rust (AST → AST)
+└────────┬────────┘
+         │ expanded AST
+         ▼
 ┌──────────┐
 │Type Check│   Rust
 └────┬─────┘
@@ -893,11 +898,11 @@ Distributed as a native Rust binary per platform:
 - Non-tail recursive functions get a compiler warning about stack usage proportional to input size
 - Mutual tail recursion is **not** optimized — trampolining adds allocation overhead for a rare case in MCP code
 
-### 8. Short-circuit operators — `&&` and `||` are macros
+### 8. Short-circuit operators — `and` and `or` are macros
 
-- `&&` and `||` expand to `if` expressions during macro expansion:
-  - `(&& a b)` → `(if a b false)`
-  - `(|| a b)` → `(let [tmp a] (if tmp tmp b))`
+- `and` and `or` expand to `if` expressions during macro expansion:
+  - `(and a b)` → `(if a b false)`
+  - `(or a b)` → `(let [tmp a] (if tmp tmp b))`
 - This preserves short-circuit semantics in both the interpreter and compiled paths
 - Treating them as regular functions would evaluate both arguments eagerly — the interpreter would produce different behavior than the compiled output
 - The compiled path would accidentally short-circuit (Go's `&&`/`||` are lazy), but the interpreter would not — a silent correctness bug

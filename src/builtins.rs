@@ -30,18 +30,6 @@ fn int_bin_op(name: &'static str, ret: VexType, go_op: &'static str) -> Builtin 
     }
 }
 
-fn bool_bin_op(name: &'static str, go_op: &'static str) -> Builtin {
-    Builtin {
-        name,
-        ty: VexType::Fn {
-            params: vec![VexType::Bool, VexType::Bool],
-            ret: Box::new(VexType::Bool),
-        },
-        go: GoTranslation::Infix(go_op),
-        variadic: false,
-    }
-}
-
 pub fn all_builtins() -> Vec<Builtin> {
     vec![
         int_bin_op("+", VexType::Int, "+"),
@@ -55,8 +43,6 @@ pub fn all_builtins() -> Vec<Builtin> {
         int_bin_op(">=", VexType::Bool, ">="),
         int_bin_op("=", VexType::Bool, "=="),
         int_bin_op("!=", VexType::Bool, "!="),
-        bool_bin_op("&&", "&&"),
-        bool_bin_op("||", "||"),
         Builtin {
             name: "not",
             ty: VexType::Fn {
@@ -138,7 +124,7 @@ mod tests {
     #[test]
     fn all_builtins_count() {
         let builtins = all_builtins();
-        assert_eq!(builtins.len(), 17);
+        assert_eq!(builtins.len(), 15);
     }
 
     #[test]
@@ -177,15 +163,6 @@ mod tests {
 
     #[test]
     fn lookup_logical() {
-        let and = lookup("&&").unwrap();
-        assert_eq!(
-            and.ty,
-            VexType::Fn {
-                params: vec![VexType::Bool, VexType::Bool],
-                ret: Box::new(VexType::Bool),
-            }
-        );
-
         let not = lookup("not").unwrap();
         assert_eq!(not.go, GoTranslation::Prefix("!"));
         assert_eq!(

@@ -228,6 +228,8 @@ fn run_repl() {
             continue;
         }
 
+        let ast = vex::macro_expand::expand(ast);
+
         let (hir_module, check_diags) = vex::typechecker::check(&ast);
         if !check_diags.is_empty() {
             for d in &check_diags {

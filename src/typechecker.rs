@@ -120,6 +120,10 @@ impl Checker {
                 return self.check_each(args, span);
             }
 
+            if name == "map" {
+                return self.check_map(args, span);
+            }
+
             if let Some(record_ty) = self.type_defs.get(name).cloned()
                 && matches!(&record_ty, VexType::Record { .. })
             {
@@ -1105,6 +1109,80 @@ impl Checker {
             args: vec![checked_list, checked_fn],
             span,
             ty: VexType::Unit,
+        })
+    }
+
+    fn check_map(&mut self, args: &[ast::Expr], span: Span) -> Option<hir::Expr> {
+        if args.len() != 2 {
+            self.diagnostics.push(Diagnostic::error(
+                format!(
+                    "map requires 2 arguments (list, function), found {}",
+                    args.len()
+                ),
+                span,
+            ));
+            return None;
+        }
+
+        let checked_list = self.check_expr(&args[0])?;
+        let elem_ty = match checked_list.ty() {
+            VexType::List(inner) => inner.as_ref().clone(),
+            other => {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("map requires a List, found {}", other),
+                    checked_list.span(),
+                ));
+                return None;
+            }
+        };
+
+        let checked_fn = self.check_expr(&args[1])?;
+        let ret_ty = match checked_fn.ty() {
+            VexType::Fn { params, ret } => {
+                if params.len() != 1 {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!("map callback must take 1 parameter, found {}", params.len()),
+                        checked_fn.span(),
+                    ));
+                    return None;
+                }
+                if params[0] != elem_ty {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!(
+                            "map callback parameter has type {}, but list element type is {}",
+                            params[0], elem_ty
+                        ),
+                        checked_fn.span(),
+                    ));
+                    return None;
+                }
+                ret.as_ref().clone()
+            }
+            other => {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("map requires a function, found {}", other),
+                    checked_fn.span(),
+                ));
+                return None;
+            }
+        };
+
+        let result_ty = VexType::List(Box::new(ret_ty.clone()));
+
+        let map_fn_ty = VexType::Fn {
+            params: vec![VexType::List(Box::new(elem_ty)), checked_fn.ty().clone()],
+            ret: Box::new(result_ty.clone()),
+        };
+
+        Some(hir::Expr::Call {
+            func: Box::new(hir::Expr::Var {
+                name: "map".to_string(),
+                span,
+                ty: map_fn_ty,
+            }),
+            args: vec![checked_list, checked_fn],
+            span,
+            ty: result_ty,
         })
     }
 
@@ -2812,6 +2890,68 @@ mod tests {
             diags[0]
                 .message
                 .contains("each callback must take 1 parameter")
+        );
+    }
+
+    #[test]
+    fn map_basic() {
+        let source = r#"
+            (defn double-all [xs : (List Int)] : (List Int)
+              (map xs (fn [x : Int] : Int (* x 2))))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { return_type, .. } = &module.top_forms[0] {
+            assert_eq!(*return_type, VexType::List(Box::new(VexType::Int)));
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn map_transforms_type() {
+        let source = r#"
+            (defn to-strings [xs : (List Int)] : (List String)
+              (map xs (fn [x : Int] : String (str x))))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { return_type, .. } = &module.top_forms[0] {
+            assert_eq!(*return_type, VexType::List(Box::new(VexType::String)));
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn error_map_wrong_arg_count() {
+        let (_, diags) = check_source("(map (range 0 10))");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("map requires 2 arguments"));
+    }
+
+    #[test]
+    fn error_map_non_list() {
+        let (_, diags) = check_source("(map 42 (fn [x : Int] x))");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("map requires a List"));
+    }
+
+    #[test]
+    fn error_map_non_function() {
+        let (_, diags) = check_source("(map (range 0 10) 42)");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("map requires a function"));
+    }
+
+    #[test]
+    fn error_map_callback_type_mismatch() {
+        let (_, diags) = check_source("(map (range 0 10) (fn [x : String] x))");
+        assert_eq!(diags.len(), 1);
+        assert!(
+            diags[0]
+                .message
+                .contains("map callback parameter has type String")
         );
     }
 

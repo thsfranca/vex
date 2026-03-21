@@ -481,6 +481,7 @@ pub fn go_type(ty: &VexType) -> String {
             }
         }
         VexType::Record { name, .. } => vex_to_go_public_name(name),
+        VexType::Union { name, .. } => vex_to_go_public_name(name),
         VexType::TypeVar(id) => format!("T{}", id),
     }
 }

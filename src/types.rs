@@ -8,6 +8,12 @@ pub struct RecordField {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnionVariant {
+    pub name: std::string::String,
+    pub types: Vec<VexType>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VexType {
     Int,
     Float,
@@ -21,6 +27,10 @@ pub enum VexType {
     Record {
         name: std::string::String,
         fields: Vec<RecordField>,
+    },
+    Union {
+        name: std::string::String,
+        variants: Vec<UnionVariant>,
     },
     TypeVar(u32),
 }
@@ -59,6 +69,7 @@ impl fmt::Display for VexType {
                 write!(f, "] {})", ret)
             }
             VexType::Record { name, .. } => write!(f, "{}", name),
+            VexType::Union { name, .. } => write!(f, "{}", name),
             VexType::TypeVar(id) => write!(f, "?T{}", id),
         }
     }
@@ -305,5 +316,42 @@ mod tests {
         assert_eq!(env.fresh_type_var(), VexType::TypeVar(0));
         assert_eq!(env.fresh_type_var(), VexType::TypeVar(1));
         assert_eq!(env.fresh_type_var(), VexType::TypeVar(2));
+    }
+
+    #[test]
+    fn display_union() {
+        let ty = VexType::Union {
+            name: "Shape".into(),
+            variants: vec![
+                UnionVariant {
+                    name: "Circle".into(),
+                    types: vec![VexType::Float],
+                },
+                UnionVariant {
+                    name: "Rect".into(),
+                    types: vec![VexType::Float, VexType::Float],
+                },
+            ],
+        };
+        assert_eq!(format!("{}", ty), "Shape");
+    }
+
+    #[test]
+    fn union_equality() {
+        let a = VexType::Union {
+            name: "Opt".into(),
+            variants: vec![
+                UnionVariant {
+                    name: "Some".into(),
+                    types: vec![VexType::Int],
+                },
+                UnionVariant {
+                    name: "None".into(),
+                    types: vec![],
+                },
+            ],
+        };
+        let b = a.clone();
+        assert_eq!(a, b);
     }
 }

@@ -1,5 +1,5 @@
 use crate::source::Span;
-use crate::types::VexType;
+use crate::types::{RecordField, VexType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Param {
@@ -110,13 +110,21 @@ pub enum TopForm {
         span: Span,
     },
 
+    Deftype {
+        name: String,
+        fields: Vec<RecordField>,
+        span: Span,
+    },
+
     Expr(Expr),
 }
 
 impl TopForm {
     pub fn span(&self) -> Span {
         match self {
-            TopForm::Defn { span, .. } | TopForm::Def { span, .. } => *span,
+            TopForm::Defn { span, .. }
+            | TopForm::Def { span, .. }
+            | TopForm::Deftype { span, .. } => *span,
             TopForm::Expr(expr) => expr.span(),
         }
     }
@@ -293,6 +301,59 @@ mod tests {
         };
         assert_eq!(module.top_forms.len(), 2);
         assert!(matches!(&module.top_forms[0], TopForm::Def { .. }));
+        assert!(matches!(&module.top_forms[1], TopForm::Defn { .. }));
+    }
+
+    #[test]
+    fn deftype_top_form() {
+        let form = TopForm::Deftype {
+            name: "Point".into(),
+            fields: vec![
+                RecordField {
+                    name: "x".into(),
+                    ty: VexType::Float,
+                },
+                RecordField {
+                    name: "y".into(),
+                    ty: VexType::Float,
+                },
+            ],
+            span: span(0, 35),
+        };
+        assert_eq!(form.span(), span(0, 35));
+        if let TopForm::Deftype { name, fields, .. } = &form {
+            assert_eq!(name, "Point");
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name, "x");
+            assert_eq!(fields[0].ty, VexType::Float);
+            assert_eq!(fields[1].name, "y");
+            assert_eq!(fields[1].ty, VexType::Float);
+        }
+    }
+
+    #[test]
+    fn module_with_deftype() {
+        let module = Module {
+            top_forms: vec![
+                TopForm::Deftype {
+                    name: "Config".into(),
+                    fields: vec![RecordField {
+                        name: "name".into(),
+                        ty: VexType::String,
+                    }],
+                    span: span(0, 30),
+                },
+                TopForm::Defn {
+                    name: "main".into(),
+                    params: vec![],
+                    return_type: VexType::Unit,
+                    body: vec![Expr::Nil(span(40, 43))],
+                    span: span(32, 44),
+                },
+            ],
+        };
+        assert_eq!(module.top_forms.len(), 2);
+        assert!(matches!(&module.top_forms[0], TopForm::Deftype { .. }));
         assert!(matches!(&module.top_forms[1], TopForm::Defn { .. }));
     }
 

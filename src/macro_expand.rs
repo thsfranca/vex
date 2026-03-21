@@ -147,6 +147,21 @@ fn expand_expr(expr: Expr) -> Expr {
             span,
         },
 
+        Expr::Quote { expr, span } => Expr::Quote {
+            expr: Box::new(expand_expr(*expr)),
+            span,
+        },
+
+        Expr::Unquote { expr, span } => Expr::Unquote {
+            expr: Box::new(expand_expr(*expr)),
+            span,
+        },
+
+        Expr::Splice { expr, span } => Expr::Splice {
+            expr: Box::new(expand_expr(*expr)),
+            span,
+        },
+
         other @ (Expr::Int(..)
         | Expr::Float(..)
         | Expr::String(..)

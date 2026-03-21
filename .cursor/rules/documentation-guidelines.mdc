@@ -1,0 +1,17 @@
+---
+description: Documentation writing style — active voice, bullet points, human-readable prose
+alwaysApply: true
+---
+
+# Documentation Guidelines
+
+All markdown files (`docs/`, `README.md`, skill files, rule descriptions) must follow `docs/documentation-guidelines.md`.
+
+## Key Rules
+
+- Use active voice — never passive ("the lexer reads the file," not "the file is read by the lexer")
+- Prefer bullet points or numbered lists over dense paragraphs
+- Keep sentences short — one idea per sentence, one idea per bullet point
+- Remove filler words: "basically," "simply," "just," "actually," "really"
+- Lead with "what" and "why" before "how"
+- Write for someone reading the document for the first time

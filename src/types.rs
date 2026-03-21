@@ -45,6 +45,37 @@ impl VexType {
         matches!(self, VexType::Int | VexType::Float)
     }
 
+    pub fn types_compatible(a: &VexType, b: &VexType) -> Option<VexType> {
+        if a == b {
+            return Some(a.clone());
+        }
+        match (a, b) {
+            (VexType::TypeVar(_), other) | (other, VexType::TypeVar(_)) => Some(other.clone()),
+            (VexType::Option(inner_a), VexType::Option(inner_b)) => {
+                let merged = VexType::types_compatible(inner_a, inner_b)?;
+                Some(VexType::Option(Box::new(merged)))
+            }
+            (
+                VexType::Result {
+                    ok: ok_a,
+                    err: err_a,
+                },
+                VexType::Result {
+                    ok: ok_b,
+                    err: err_b,
+                },
+            ) => {
+                let ok = VexType::types_compatible(ok_a, ok_b)?;
+                let err = VexType::types_compatible(err_a, err_b)?;
+                Some(VexType::Result {
+                    ok: Box::new(ok),
+                    err: Box::new(err),
+                })
+            }
+            _ => None,
+        }
+    }
+
     pub fn field_type(&self, field_name: &str) -> Option<&VexType> {
         match self {
             VexType::Record { fields, .. } => {
@@ -389,6 +420,63 @@ mod tests {
         };
         assert_eq!(a, b);
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn types_compatible_equal() {
+        assert_eq!(
+            VexType::types_compatible(&VexType::Int, &VexType::Int),
+            Some(VexType::Int)
+        );
+    }
+
+    #[test]
+    fn types_compatible_mismatch() {
+        assert_eq!(
+            VexType::types_compatible(&VexType::Int, &VexType::String),
+            None
+        );
+    }
+
+    #[test]
+    fn types_compatible_typevar_resolves() {
+        assert_eq!(
+            VexType::types_compatible(&VexType::TypeVar(0), &VexType::Int),
+            Some(VexType::Int)
+        );
+        assert_eq!(
+            VexType::types_compatible(&VexType::Int, &VexType::TypeVar(0)),
+            Some(VexType::Int)
+        );
+    }
+
+    #[test]
+    fn types_compatible_option_with_typevar() {
+        let a = VexType::Option(Box::new(VexType::TypeVar(0)));
+        let b = VexType::Option(Box::new(VexType::Int));
+        assert_eq!(
+            VexType::types_compatible(&a, &b),
+            Some(VexType::Option(Box::new(VexType::Int)))
+        );
+    }
+
+    #[test]
+    fn types_compatible_result_with_typevar() {
+        let a = VexType::Result {
+            ok: Box::new(VexType::Int),
+            err: Box::new(VexType::TypeVar(0)),
+        };
+        let b = VexType::Result {
+            ok: Box::new(VexType::Int),
+            err: Box::new(VexType::String),
+        };
+        assert_eq!(
+            VexType::types_compatible(&a, &b),
+            Some(VexType::Result {
+                ok: Box::new(VexType::Int),
+                err: Box::new(VexType::String),
+            })
+        );
     }
 
     #[test]

@@ -79,6 +79,17 @@ impl Checker {
     }
 
     fn check_symbol(&mut self, name: &str, span: Span) -> Option<hir::Expr> {
+        if name == "None" && self.find_variant_union("None").is_none() {
+            let ty = VexType::Option(Box::new(self.env.fresh_type_var()));
+            return Some(hir::Expr::VariantConstructor {
+                union_name: "Option".to_string(),
+                variant_name: "None".to_string(),
+                args: vec![],
+                span,
+                ty,
+            });
+        }
+
         if let Some(ty) = self.env.lookup(name) {
             Some(hir::Expr::Var {
                 name: name.to_string(),
@@ -101,6 +112,10 @@ impl Checker {
         span: Span,
     ) -> Option<hir::Expr> {
         if let ast::Expr::Symbol(name, _) = func {
+            if let Some(result) = self.check_builtin_constructor(name, args, span) {
+                return result;
+            }
+
             if let Some(record_ty) = self.type_defs.get(name).cloned()
                 && matches!(&record_ty, VexType::Record { .. })
             {
@@ -240,19 +255,20 @@ impl Checker {
         let checked_then = self.check_expr(then_branch)?;
         let checked_else = self.check_expr(else_branch)?;
 
-        if checked_then.ty() != checked_else.ty() {
-            self.diagnostics.push(Diagnostic::error(
-                format!(
-                    "if branches have different types: {} and {}",
-                    checked_then.ty(),
-                    checked_else.ty()
-                ),
-                span,
-            ));
-            return None;
-        }
-
-        let ty = checked_then.ty().clone();
+        let ty = match VexType::types_compatible(checked_then.ty(), checked_else.ty()) {
+            Some(merged) => merged,
+            None => {
+                self.diagnostics.push(Diagnostic::error(
+                    format!(
+                        "if branches have different types: {} and {}",
+                        checked_then.ty(),
+                        checked_else.ty()
+                    ),
+                    span,
+                ));
+                return None;
+            }
+        };
 
         Some(hir::Expr::If {
             test: Box::new(checked_test),
@@ -402,19 +418,20 @@ impl Checker {
 
             let checked_value = self.check_expr(&clause.value)?;
 
-            if checked_value.ty() != result.ty() {
-                self.diagnostics.push(Diagnostic::error(
-                    format!(
-                        "cond branches have different types: {} and {}",
-                        checked_value.ty(),
-                        result.ty()
-                    ),
-                    clause.span,
-                ));
-                return None;
-            }
-
-            let ty = checked_value.ty().clone();
+            let ty = match VexType::types_compatible(checked_value.ty(), result.ty()) {
+                Some(merged) => merged,
+                None => {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!(
+                            "cond branches have different types: {} and {}",
+                            checked_value.ty(),
+                            result.ty()
+                        ),
+                        clause.span,
+                    ));
+                    return None;
+                }
+            };
 
             result = hir::Expr::If {
                 test: Box::new(checked_test),
@@ -471,17 +488,19 @@ impl Checker {
 
         let ret_ty = if let Some(ret_ann) = return_type {
             let declared = self.resolve_type(ret_ann)?;
-            if declared != body_ty {
-                self.diagnostics.push(Diagnostic::error(
-                    format!(
-                        "declared return type {} doesn't match body type {}",
-                        declared, body_ty
-                    ),
-                    span,
-                ));
-                return None;
+            match VexType::types_compatible(&declared, &body_ty) {
+                Some(merged) => merged,
+                None => {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!(
+                            "declared return type {} doesn't match body type {}",
+                            declared, body_ty
+                        ),
+                        span,
+                    ));
+                    return None;
+                }
             }
-            declared
         } else {
             body_ty
         };
@@ -549,15 +568,18 @@ impl Checker {
             self.env.pop_scope();
 
             if let Some(ref expected) = result_ty {
-                if &body_ty != expected {
-                    self.diagnostics.push(Diagnostic::error(
-                        format!(
-                            "match clause body has type {}, expected {}",
-                            body_ty, expected
-                        ),
-                        clause.body.span(),
-                    ));
-                    return None;
+                match VexType::types_compatible(&body_ty, expected) {
+                    Some(merged) => result_ty = Some(merged),
+                    None => {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!(
+                                "match clause body has type {}, expected {}",
+                                body_ty, expected
+                            ),
+                            clause.body.span(),
+                        ));
+                        return None;
+                    }
                 }
             } else {
                 result_ty = Some(body_ty);
@@ -588,6 +610,18 @@ impl Checker {
         match pattern {
             ast::Pattern::Wildcard(span) => Some(hir::Pattern::Wildcard(*span)),
             ast::Pattern::Binding(name, span) => {
+                if name == "None"
+                    && matches!(expected_ty, VexType::Option(_))
+                    && !matches!(expected_ty, VexType::Union { .. })
+                {
+                    return Some(hir::Pattern::Constructor {
+                        union_name: "Option".to_string(),
+                        variant_name: "None".to_string(),
+                        bindings: vec![],
+                        span: *span,
+                    });
+                }
+
                 self.env.define(name.clone(), expected_ty.clone());
                 Some(hir::Pattern::Binding {
                     name: name.clone(),
@@ -611,6 +645,10 @@ impl Checker {
                 Some(hir::Pattern::Literal(Box::new(checked)))
             }
             ast::Pattern::Constructor { name, args, span } => {
+                if let Some(pat) = self.check_builtin_pattern(name, args, *span, expected_ty) {
+                    return pat;
+                }
+
                 let union_ty = match expected_ty {
                     VexType::Union { .. } => expected_ty,
                     _ => {
@@ -664,6 +702,122 @@ impl Checker {
                     span: *span,
                 })
             }
+        }
+    }
+
+    fn check_builtin_pattern(
+        &mut self,
+        name: &str,
+        args: &[ast::Pattern],
+        span: Span,
+        expected_ty: &VexType,
+    ) -> Option<Option<hir::Pattern>> {
+        if matches!(expected_ty, VexType::Union { .. }) {
+            return None;
+        }
+
+        match name {
+            "Some" => {
+                let inner = match expected_ty {
+                    VexType::Option(inner) => inner.as_ref(),
+                    _ => {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!("Some pattern used on non-Option type {}", expected_ty),
+                            span,
+                        ));
+                        return Some(None);
+                    }
+                };
+                if args.len() != 1 {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!("Some pattern requires 1 binding, found {}", args.len()),
+                        span,
+                    ));
+                    return Some(None);
+                }
+                let checked = self.check_pattern(&args[0], inner)?;
+                Some(Some(hir::Pattern::Constructor {
+                    union_name: "Option".to_string(),
+                    variant_name: "Some".to_string(),
+                    bindings: vec![checked],
+                    span,
+                }))
+            }
+            "None" => {
+                if !matches!(expected_ty, VexType::Option(_)) {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!("None pattern used on non-Option type {}", expected_ty),
+                        span,
+                    ));
+                    return Some(None);
+                }
+                if !args.is_empty() {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!("None pattern takes no bindings, found {}", args.len()),
+                        span,
+                    ));
+                    return Some(None);
+                }
+                Some(Some(hir::Pattern::Constructor {
+                    union_name: "Option".to_string(),
+                    variant_name: "None".to_string(),
+                    bindings: vec![],
+                    span,
+                }))
+            }
+            "Ok" => {
+                let ok_ty = match expected_ty {
+                    VexType::Result { ok, .. } => ok.as_ref(),
+                    _ => {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!("Ok pattern used on non-Result type {}", expected_ty),
+                            span,
+                        ));
+                        return Some(None);
+                    }
+                };
+                if args.len() != 1 {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!("Ok pattern requires 1 binding, found {}", args.len()),
+                        span,
+                    ));
+                    return Some(None);
+                }
+                let checked = self.check_pattern(&args[0], ok_ty)?;
+                Some(Some(hir::Pattern::Constructor {
+                    union_name: "Result".to_string(),
+                    variant_name: "Ok".to_string(),
+                    bindings: vec![checked],
+                    span,
+                }))
+            }
+            "Err" => {
+                let err_ty = match expected_ty {
+                    VexType::Result { err, .. } => err.as_ref(),
+                    _ => {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!("Err pattern used on non-Result type {}", expected_ty),
+                            span,
+                        ));
+                        return Some(None);
+                    }
+                };
+                if args.len() != 1 {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!("Err pattern requires 1 binding, found {}", args.len()),
+                        span,
+                    ));
+                    return Some(None);
+                }
+                let checked = self.check_pattern(&args[0], err_ty)?;
+                Some(Some(hir::Pattern::Constructor {
+                    union_name: "Result".to_string(),
+                    variant_name: "Err".to_string(),
+                    bindings: vec![checked],
+                    span,
+                }))
+            }
+            _ => None,
         }
     }
 
@@ -730,6 +884,110 @@ impl Checker {
             span,
             ty: union_ty.clone(),
         })
+    }
+
+    fn check_builtin_constructor(
+        &mut self,
+        name: &str,
+        args: &[ast::Expr],
+        span: Span,
+    ) -> Option<Option<hir::Expr>> {
+        if self.find_variant_union(name).is_some() {
+            return None;
+        }
+
+        match name {
+            "Some" => {
+                if args.len() != 1 {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!("Some requires 1 argument, found {}", args.len()),
+                        span,
+                    ));
+                    return Some(None);
+                }
+                let checked = match self.check_expr(&args[0]) {
+                    Some(e) => e,
+                    None => return Some(None),
+                };
+                let inner_ty = checked.ty().clone();
+                let ty = VexType::Option(Box::new(inner_ty));
+                Some(Some(hir::Expr::VariantConstructor {
+                    union_name: "Option".to_string(),
+                    variant_name: "Some".to_string(),
+                    args: vec![checked],
+                    span,
+                    ty,
+                }))
+            }
+            "None" => {
+                if !args.is_empty() {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!("None takes no arguments, found {}", args.len()),
+                        span,
+                    ));
+                    return Some(None);
+                }
+                let ty = VexType::Option(Box::new(self.env.fresh_type_var()));
+                Some(Some(hir::Expr::VariantConstructor {
+                    union_name: "Option".to_string(),
+                    variant_name: "None".to_string(),
+                    args: vec![],
+                    span,
+                    ty,
+                }))
+            }
+            "Ok" => {
+                if args.len() != 1 {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!("Ok requires 1 argument, found {}", args.len()),
+                        span,
+                    ));
+                    return Some(None);
+                }
+                let checked = match self.check_expr(&args[0]) {
+                    Some(e) => e,
+                    None => return Some(None),
+                };
+                let ok_ty = checked.ty().clone();
+                let ty = VexType::Result {
+                    ok: Box::new(ok_ty),
+                    err: Box::new(self.env.fresh_type_var()),
+                };
+                Some(Some(hir::Expr::VariantConstructor {
+                    union_name: "Result".to_string(),
+                    variant_name: "Ok".to_string(),
+                    args: vec![checked],
+                    span,
+                    ty,
+                }))
+            }
+            "Err" => {
+                if args.len() != 1 {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!("Err requires 1 argument, found {}", args.len()),
+                        span,
+                    ));
+                    return Some(None);
+                }
+                let checked = match self.check_expr(&args[0]) {
+                    Some(e) => e,
+                    None => return Some(None),
+                };
+                let err_ty = checked.ty().clone();
+                let ty = VexType::Result {
+                    ok: Box::new(self.env.fresh_type_var()),
+                    err: Box::new(err_ty),
+                };
+                Some(Some(hir::Expr::VariantConstructor {
+                    union_name: "Result".to_string(),
+                    variant_name: "Err".to_string(),
+                    args: vec![checked],
+                    span,
+                    ty,
+                }))
+            }
+            _ => None,
+        }
     }
 
     fn check_record_constructor(
@@ -838,17 +1096,19 @@ impl Checker {
         self.env.pop_scope();
 
         let ret_ty = if let Some(declared) = ret_ty_from_ann {
-            if declared != body_ty {
-                self.diagnostics.push(Diagnostic::error(
-                    format!(
-                        "declared return type {} doesn't match body type {}",
-                        declared, body_ty
-                    ),
-                    span,
-                ));
-                return None;
+            match VexType::types_compatible(&declared, &body_ty) {
+                Some(merged) => merged,
+                None => {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!(
+                            "declared return type {} doesn't match body type {}",
+                            declared, body_ty
+                        ),
+                        span,
+                    ));
+                    return None;
+                }
             }
-            declared
         } else {
             body_ty.clone()
         };
@@ -2061,5 +2321,198 @@ mod tests {
         let (_, diags) = check_source("(defn f [x : (List Int)] x)");
         assert_eq!(diags.len(), 1);
         assert!(diags[0].message.contains("unknown parametric type"));
+    }
+
+    #[test]
+    fn some_constructor() {
+        let source = r#"
+            (defn f [] : (Option Int)
+              (Some 42))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            assert!(matches!(
+                &body[0],
+                hir::Expr::VariantConstructor {
+                    union_name,
+                    variant_name,
+                    ..
+                } if union_name == "Option" && variant_name == "Some"
+            ));
+            assert_eq!(body[0].ty(), &VexType::Option(Box::new(VexType::Int)));
+        }
+    }
+
+    #[test]
+    fn none_constructor_call() {
+        let source = r#"
+            (defn f [] : (Option Int)
+              (None))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            assert!(matches!(
+                &body[0],
+                hir::Expr::VariantConstructor {
+                    variant_name,
+                    args,
+                    ..
+                } if variant_name == "None" && args.is_empty()
+            ));
+        }
+    }
+
+    #[test]
+    fn none_constructor_bare() {
+        let source = r#"
+            (defn f [] : (Option Int)
+              None)
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            assert!(matches!(
+                &body[0],
+                hir::Expr::VariantConstructor {
+                    variant_name,
+                    ..
+                } if variant_name == "None"
+            ));
+        }
+    }
+
+    #[test]
+    fn ok_constructor() {
+        let source = r#"
+            (defn f [] : (Result Int String)
+              (Ok 42))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            assert!(matches!(
+                &body[0],
+                hir::Expr::VariantConstructor {
+                    union_name,
+                    variant_name,
+                    ..
+                } if union_name == "Result" && variant_name == "Ok"
+            ));
+        }
+    }
+
+    #[test]
+    fn err_constructor() {
+        let source = r#"
+            (defn f [] : (Result Int String)
+              (Err "bad"))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            assert!(matches!(
+                &body[0],
+                hir::Expr::VariantConstructor {
+                    union_name,
+                    variant_name,
+                    ..
+                } if union_name == "Result" && variant_name == "Err"
+            ));
+        }
+    }
+
+    #[test]
+    fn error_some_wrong_arity() {
+        let (_, diags) = check_source("(Some 1 2)");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("Some requires 1 argument"));
+    }
+
+    #[test]
+    fn error_none_with_args() {
+        let (_, diags) = check_source("(None 42)");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("None takes no arguments"));
+    }
+
+    #[test]
+    fn match_option_patterns() {
+        let source = r#"
+            (defn unwrap [o : (Option Int)] : Int
+              (match o
+                (Some x) x
+                None 0))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            if let hir::Expr::Match { clauses, ty, .. } = &body[0] {
+                assert_eq!(clauses.len(), 2);
+                assert_eq!(*ty, VexType::Int);
+            } else {
+                panic!("expected match");
+            }
+        }
+    }
+
+    #[test]
+    fn match_result_patterns() {
+        let source = r#"
+            (defn unwrap-result [r : (Result Int String)] : Int
+              (match r
+                (Ok x) x
+                (Err e) -1))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            if let hir::Expr::Match { clauses, ty, .. } = &body[0] {
+                assert_eq!(clauses.len(), 2);
+                assert_eq!(*ty, VexType::Int);
+            } else {
+                panic!("expected match");
+            }
+        }
+    }
+
+    #[test]
+    fn error_some_pattern_on_non_option() {
+        let source = r#"
+            (defn f [x : Int] : Int
+              (match x
+                (Some y) y))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("non-Option"));
+    }
+
+    #[test]
+    fn error_ok_pattern_on_non_result() {
+        let source = r#"
+            (defn f [x : Int] : Int
+              (match x
+                (Ok y) y))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("non-Result"));
+    }
+
+    #[test]
+    fn if_with_option_branches() {
+        let source = r#"
+            (defn f [x : Int] : (Option Int)
+              (if (> x 0)
+                (Some x)
+                None))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { return_type, .. } = &module.top_forms[0] {
+            assert_eq!(*return_type, VexType::Option(Box::new(VexType::Int)));
+        }
     }
 }

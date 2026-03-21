@@ -5,3 +5,4 @@
 .DS_Store
 .cursor/*
 !.cursor/rules/
+!.cursor/skills/

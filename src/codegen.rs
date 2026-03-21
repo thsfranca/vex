@@ -365,6 +365,11 @@ impl Generator {
             return;
         }
 
+        if func_name == Some("map") && args.len() == 2 {
+            self.emit_map(&args[0], &args[1], _ty);
+            return;
+        }
+
         if let Some(name) = func_name
             && let Some(builtin) = builtins::lookup(name)
         {
@@ -442,6 +447,70 @@ impl Generator {
             self.write_indent();
             self.write("}");
         }
+    }
+
+    fn emit_map(&mut self, list: &hir::Expr, callback: &hir::Expr, result_ty: &VexType) {
+        let result_go_ty = go_type(result_ty);
+        self.write("func() ");
+        self.write(&result_go_ty);
+        self.write(" {\n");
+        self.indent += 1;
+
+        self.write_indent();
+        self.write("_result := make(");
+        self.write(&result_go_ty);
+        self.write(", 0, len(");
+        self.emit_expr(list);
+        self.write("))");
+        self.newline();
+
+        if let hir::Expr::Lambda { params, body, .. } = callback {
+            let param_name = if let Some(p) = params.first() {
+                vex_to_go_name(&p.name)
+            } else {
+                "_v".to_string()
+            };
+            self.write_indent();
+            self.write("for _, ");
+            self.write(&param_name);
+            self.write(" := range ");
+            self.emit_expr(list);
+            self.write(" {\n");
+            self.indent += 1;
+            self.write_indent();
+            self.write("_result = append(_result, ");
+            if let Some(last) = body.last() {
+                self.emit_expr(last);
+            }
+            self.write(")");
+            self.newline();
+            self.indent -= 1;
+            self.write_indent();
+            self.write("}");
+            self.newline();
+        } else {
+            self.write_indent();
+            self.write("for _, _v := range ");
+            self.emit_expr(list);
+            self.write(" {\n");
+            self.indent += 1;
+            self.write_indent();
+            self.write("_result = append(_result, ");
+            self.emit_expr(callback);
+            self.write("(_v))");
+            self.newline();
+            self.indent -= 1;
+            self.write_indent();
+            self.write("}");
+            self.newline();
+        }
+
+        self.write_indent();
+        self.write("return _result");
+        self.newline();
+        self.indent -= 1;
+        self.write_indent();
+        self.write("}()");
     }
 
     fn emit_lambda(&mut self, params: &[hir::Param], return_type: &VexType, body: &[hir::Expr]) {
@@ -2326,6 +2395,98 @@ mod tests {
             cg.output
         );
         assert!(cg.output.contains("processItem(_v)"), "{}", cg.output);
+    }
+
+    #[test]
+    fn expr_map_with_lambda() {
+        let mut cg = Generator::new();
+        let list_expr = hir::Expr::Var {
+            name: "xs".into(),
+            span: span(5, 7),
+            ty: VexType::List(Box::new(VexType::Int)),
+        };
+        let callback = hir::Expr::Lambda {
+            params: vec![hir::Param {
+                name: "x".into(),
+                ty: VexType::Int,
+                span: span(13, 14),
+            }],
+            return_type: VexType::Int,
+            body: vec![hir::Expr::Call {
+                func: Box::new(hir::Expr::Var {
+                    name: "*".into(),
+                    span: span(20, 21),
+                    ty: VexType::Fn {
+                        params: vec![VexType::Int, VexType::Int],
+                        ret: Box::new(VexType::Int),
+                    },
+                }),
+                args: vec![
+                    hir::Expr::Var {
+                        name: "x".into(),
+                        span: span(22, 23),
+                        ty: VexType::Int,
+                    },
+                    hir::Expr::Int(2, span(24, 25)),
+                ],
+                span: span(19, 26),
+                ty: VexType::Int,
+            }],
+            span: span(8, 27),
+            ty: VexType::Fn {
+                params: vec![VexType::Int],
+                ret: Box::new(VexType::Int),
+            },
+        };
+        let result_ty = VexType::List(Box::new(VexType::Int));
+        cg.emit_map(&list_expr, &callback, &result_ty);
+        assert!(cg.output.contains("func() []int64 {"), "{}", cg.output);
+        assert!(
+            cg.output.contains("_result := make([]int64, 0, len(xs))"),
+            "{}",
+            cg.output
+        );
+        assert!(
+            cg.output.contains("for _, x := range xs {"),
+            "{}",
+            cg.output
+        );
+        assert!(
+            cg.output.contains("_result = append(_result, (x * 2))"),
+            "{}",
+            cg.output
+        );
+        assert!(cg.output.contains("return _result"), "{}", cg.output);
+    }
+
+    #[test]
+    fn expr_map_with_var() {
+        let mut cg = Generator::new();
+        let list_expr = hir::Expr::Var {
+            name: "xs".into(),
+            span: span(5, 7),
+            ty: VexType::List(Box::new(VexType::Int)),
+        };
+        let callback = hir::Expr::Var {
+            name: "double".into(),
+            span: span(8, 14),
+            ty: VexType::Fn {
+                params: vec![VexType::Int],
+                ret: Box::new(VexType::Int),
+            },
+        };
+        let result_ty = VexType::List(Box::new(VexType::Int));
+        cg.emit_map(&list_expr, &callback, &result_ty);
+        assert!(
+            cg.output.contains("for _, _v := range xs {"),
+            "{}",
+            cg.output
+        );
+        assert!(
+            cg.output.contains("_result = append(_result, double(_v))"),
+            "{}",
+            cg.output
+        );
     }
 
     #[test]

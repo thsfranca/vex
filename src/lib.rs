@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod builtins;
+pub mod codegen;
 pub mod diagnostics;
 pub mod hir;
 pub mod lexer;

@@ -30,7 +30,7 @@ vex repl                        # Interactive REPL
 
 ## Current Status
 
-All compiler phases are implemented, including macro expansion (`cond`, `and`, `or`) and a tree-walking interpreter powering `vex repl`.
+All compiler phases are implemented. The self-hosted macro system (`defmacro`) supports user-defined compile-time macros with automatic hygiene.
 
 ### Compiler Phases
 
@@ -42,7 +42,7 @@ All compiler phases are implemented, including macro expansion (`cond`, `and`, `
 | `ast.rs` — Untyped AST types | Done |
 | `parser.rs` — Recursive descent parser | Done |
 | `types.rs` / `hir.rs` / `builtins.rs` — Type system | Done |
-| `macro_expand.rs` — Compiler-internal macros (cond, and, or) | Done |
+| `macro_expand.rs` — Compiler macros + self-hosted `defmacro` with hygiene | Done |
 | `typechecker.rs` — AST → HIR | Done |
 | `codegen.rs` — HIR → Go source | Done |
 | `interpreter.rs` — HIR → Value (tree-walking eval) | Done |
@@ -53,6 +53,7 @@ All compiler phases are implemented, including macro expansion (`cond`, `and`, `
 - **Primitives:** integers, floats, strings, booleans, nil
 - **Functions:** `defn`, `def`, `fn` (lambdas), higher-order functions
 - **Control flow:** `if`, `cond`, `and`, `or`, `let`, pattern matching (`match`)
+- **Macros:** `defmacro`, `quote`, `unquote`, `splice`, macro helpers (`syntax-list`, `syntax-cons`, etc.), automatic hygiene via `gensym`
 - **Data types:** records (`deftype`), field access (`.`), record constructors, unions (`defunion`)
 - **Built-in types:** `Option`, `Result`, `List`, `Map`
 - **Collections:** `each`, `range`, `map`, `filter`

@@ -172,6 +172,12 @@ pub enum TopForm {
         span: Span,
     },
 
+    ImportGo {
+        go_package: String,
+        symbols: Vec<String>,
+        span: Span,
+    },
+
     Defn {
         name: String,
         params: Vec<Param>,
@@ -208,6 +214,7 @@ impl TopForm {
             TopForm::Module { span, .. }
             | TopForm::Export { span, .. }
             | TopForm::Import { span, .. }
+            | TopForm::ImportGo { span, .. }
             | TopForm::Defn { span, .. }
             | TopForm::Def { span, .. }
             | TopForm::Deftype { span, .. }

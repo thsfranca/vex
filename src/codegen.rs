@@ -33,6 +33,7 @@ struct Generator {
     output: String,
     indent: usize,
     import_map: std::collections::HashMap<String, String>,
+    go_import_packages: BTreeSet<String>,
     package_name: Option<String>,
 }
 
@@ -42,6 +43,7 @@ impl Generator {
             output: String::new(),
             indent: 0,
             import_map: std::collections::HashMap::new(),
+            go_import_packages: BTreeSet::new(),
             package_name: None,
         }
     }
@@ -89,14 +91,35 @@ impl Generator {
         }
         self.newline();
 
+        for form in &module.top_forms {
+            if let hir::TopForm::ImportGo {
+                go_package,
+                symbols,
+                ..
+            } = form
+            {
+                self.go_import_packages.insert(go_package.clone());
+                for sym in symbols {
+                    self.import_map
+                        .entry(sym.clone())
+                        .or_insert_with(|| go_package.clone());
+                }
+            }
+        }
+
         let mut imports = collect_go_imports(module);
 
-        let module_packages: BTreeSet<String> = self
+        for pkg in &self.go_import_packages {
+            imports.insert(pkg.clone());
+        }
+
+        let vex_module_packages: BTreeSet<String> = self
             .import_map
             .values()
+            .filter(|pkg| !self.go_import_packages.contains(*pkg))
             .map(|pkg| format!("vex_out/{}", pkg))
             .collect();
-        for pkg in &module_packages {
+        for pkg in &vex_module_packages {
             imports.insert(pkg.clone());
         }
 
@@ -126,7 +149,8 @@ impl Generator {
         match form {
             hir::TopForm::Module { .. }
             | hir::TopForm::Export { .. }
-            | hir::TopForm::Import { .. } => {}
+            | hir::TopForm::Import { .. }
+            | hir::TopForm::ImportGo { .. } => {}
             hir::TopForm::Defn {
                 name,
                 params,
@@ -1110,8 +1134,10 @@ fn collect_builtin_calls_expr(expr: &hir::Expr, names: &mut Vec<String>) {
 
 fn collect_builtin_calls_top_form(form: &hir::TopForm, names: &mut Vec<String>) {
     match form {
-        hir::TopForm::Module { .. } | hir::TopForm::Export { .. } | hir::TopForm::Import { .. } => {
-        }
+        hir::TopForm::Module { .. }
+        | hir::TopForm::Export { .. }
+        | hir::TopForm::Import { .. }
+        | hir::TopForm::ImportGo { .. } => {}
         hir::TopForm::Defn { body, .. } => {
             for expr in body {
                 collect_builtin_calls_expr(expr, names);
@@ -2848,5 +2874,34 @@ mod tests {
         let output = generate_with_imports(&module, &import_map);
         assert!(output.contains("math.Add(1, 2)"), "{}", output);
         assert!(output.contains("\"vex_out/math\""), "{}", output);
+    }
+
+    #[test]
+    fn import_go_adds_go_import() {
+        let module = hir::Module {
+            top_forms: vec![
+                hir::TopForm::ImportGo {
+                    go_package: "os".into(),
+                    symbols: vec!["Exit".into()],
+                    span: span(0, 20),
+                },
+                hir::TopForm::Expr(hir::Expr::Call {
+                    func: Box::new(hir::Expr::Var {
+                        name: "Exit".into(),
+                        span: span(21, 25),
+                        ty: VexType::Fn {
+                            params: vec![VexType::Int],
+                            ret: Box::new(VexType::Unit),
+                        },
+                    }),
+                    args: vec![hir::Expr::Int(1, span(26, 27))],
+                    span: span(20, 28),
+                    ty: VexType::Unit,
+                }),
+            ],
+        };
+        let output = generate(&module);
+        assert!(output.contains("\"os\""), "{}", output);
+        assert!(output.contains("os.Exit(1)"), "{}", output);
     }
 }

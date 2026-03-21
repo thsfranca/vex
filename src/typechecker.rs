@@ -1533,6 +1533,15 @@ impl Checker {
                 symbols: symbols.clone(),
                 span: *span,
             }),
+            ast::TopForm::ImportGo {
+                go_package,
+                symbols,
+                span,
+            } => Some(hir::TopForm::ImportGo {
+                go_package: go_package.clone(),
+                symbols: symbols.clone(),
+                span: *span,
+            }),
             ast::TopForm::Expr(expr) => {
                 let checked = self.check_expr(expr)?;
                 Some(hir::TopForm::Expr(checked))

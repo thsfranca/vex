@@ -190,13 +190,31 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 let text = &self.source[start..self.pos];
-                let val: f64 = text.parse().unwrap_or(0.0);
+                let val: f64 = match text.parse() {
+                    Ok(v) => v,
+                    Err(_) => {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!("float literal out of range: {text}"),
+                            self.span(start),
+                        ));
+                        0.0
+                    }
+                };
                 return Token::new(TokenKind::Float(val), self.span(start));
             }
         }
 
         let text = &self.source[start..self.pos];
-        let val: i64 = text.parse().unwrap_or(0);
+        let val: i64 = match text.parse() {
+            Ok(v) => v,
+            Err(_) => {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("integer literal out of range: {text}"),
+                    self.span(start),
+                ));
+                0
+            }
+        };
         Token::new(TokenKind::Integer(val), self.span(start))
     }
 
@@ -314,12 +332,13 @@ impl<'a> Lexer<'a> {
                         }
                     }
                     let text = &self.source[start + 1..self.pos];
-                    return Some(Token::new(
+                    Some(Token::new(
                         TokenKind::Keyword(text.to_string()),
                         self.span(start),
-                    ));
+                    ))
+                } else {
+                    Some(Token::new(TokenKind::Colon, self.span(start)))
                 }
-                Some(Token::new(TokenKind::Colon, self.span(start)))
             }
             b'"' => Some(self.lex_string()),
             b'-' => {
@@ -328,9 +347,10 @@ impl<'a> Lexer<'a> {
                 {
                     let start = self.pos;
                     self.advance();
-                    return Some(self.lex_number(start));
+                    Some(self.lex_number(start))
+                } else {
+                    Some(self.lex_operator_symbol())
                 }
-                Some(self.lex_operator_symbol())
             }
             b if b.is_ascii_digit() => {
                 let start = self.pos;
@@ -587,6 +607,15 @@ mod tests {
                 TokenKind::Symbol("foo".into()),
             ]
         );
+    }
+
+    #[test]
+    fn integer_overflow() {
+        let (tokens, diags) = lex_test("99999999999999999999");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, TokenKind::Integer(0));
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("integer literal out of range"));
     }
 
     #[test]

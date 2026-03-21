@@ -63,9 +63,7 @@ impl Diagnostic {
         self.labels.push(label);
         self
     }
-}
 
-impl Diagnostic {
     pub fn render(&self, source_map: &SourceMap) -> String {
         let loc = source_map.line_col(self.span.file, self.span.start);
         let file_name = source_map.name(self.span.file);

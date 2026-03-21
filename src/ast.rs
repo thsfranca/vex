@@ -149,6 +149,12 @@ pub enum TopForm {
         span: Span,
     },
 
+    Defunion {
+        name: String,
+        variants: Vec<Variant>,
+        span: Span,
+    },
+
     Expr(Expr),
 }
 
@@ -157,10 +163,18 @@ impl TopForm {
         match self {
             TopForm::Defn { span, .. }
             | TopForm::Def { span, .. }
-            | TopForm::Deftype { span, .. } => *span,
+            | TopForm::Deftype { span, .. }
+            | TopForm::Defunion { span, .. } => *span,
             TopForm::Expr(expr) => expr.span(),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Variant {
+    pub name: String,
+    pub types: Vec<TypeExpr>,
+    pub span: Span,
 }
 
 #[cfg(test)]
@@ -537,5 +551,45 @@ mod tests {
             assert_eq!(params.len(), 1);
             assert_eq!(params[0].name, "n");
         }
+    }
+
+    #[test]
+    fn variant_struct() {
+        let v = Variant {
+            name: "Some".into(),
+            types: vec![TypeExpr::Named {
+                name: "Int".into(),
+                span: span(6, 9),
+            }],
+            span: span(0, 10),
+        };
+        assert_eq!(v.name, "Some");
+        assert_eq!(v.types.len(), 1);
+    }
+
+    #[test]
+    fn defunion_top_form() {
+        let form = TopForm::Defunion {
+            name: "Option".into(),
+            variants: vec![
+                Variant {
+                    name: "Some".into(),
+                    types: vec![TypeExpr::Named {
+                        name: "Int".into(),
+                        span: span(22, 25),
+                    }],
+                    span: span(16, 26),
+                },
+                Variant {
+                    name: "None".into(),
+                    types: vec![],
+                    span: span(27, 33),
+                },
+            ],
+            span: span(0, 34),
+        };
+        assert!(matches!(&form, TopForm::Defunion { name, variants, .. }
+            if name == "Option" && variants.len() == 2));
+        assert_eq!(form.span(), span(0, 34));
     }
 }

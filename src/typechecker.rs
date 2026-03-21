@@ -712,6 +712,7 @@ impl Checker {
                 span,
             } => self.check_def(name, type_ann.as_ref(), value, *span),
             ast::TopForm::Deftype { name, fields, span } => self.check_deftype(name, fields, *span),
+            ast::TopForm::Defunion { .. } => None,
         }
     }
 }

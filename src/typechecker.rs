@@ -1516,6 +1516,23 @@ impl Checker {
 
     fn check_top_form(&mut self, form: &ast::TopForm) -> Option<hir::TopForm> {
         match form {
+            ast::TopForm::Module { name, span } => Some(hir::TopForm::Module {
+                name: name.clone(),
+                span: *span,
+            }),
+            ast::TopForm::Export { symbols, span } => Some(hir::TopForm::Export {
+                symbols: symbols.clone(),
+                span: *span,
+            }),
+            ast::TopForm::Import {
+                module_path,
+                symbols,
+                span,
+            } => Some(hir::TopForm::Import {
+                module_path: module_path.clone(),
+                symbols: symbols.clone(),
+                span: *span,
+            }),
             ast::TopForm::Expr(expr) => {
                 let checked = self.check_expr(expr)?;
                 Some(hir::TopForm::Expr(checked))

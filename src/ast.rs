@@ -164,6 +164,22 @@ pub struct Field {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TopForm {
+    Module {
+        name: String,
+        span: Span,
+    },
+
+    Export {
+        symbols: Vec<String>,
+        span: Span,
+    },
+
+    Import {
+        module_path: String,
+        symbols: Vec<String>,
+        span: Span,
+    },
+
     Defn {
         name: String,
         params: Vec<Param>,
@@ -197,7 +213,10 @@ pub enum TopForm {
 impl TopForm {
     pub fn span(&self) -> Span {
         match self {
-            TopForm::Defn { span, .. }
+            TopForm::Module { span, .. }
+            | TopForm::Export { span, .. }
+            | TopForm::Import { span, .. }
+            | TopForm::Defn { span, .. }
             | TopForm::Def { span, .. }
             | TopForm::Deftype { span, .. }
             | TopForm::Defunion { span, .. } => *span,
@@ -680,6 +699,47 @@ mod tests {
         assert_eq!(expr.span(), span(0, 26));
         if let Expr::Match { clauses, .. } = &expr {
             assert_eq!(clauses.len(), 2);
+        }
+    }
+
+    #[test]
+    fn module_top_form() {
+        let form = TopForm::Module {
+            name: "vex.http".into(),
+            span: span(0, 16),
+        };
+        assert_eq!(form.span(), span(0, 16));
+        assert!(matches!(&form, TopForm::Module { name, .. } if name == "vex.http"));
+    }
+
+    #[test]
+    fn export_top_form() {
+        let form = TopForm::Export {
+            symbols: vec!["foo".into(), "bar".into()],
+            span: span(0, 18),
+        };
+        assert_eq!(form.span(), span(0, 18));
+        if let TopForm::Export { symbols, .. } = &form {
+            assert_eq!(symbols, &["foo", "bar"]);
+        }
+    }
+
+    #[test]
+    fn import_top_form() {
+        let form = TopForm::Import {
+            module_path: "math.core".into(),
+            symbols: vec!["add".into(), "sub".into()],
+            span: span(0, 28),
+        };
+        assert_eq!(form.span(), span(0, 28));
+        if let TopForm::Import {
+            module_path,
+            symbols,
+            ..
+        } = &form
+        {
+            assert_eq!(module_path, "math.core");
+            assert_eq!(symbols, &["add", "sub"]);
         }
     }
 }

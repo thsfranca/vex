@@ -156,6 +156,22 @@ impl Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TopForm {
+    Module {
+        name: String,
+        span: Span,
+    },
+
+    Export {
+        symbols: Vec<String>,
+        span: Span,
+    },
+
+    Import {
+        module_path: String,
+        symbols: Vec<String>,
+        span: Span,
+    },
+
     Defn {
         name: String,
         params: Vec<Param>,
@@ -189,7 +205,10 @@ pub enum TopForm {
 impl TopForm {
     pub fn span(&self) -> Span {
         match self {
-            TopForm::Defn { span, .. }
+            TopForm::Module { span, .. }
+            | TopForm::Export { span, .. }
+            | TopForm::Import { span, .. }
+            | TopForm::Defn { span, .. }
             | TopForm::Def { span, .. }
             | TopForm::Deftype { span, .. }
             | TopForm::Defunion { span, .. } => *span,

@@ -116,6 +116,10 @@ impl Checker {
                 return result;
             }
 
+            if name == "each" {
+                return self.check_each(args, span);
+            }
+
             if let Some(record_ty) = self.type_defs.get(name).cloned()
                 && matches!(&record_ty, VexType::Record { .. })
             {
@@ -1025,6 +1029,83 @@ impl Checker {
             }
             _ => None,
         }
+    }
+
+    fn check_each(&mut self, args: &[ast::Expr], span: Span) -> Option<hir::Expr> {
+        if args.len() != 2 {
+            self.diagnostics.push(Diagnostic::error(
+                format!(
+                    "each requires 2 arguments (list, function), found {}",
+                    args.len()
+                ),
+                span,
+            ));
+            return None;
+        }
+
+        let checked_list = self.check_expr(&args[0])?;
+        let elem_ty = match checked_list.ty() {
+            VexType::List(inner) => inner.as_ref().clone(),
+            other => {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("each requires a List, found {}", other),
+                    checked_list.span(),
+                ));
+                return None;
+            }
+        };
+
+        let checked_fn = self.check_expr(&args[1])?;
+        match checked_fn.ty() {
+            VexType::Fn { params, .. } => {
+                if params.len() != 1 {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!(
+                            "each callback must take 1 parameter, found {}",
+                            params.len()
+                        ),
+                        checked_fn.span(),
+                    ));
+                    return None;
+                }
+                if params[0] != elem_ty {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!(
+                            "each callback parameter has type {}, but list element type is {}",
+                            params[0], elem_ty
+                        ),
+                        checked_fn.span(),
+                    ));
+                    return None;
+                }
+            }
+            other => {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("each requires a function, found {}", other),
+                    checked_fn.span(),
+                ));
+                return None;
+            }
+        }
+
+        let each_ty = VexType::Fn {
+            params: vec![
+                VexType::List(Box::new(elem_ty.clone())),
+                checked_fn.ty().clone(),
+            ],
+            ret: Box::new(VexType::Unit),
+        };
+
+        Some(hir::Expr::Call {
+            func: Box::new(hir::Expr::Var {
+                name: "each".to_string(),
+                span,
+                ty: each_ty,
+            }),
+            args: vec![checked_list, checked_fn],
+            span,
+            ty: VexType::Unit,
+        })
     }
 
     fn check_record_constructor(
@@ -2655,6 +2736,83 @@ mod tests {
         } else {
             panic!("expected expression");
         }
+    }
+
+    #[test]
+    fn each_basic() {
+        let source = r#"
+            (defn main []
+              (each (range 0 10) (fn [x : Int] (println (str x)))))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            assert_eq!(body[0].ty(), &VexType::Unit);
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn each_with_variable_fn() {
+        let source = r#"
+            (defn process [x : Int] (println (str x)))
+            (defn main []
+              (each (range 0 5) process))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(module.top_forms.len(), 2);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[1] {
+            assert_eq!(body[0].ty(), &VexType::Unit);
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn error_each_wrong_arg_count() {
+        let (_, diags) = check_source("(each (range 0 10))");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("each requires 2 arguments"));
+    }
+
+    #[test]
+    fn error_each_non_list() {
+        let (_, diags) = check_source("(each 42 (fn [x : Int] x))");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("each requires a List"));
+    }
+
+    #[test]
+    fn error_each_non_function() {
+        let (_, diags) = check_source("(each (range 0 10) 42)");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("each requires a function"));
+    }
+
+    #[test]
+    fn error_each_callback_type_mismatch() {
+        let (_, diags) = check_source("(each (range 0 10) (fn [x : String] (println x)))");
+        assert_eq!(diags.len(), 1);
+        assert!(
+            diags[0]
+                .message
+                .contains("callback parameter has type String")
+        );
+        assert!(diags[0].message.contains("list element type is Int"));
+    }
+
+    #[test]
+    fn error_each_callback_wrong_param_count() {
+        let (_, diags) =
+            check_source("(each (range 0 10) (fn [x : Int y : Int] (println (str x))))");
+        assert_eq!(diags.len(), 1);
+        assert!(
+            diags[0]
+                .message
+                .contains("each callback must take 1 parameter")
+        );
     }
 
     #[test]

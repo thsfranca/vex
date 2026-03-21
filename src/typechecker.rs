@@ -8,6 +8,7 @@ use crate::types::{RecordField, TypeEnv, UnionVariant, VexType};
 struct Checker {
     env: TypeEnv,
     type_defs: std::collections::HashMap<String, VexType>,
+    go_imports: std::collections::HashSet<String>,
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -20,6 +21,7 @@ impl Checker {
         Self {
             env,
             type_defs: std::collections::HashMap::new(),
+            go_imports: std::collections::HashSet::new(),
             diagnostics: Vec::new(),
         }
     }
@@ -96,6 +98,12 @@ impl Checker {
                 span,
                 ty: ty.clone(),
             })
+        } else if self.go_imports.contains(name) {
+            Some(hir::Expr::Var {
+                name: name.to_string(),
+                span,
+                ty: VexType::Unit,
+            })
         } else {
             self.diagnostics.push(Diagnostic::error(
                 format!("undefined symbol '{}'", name),
@@ -136,6 +144,23 @@ impl Checker {
 
             if let Some((union_name, union_ty)) = self.find_variant_union(name) {
                 return self.check_variant_constructor(&union_name, name, &union_ty, args, span);
+            }
+
+            if self.go_imports.contains(name) {
+                let mut checked_args = Vec::new();
+                for arg in args {
+                    checked_args.push(self.check_expr(arg)?);
+                }
+                return Some(hir::Expr::Call {
+                    func: Box::new(hir::Expr::Var {
+                        name: name.clone(),
+                        span,
+                        ty: VexType::Unit,
+                    }),
+                    args: checked_args,
+                    span,
+                    ty: VexType::Unit,
+                });
             }
         }
 
@@ -1537,11 +1562,16 @@ impl Checker {
                 go_package,
                 symbols,
                 span,
-            } => Some(hir::TopForm::ImportGo {
-                go_package: go_package.clone(),
-                symbols: symbols.clone(),
-                span: *span,
-            }),
+            } => {
+                for sym in symbols {
+                    self.go_imports.insert(sym.clone());
+                }
+                Some(hir::TopForm::ImportGo {
+                    go_package: go_package.clone(),
+                    symbols: symbols.clone(),
+                    span: *span,
+                })
+            }
             ast::TopForm::Expr(expr) => {
                 let checked = self.check_expr(expr)?;
                 Some(hir::TopForm::Expr(checked))

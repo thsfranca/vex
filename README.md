@@ -12,14 +12,26 @@ Vex uses S-expression syntax with compile-time type checking, targeting networke
 
 ## Example
 
-```
+```lisp
 (defn main []
   (println "Hello, World!"))
+```
+
+## Usage
+
+```bash
+cargo build
+vex build hello.vx              # Compile to ./hello binary
+vex build hello.vx -o server    # Custom output name
+vex build hello.vx --emit-go .  # Also write generated Go source
+vex run hello.vx                # Build and run immediately
 ```
 
 ## Current Status
 
 Concurrency is implemented — `spawn`, `channel`, `send`, `recv` map directly to Go goroutines and channels.
+
+### Compiler Phases
 
 | Phase | Status |
 |-------|--------|
@@ -33,26 +45,27 @@ Concurrency is implemented — `spawn`, `channel`, `send`, `recv` map directly t
 | `codegen.rs` — HIR → Go source | Done |
 | `lib.rs` / `main.rs` — Full pipeline, CLI | Done |
 
-**Implemented features:** integers, floats, strings, booleans, nil, `defn`, `def`, `if`, `cond`, `let`, `fn` (lambdas), higher-order functions, records (`deftype`), field access (`.`), record constructors, unions (`defunion`), pattern matching (`match`), `Option`/`Result` types, collections (`List`, `Map`), `each`, `range`, `map`, `filter`, modules (`module`, `export`, `import`), Go interop (`import-go`), concurrency (`spawn`, `channel`, `send`, `recv`), arithmetic/comparison/logical operators, `println`, `str`, `mod`.
+### Implemented Features
+
+- **Primitives:** integers, floats, strings, booleans, nil
+- **Functions:** `defn`, `def`, `fn` (lambdas), higher-order functions
+- **Control flow:** `if`, `cond`, `let`, pattern matching (`match`)
+- **Data types:** records (`deftype`), field access (`.`), record constructors, unions (`defunion`)
+- **Built-in types:** `Option`, `Result`, `List`, `Map`
+- **Collections:** `each`, `range`, `map`, `filter`
+- **Modules:** `module`, `export`, `import`, Go interop (`import-go`)
+- **Concurrency:** `spawn`, `channel`, `send`, `recv`
+- **Operators:** arithmetic, comparison, logical
+- **Built-in functions:** `println`, `str`, `mod`
 
 ## Architecture
 
 - Pipeline: Source → Lexer → Parser → Type Checker → Codegen → `go build` → Binary
 - Design docs: [`docs/language-design.md`](docs/language-design.md), [`docs/compiler-architecture.md`](docs/compiler-architecture.md)
 
-## Usage
+## Development
 
-```
-cargo build
-vex build hello.vx              # Compile to ./hello binary
-vex build hello.vx -o server    # Custom output name
-vex build hello.vx --emit-go .  # Also write generated Go source
-vex run hello.vx                # Build and run immediately
-```
-
-## Building
-
-```
+```bash
 cargo build
 cargo test
 ```

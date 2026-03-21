@@ -32,6 +32,11 @@ pub enum VexType {
         name: std::string::String,
         variants: Vec<UnionVariant>,
     },
+    List(Box<VexType>),
+    Map {
+        key: Box<VexType>,
+        value: Box<VexType>,
+    },
     Option(Box<VexType>),
     Result {
         ok: Box<VexType>,
@@ -51,6 +56,18 @@ impl VexType {
         }
         match (a, b) {
             (VexType::TypeVar(_), other) | (other, VexType::TypeVar(_)) => Some(other.clone()),
+            (VexType::List(inner_a), VexType::List(inner_b)) => {
+                let merged = VexType::types_compatible(inner_a, inner_b)?;
+                Some(VexType::List(Box::new(merged)))
+            }
+            (VexType::Map { key: ka, value: va }, VexType::Map { key: kb, value: vb }) => {
+                let key = VexType::types_compatible(ka, kb)?;
+                let value = VexType::types_compatible(va, vb)?;
+                Some(VexType::Map {
+                    key: Box::new(key),
+                    value: Box::new(value),
+                })
+            }
             (VexType::Option(inner_a), VexType::Option(inner_b)) => {
                 let merged = VexType::types_compatible(inner_a, inner_b)?;
                 Some(VexType::Option(Box::new(merged)))
@@ -79,6 +96,13 @@ impl VexType {
     pub fn resolve_vars(&self, target: &VexType) -> VexType {
         match (self, target) {
             (VexType::TypeVar(_), concrete) => concrete.clone(),
+            (VexType::List(a), VexType::List(b)) => VexType::List(Box::new(a.resolve_vars(b))),
+            (VexType::Map { key: ka, value: va }, VexType::Map { key: kb, value: vb }) => {
+                VexType::Map {
+                    key: Box::new(ka.resolve_vars(kb)),
+                    value: Box::new(va.resolve_vars(vb)),
+                }
+            }
             (VexType::Option(a), VexType::Option(b)) => {
                 VexType::Option(Box::new(a.resolve_vars(b)))
             }
@@ -127,6 +151,8 @@ impl fmt::Display for VexType {
             }
             VexType::Record { name, .. } => write!(f, "{}", name),
             VexType::Union { name, .. } => write!(f, "{}", name),
+            VexType::List(inner) => write!(f, "(List {})", inner),
+            VexType::Map { key, value } => write!(f, "(Map {} {})", key, value),
             VexType::Option(inner) => write!(f, "(Option {})", inner),
             VexType::Result { ok, err } => write!(f, "(Result {} {})", ok, err),
             VexType::TypeVar(id) => write!(f, "?T{}", id),
@@ -496,6 +522,83 @@ mod tests {
             Some(VexType::Result {
                 ok: Box::new(VexType::Int),
                 err: Box::new(VexType::String),
+            })
+        );
+    }
+
+    #[test]
+    fn display_list() {
+        let ty = VexType::List(Box::new(VexType::Int));
+        assert_eq!(format!("{}", ty), "(List Int)");
+    }
+
+    #[test]
+    fn display_list_nested() {
+        let ty = VexType::List(Box::new(VexType::List(Box::new(VexType::String))));
+        assert_eq!(format!("{}", ty), "(List (List String))");
+    }
+
+    #[test]
+    fn display_map() {
+        let ty = VexType::Map {
+            key: Box::new(VexType::String),
+            value: Box::new(VexType::Int),
+        };
+        assert_eq!(format!("{}", ty), "(Map String Int)");
+    }
+
+    #[test]
+    fn list_equality() {
+        let a = VexType::List(Box::new(VexType::Int));
+        let b = VexType::List(Box::new(VexType::Int));
+        let c = VexType::List(Box::new(VexType::String));
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn map_equality() {
+        let a = VexType::Map {
+            key: Box::new(VexType::String),
+            value: Box::new(VexType::Int),
+        };
+        let b = VexType::Map {
+            key: Box::new(VexType::String),
+            value: Box::new(VexType::Int),
+        };
+        let c = VexType::Map {
+            key: Box::new(VexType::Int),
+            value: Box::new(VexType::Int),
+        };
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn types_compatible_list() {
+        let a = VexType::List(Box::new(VexType::TypeVar(0)));
+        let b = VexType::List(Box::new(VexType::Int));
+        assert_eq!(
+            VexType::types_compatible(&a, &b),
+            Some(VexType::List(Box::new(VexType::Int)))
+        );
+    }
+
+    #[test]
+    fn types_compatible_map() {
+        let a = VexType::Map {
+            key: Box::new(VexType::String),
+            value: Box::new(VexType::TypeVar(0)),
+        };
+        let b = VexType::Map {
+            key: Box::new(VexType::String),
+            value: Box::new(VexType::Int),
+        };
+        assert_eq!(
+            VexType::types_compatible(&a, &b),
+            Some(VexType::Map {
+                key: Box::new(VexType::String),
+                value: Box::new(VexType::Int),
             })
         );
     }

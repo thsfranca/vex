@@ -312,6 +312,32 @@ impl Checker {
                 })
             }
             ast::TypeExpr::Applied { name, args, span } => match name.as_str() {
+                "List" => {
+                    if args.len() != 1 {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!("List requires 1 type argument, found {}", args.len()),
+                            *span,
+                        ));
+                        return None;
+                    }
+                    let inner = self.resolve_type(&args[0])?;
+                    Some(VexType::List(Box::new(inner)))
+                }
+                "Map" => {
+                    if args.len() != 2 {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!("Map requires 2 type arguments, found {}", args.len()),
+                            *span,
+                        ));
+                        return None;
+                    }
+                    let key = self.resolve_type(&args[0])?;
+                    let value = self.resolve_type(&args[1])?;
+                    Some(VexType::Map {
+                        key: Box::new(key),
+                        value: Box::new(value),
+                    })
+                }
                 "Option" => {
                     if args.len() != 1 {
                         self.diagnostics.push(Diagnostic::error(
@@ -2367,8 +2393,76 @@ mod tests {
     }
 
     #[test]
+    fn resolve_list_type() {
+        let source = r#"
+            (defn f [x : (List Int)] : (List Int)
+              x)
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn {
+            params,
+            return_type,
+            ..
+        } = &module.top_forms[0]
+        {
+            assert_eq!(params[0].ty, VexType::List(Box::new(VexType::Int)));
+            assert_eq!(*return_type, VexType::List(Box::new(VexType::Int)));
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn resolve_map_type() {
+        let source = r#"
+            (defn f [x : (Map String Int)] : (Map String Int)
+              x)
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn {
+            params,
+            return_type,
+            ..
+        } = &module.top_forms[0]
+        {
+            assert_eq!(
+                params[0].ty,
+                VexType::Map {
+                    key: Box::new(VexType::String),
+                    value: Box::new(VexType::Int),
+                }
+            );
+            assert_eq!(
+                *return_type,
+                VexType::Map {
+                    key: Box::new(VexType::String),
+                    value: Box::new(VexType::Int),
+                }
+            );
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn error_list_wrong_arity() {
+        let (_, diags) = check_source("(defn f [x : (List Int String)] x)");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("List requires 1 type argument"));
+    }
+
+    #[test]
+    fn error_map_wrong_arity() {
+        let (_, diags) = check_source("(defn f [x : (Map String)] x)");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("Map requires 2 type arguments"));
+    }
+
+    #[test]
     fn error_unknown_parametric_type() {
-        let (_, diags) = check_source("(defn f [x : (List Int)] x)");
+        let (_, diags) = check_source("(defn f [x : (Set Int)] x)");
         assert_eq!(diags.len(), 1);
         assert!(diags[0].message.contains("unknown parametric type"));
     }

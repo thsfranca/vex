@@ -148,7 +148,7 @@ Exit codes: `0` success, `1` compilation error, `2` Go build error, `3` CLI usag
 | Traits | Requires `deftype` first |
 | `Result` / `Option` | Requires `defunion` and pattern matching on ADTs |
 | Pattern matching (`match`) | Only useful with ADTs; `if`/`cond` cover MVP needs |
-| User-defined macros (`defmacro`) | Entire subsystem deferred to post-MVP; compiler-internal macros (`cond`, `and`, `or`) are included |
+| User-defined macros (`defmacro`) | Entire subsystem deferred to post-MVP; core macros (`cond`, `and`, `or`) are self-hosted via `defmacro` in the prelude |
 | Modules / imports | Single-file compilation only |
 | Go interop (`import-go`) | Not needed until stdlib work begins |
 | Concurrency (`spawn`, `channel`) | Requires runtime support beyond basic codegen |

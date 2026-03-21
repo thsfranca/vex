@@ -189,8 +189,6 @@ Source (.vx)
 │         macro-introduced bindings)   │
 │      d. Convert Syntax → AST        │
 │      e. Re-expand the result         │
-│    → apply compiler-internal macros  │
-│      (cond, and, or)                 │
 │                                       │
 └───────────────────┬───────────────────┘
                     │ expanded AST (no defmacro, no macro calls)
@@ -198,6 +196,18 @@ Source (.vx)
             ┌──────────────┐
             │ Type Checker │
 ```
+
+#### Prelude — Self-Hosted Core Macros
+
+The compiler ships a prelude module (`prelude.vx`) containing `defmacro` definitions for `cond`, `and`, and `or`. During compilation, the prelude source is embedded in the compiler binary and expanded before any user code. These macros expand to primitive `if` and `let` forms:
+
+- `cond` → nested `if` expressions
+- `and` → `(if a b false)`
+- `or` → `(let [tmp a] (if tmp tmp b))` (with hygienic `tmp`)
+
+This keeps the core language small — `if` and `let` are the only control flow primitives the compiler needs to understand — while making the standard control flow forms available in every Vex program without explicit imports.
+
+#### AST Evaluator
 
 The AST evaluator supports a deliberate subset of the language: literals, symbols, `quote`, `if`, `let`, and calls to macro helper functions. This mirrors the approach taken by Zig's comptime (a separate tree-walking evaluator for compile-time code) and matches how every typed Lisp (Typed Racket, Carp) handles macros — macro bodies run in a dynamic context, and the type checker validates the expanded output.
 
@@ -256,7 +266,7 @@ Functions available only inside macro bodies for constructing and inspecting `Sy
 
 Macros are hygienic by default. The expander automatically renames all bindings introduced by the macro to unique names, preventing variable capture at the call site. The macro author does not need to manage name uniqueness.
 
-For example, the compiler-internal `or` macro introduces a temporary binding. With automatic hygiene, this binding receives a unique compiler-generated name that cannot conflict with user code.
+For example, the `or` macro in the prelude introduces a temporary binding. With automatic hygiene, this binding receives a unique compiler-generated name that cannot conflict with user code.
 
 #### Constraints
 
@@ -1011,19 +1021,19 @@ Distributed as a native Rust binary per platform:
 - Non-tail recursive functions get a compiler warning about stack usage proportional to input size
 - Mutual tail recursion is **not** optimized — trampolining adds allocation overhead for a rare case in MCP code
 
-### 8. Short-circuit operators — `and` and `or` are macros
+### 8. Short-circuit operators — `and` and `or` are self-hosted macros
 
-- `and` and `or` expand to `if` expressions during macro expansion:
+- `and` and `or` are defined with `defmacro` in the prelude and expand to `if` expressions:
   - `(and a b)` → `(if a b false)`
   - `(or a b)` → `(let [tmp a] (if tmp tmp b))`
 - This preserves short-circuit semantics in both the interpreter and compiled paths
 - Treating them as regular functions would evaluate both arguments eagerly — the interpreter would produce different behavior than the compiled output
 - The compiled path would accidentally short-circuit (Go's `&&`/`||` are lazy), but the interpreter would not — a silent correctness bug
-- Macros make the semantics explicit and consistent across execution modes
+- Self-hosted macros make the semantics explicit and consistent across execution modes
 
-### 9. `cond` is a macro over `if`
+### 9. `cond` is a self-hosted macro over `if`
 
-- `cond` expands to nested `if` expressions during macro expansion:
+- `cond` is defined with `defmacro` in the prelude and expands to nested `if` expressions:
   - `(cond test1 val1 test2 val2 :else default)` → `(if test1 val1 (if test2 val2 default))`
 - The parser, AST, and type checker do not need to know `cond` exists — it is gone before type checking
 - `defn` remains a special form (not a macro) because it is the most common form in Vex programs, and first-class parser support produces better error messages
@@ -1037,16 +1047,18 @@ Distributed as a native Rust binary per platform:
 - Testing is covered by Result types and dependency injection
 - If purity annotations are ever wanted, an opt-in `:pure` marker can be added later without breaking existing code
 
-### 11. User-defined macros — AST-evaluated, hygienic
+### 11. Macro system — self-hosted, AST-evaluated, hygienic
 
 - `defmacro` bodies are Vex code that transforms `Syntax` values at compile time
 - A dedicated AST evaluator in `macro_expand.rs` executes macro bodies — no type checking, no HIR, no interpreter involvement
 - The AST evaluator supports a deliberate subset: literals, symbols, `quote`, `if`, `let`, and calls to macro helper functions (`list`, `cons`, `first`, `rest`, `symbol?`, `list?`, `concat`)
 - Macro helpers exist only in the compile-time evaluator — they are not global builtins and cannot conflict with user code
+- Core control flow macros (`cond`, `and`, `or`) are self-hosted — defined with `defmacro` in a prelude module that the compiler loads automatically before user code
 - Alternatives rejected:
   - **Type-check-to-HIR, evaluate via interpreter** — Quote/Unquote/Splice are AST-level concepts with no natural HIR representation; routing them through the type checker and interpreter adds cross-phase coupling for marginal benefit. Every typed Lisp (Typed Racket, Carp) runs macros in a dynamic context and type-checks the expanded output, not the macro body. The useful type errors are in the expanded code.
   - **Compile-to-Go-and-exec** — compiling each macro to Go and running it as a subprocess adds seconds of latency and IPC complexity for every macro invocation
   - **Two-phase compilation** — building a "macro plugin" binary first, then using it for expansion, adds toolchain complexity without proportional benefit
+  - **Hardcoded Rust implementations** — implementing `cond`, `and`, `or` directly in Rust defeats the purpose of building a `defmacro` system; self-hosting validates the macro infrastructure and keeps the compiler core minimal
 - Hygiene is automatic — the expander renames macro-introduced bindings to unique names without macro author intervention
   - Manual `gensym` was rejected: it shifts hygiene responsibility to the macro author, making accidental variable capture a common bug
   - Automatic hygiene matches the design principle "Macros are hygienic" (§2.6) and follows Scheme's proven approach

@@ -1135,4 +1135,40 @@ mod tests {
             panic!("expected SList");
         }
     }
+
+    #[test]
+    fn defmacro_unless_via_interpreter() {
+        let result = eval_source(
+            r#"(defmacro unless [test body]
+  (syntax-list (quote if) test (quote nil) body))
+
+(unless true nil)"#,
+        )
+        .unwrap();
+        assert!(matches!(result, Value::Unit));
+    }
+
+    #[test]
+    fn defmacro_when_via_interpreter() {
+        let result = eval_source(
+            r#"(defmacro when [test body]
+  (syntax-list (quote if) test body (quote nil)))
+
+(when true nil)"#,
+        )
+        .unwrap();
+        assert!(matches!(result, Value::Unit));
+    }
+
+    #[test]
+    fn defmacro_double_via_interpreter() {
+        let result = eval_source(
+            r#"(defmacro double [x]
+  (syntax-list (quote +) x x))
+
+(double 21)"#,
+        )
+        .unwrap();
+        assert!(matches!(result, Value::Int(42)));
+    }
 }

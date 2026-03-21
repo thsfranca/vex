@@ -419,4 +419,118 @@ mod tests {
         let types = extract_exported_types(&hir_module, &["add".into()]);
         assert!(types.is_empty());
     }
+
+    fn compile_source(source: &str) -> CompileResult {
+        compile(source, "test.vx")
+    }
+
+    #[test]
+    fn defmacro_unless_compiles() {
+        let result = compile_source(
+            r#"(defmacro unless [test body]
+  (syntax-list (quote if) test (quote nil) body))
+
+(defn main []
+  (unless (> 1 10)
+    (println "1 is not greater than 10")))"#,
+        );
+        assert!(
+            result.diagnostics.is_empty(),
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
+        assert!(result.go_source.contains("func main()"));
+        assert!(result.go_source.contains("fmt.Println"));
+    }
+
+    #[test]
+    fn defmacro_when_compiles() {
+        let result = compile_source(
+            r#"(defmacro when [test body]
+  (syntax-list (quote if) test body (quote nil)))
+
+(defn main []
+  (when (< 1 10)
+    (println "1 is less than 10")))"#,
+        );
+        assert!(
+            result.diagnostics.is_empty(),
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
+        assert!(result.go_source.contains("func main()"));
+    }
+
+    #[test]
+    fn defmacro_stripped_from_go_output() {
+        let result = compile_source(
+            r#"(defmacro noop []
+  (quote nil))
+
+(defn main []
+  (println "hello"))"#,
+        );
+        assert!(
+            result.diagnostics.is_empty(),
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
+        assert!(!result.go_source.contains("defmacro"));
+        assert!(!result.go_source.contains("noop"));
+    }
+
+    #[test]
+    fn defmacro_with_hygiene_compiles() {
+        let result = compile_source(
+            r#"(defmacro with-temp [body]
+  (syntax-list (quote let)
+    (syntax-list (quote tmp) (quote 0))
+    body))
+
+(defn main []
+  (let [tmp 42]
+    (println (str (with-temp tmp)))))"#,
+        );
+        assert!(
+            result.diagnostics.is_empty(),
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
+        assert!(result.go_source.contains("func main()"));
+    }
+
+    #[test]
+    fn defmacro_multiple_macros_compile() {
+        let result = compile_source(
+            r#"(defmacro unless [test body]
+  (syntax-list (quote if) test (quote nil) body))
+
+(defmacro when [test body]
+  (syntax-list (quote if) test body (quote nil)))
+
+(defn main []
+  (unless (> 1 10)
+    (println "not greater"))
+  (when (< 1 10)
+    (println "less than")))"#,
+        );
+        assert!(
+            result.diagnostics.is_empty(),
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
+        assert!(result.go_source.contains("func main()"));
+    }
+
+    #[test]
+    fn defmacro_example_file_compiles() {
+        let source = std::fs::read_to_string("examples/macros.vx").expect("macros.vx should exist");
+        let result = compile(&source, "examples/macros.vx");
+        assert!(
+            result.diagnostics.is_empty(),
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
+        assert!(result.go_source.contains("func main()"));
+    }
 }

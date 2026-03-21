@@ -133,6 +133,24 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_top_form(&mut self) -> Option<TopForm> {
+        if self.check(|k| matches!(k, TokenKind::LeftParen))
+            && let Some(TokenKind::Symbol(name)) = self.tokens.get(self.pos + 1).map(|t| &t.kind)
+        {
+            match name.as_str() {
+                "defn" => {
+                    let open_span = self.tokens[self.pos].span;
+                    self.pos += 1;
+                    return self.parse_defn(open_span);
+                }
+                "def" => {
+                    let open_span = self.tokens[self.pos].span;
+                    self.pos += 1;
+                    return self.parse_def(open_span);
+                }
+                _ => {}
+            }
+        }
+
         let expr = self.parse_expr()?;
         Some(TopForm::Expr(expr))
     }
@@ -357,6 +375,54 @@ impl<'a> Parser<'a> {
             params,
             return_type,
             body,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_defn(&mut self, open_span: Span) -> Option<TopForm> {
+        self.pos += 1;
+
+        let (name, _) = self.expect_symbol()?;
+        let params = self.parse_param_list()?;
+
+        let return_type = if self.check(|k| matches!(k, TokenKind::Colon)) {
+            self.pos += 1;
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+
+        let body = self.parse_body()?;
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(TopForm::Defn {
+            name,
+            params,
+            return_type,
+            body,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_def(&mut self, open_span: Span) -> Option<TopForm> {
+        self.pos += 1;
+
+        let (name, _) = self.expect_symbol()?;
+
+        let type_ann = if self.check(|k| matches!(k, TokenKind::Colon)) {
+            self.pos += 1;
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+
+        let value = self.parse_expr()?;
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(TopForm::Def {
+            name,
+            type_ann,
+            value,
             span: Span::new(open_span.file, open_span.start, close_span.end),
         })
     }
@@ -1015,5 +1081,221 @@ mod tests {
         let (_, diags) = parse_source("(fn [x : 42] x)");
         assert!(!diags.is_empty());
         assert!(diags[0].message.contains("expected type"));
+    }
+
+    #[test]
+    fn defn_no_params() {
+        let (forms, diags) = parse_source("(defn main [] (println \"hi\"))");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Defn {
+            name,
+            params,
+            return_type,
+            body,
+            ..
+        } = &forms[0]
+        {
+            assert_eq!(name, "main");
+            assert!(params.is_empty());
+            assert!(return_type.is_none());
+            assert_eq!(body.len(), 1);
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn defn_with_typed_params_and_return() {
+        let (forms, diags) = parse_source("(defn add [a : Int b : Int] : Int (+ a b))");
+        assert!(diags.is_empty());
+        if let TopForm::Defn {
+            name,
+            params,
+            return_type,
+            body,
+            ..
+        } = &forms[0]
+        {
+            assert_eq!(name, "add");
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0].name, "a");
+            assert!(params[0].type_ann.is_some());
+            assert_eq!(params[1].name, "b");
+            assert!(params[1].type_ann.is_some());
+            assert!(matches!(return_type, Some(TypeExpr::Named { name, .. }) if name == "Int"));
+            assert_eq!(body.len(), 1);
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn defn_multi_body() {
+        let (forms, diags) = parse_source("(defn f [] (println 1) (println 2) 42)");
+        assert!(diags.is_empty());
+        if let TopForm::Defn { body, .. } = &forms[0] {
+            assert_eq!(body.len(), 3);
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn defn_spans() {
+        let src = "(defn main [] 42)";
+        let (forms, _) = parse_source(src);
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, src.len() as u32);
+    }
+
+    #[test]
+    fn def_simple() {
+        let (forms, diags) = parse_source("(def x 42)");
+        assert!(diags.is_empty());
+        if let TopForm::Def {
+            name,
+            type_ann,
+            value,
+            ..
+        } = &forms[0]
+        {
+            assert_eq!(name, "x");
+            assert!(type_ann.is_none());
+            assert!(matches!(value, Expr::Int(42, _)));
+        } else {
+            panic!("expected def");
+        }
+    }
+
+    #[test]
+    fn def_with_type_annotation() {
+        let (forms, diags) = parse_source("(def pi : Float 3.14)");
+        assert!(diags.is_empty());
+        if let TopForm::Def {
+            name,
+            type_ann,
+            value,
+            ..
+        } = &forms[0]
+        {
+            assert_eq!(name, "pi");
+            assert!(matches!(type_ann, Some(TypeExpr::Named { name, .. }) if name == "Float"));
+            assert!(matches!(value, Expr::Float(f, _) if (*f - 3.14).abs() < f64::EPSILON));
+        } else {
+            panic!("expected def");
+        }
+    }
+
+    #[test]
+    fn def_spans() {
+        let src = "(def x 42)";
+        let (forms, _) = parse_source(src);
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, src.len() as u32);
+    }
+
+    #[test]
+    fn multiple_top_forms() {
+        let (forms, diags) = parse_source("(def x 1) (defn f [] x)");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 2);
+        assert!(matches!(&forms[0], TopForm::Def { name, .. } if name == "x"));
+        assert!(matches!(&forms[1], TopForm::Defn { name, .. } if name == "f"));
+    }
+
+    #[test]
+    fn mixed_top_forms_and_exprs() {
+        let (forms, diags) = parse_source("(def x 1) (+ x 2)");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 2);
+        assert!(matches!(&forms[0], TopForm::Def { .. }));
+        assert!(matches!(&forms[1], TopForm::Expr(Expr::Call { .. })));
+    }
+
+    #[test]
+    fn error_defn_missing_name() {
+        let (_, diags) = parse_source("(defn [] 42)");
+        assert!(!diags.is_empty());
+        assert!(diags[0].message.contains("expected symbol"));
+    }
+
+    #[test]
+    fn error_def_missing_value() {
+        let (_, diags) = parse_source("(def x)");
+        assert!(!diags.is_empty());
+    }
+
+    #[test]
+    fn hello_world_integration() {
+        let src = "(defn main [] (println \"Hello, World!\"))";
+        let (forms, diags) = parse_source(src);
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Defn {
+            name, params, body, ..
+        } = &forms[0]
+        {
+            assert_eq!(name, "main");
+            assert!(params.is_empty());
+            assert_eq!(body.len(), 1);
+            if let Expr::Call { func, args, .. } = &body[0] {
+                assert!(matches!(func.as_ref(), Expr::Symbol(s, _) if s == "println"));
+                assert_eq!(args.len(), 1);
+                assert!(matches!(&args[0], Expr::String(s, _) if s == "Hello, World!"));
+            } else {
+                panic!("expected call in body");
+            }
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn fibonacci_integration() {
+        let src = r#"(defn fib [n : Int] : Int
+  (if (<= n 1)
+    n
+    (+ (fib (- n 1)) (fib (- n 2)))))"#;
+        let (forms, diags) = parse_source(src);
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Defn {
+            name,
+            params,
+            return_type,
+            body,
+            ..
+        } = &forms[0]
+        {
+            assert_eq!(name, "fib");
+            assert_eq!(params.len(), 1);
+            assert_eq!(params[0].name, "n");
+            assert!(params[0].type_ann.is_some());
+            assert!(return_type.is_some());
+            assert_eq!(body.len(), 1);
+            assert!(matches!(&body[0], Expr::If { .. }));
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn multi_function_program() {
+        let src = r#"(def pi : Float 3.14)
+
+(defn circle-area [r : Float] : Float
+  (* pi (* r r)))
+
+(defn main []
+  (println (circle-area 5.0)))"#;
+        let (forms, diags) = parse_source(src);
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 3);
+        assert!(matches!(&forms[0], TopForm::Def { name, .. } if name == "pi"));
+        assert!(matches!(&forms[1], TopForm::Defn { name, .. } if name == "circle-area"));
+        assert!(matches!(&forms[2], TopForm::Defn { name, .. } if name == "main"));
     }
 }

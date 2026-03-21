@@ -70,7 +70,11 @@ impl Checker {
                 field,
                 span,
             } => self.check_field_access(object, field, *span),
-            ast::Expr::Match { .. } => None,
+            ast::Expr::Match {
+                scrutinee,
+                clauses,
+                span,
+            } => self.check_match(scrutinee, clauses, *span),
         }
     }
 
@@ -487,6 +491,144 @@ impl Checker {
                     span,
                 ));
                 None
+            }
+        }
+    }
+
+    fn check_match(
+        &mut self,
+        scrutinee: &ast::Expr,
+        clauses: &[ast::MatchClause],
+        span: Span,
+    ) -> Option<hir::Expr> {
+        let checked_scrutinee = self.check_expr(scrutinee)?;
+        let scrutinee_ty = checked_scrutinee.ty().clone();
+
+        let mut checked_clauses = Vec::new();
+        let mut result_ty: Option<VexType> = None;
+
+        for clause in clauses {
+            self.env.push_scope();
+            let checked_pattern = self.check_pattern(&clause.pattern, &scrutinee_ty)?;
+            let checked_body = self.check_expr(&clause.body)?;
+            let body_ty = checked_body.ty().clone();
+            self.env.pop_scope();
+
+            if let Some(ref expected) = result_ty {
+                if &body_ty != expected {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!(
+                            "match clause body has type {}, expected {}",
+                            body_ty, expected
+                        ),
+                        clause.body.span(),
+                    ));
+                    return None;
+                }
+            } else {
+                result_ty = Some(body_ty);
+            }
+
+            checked_clauses.push(hir::MatchClause {
+                pattern: checked_pattern,
+                body: checked_body,
+                span: clause.span,
+            });
+        }
+
+        let ty = result_ty.unwrap_or(VexType::Unit);
+
+        Some(hir::Expr::Match {
+            scrutinee: Box::new(checked_scrutinee),
+            clauses: checked_clauses,
+            span,
+            ty,
+        })
+    }
+
+    fn check_pattern(
+        &mut self,
+        pattern: &ast::Pattern,
+        expected_ty: &VexType,
+    ) -> Option<hir::Pattern> {
+        match pattern {
+            ast::Pattern::Wildcard(span) => Some(hir::Pattern::Wildcard(*span)),
+            ast::Pattern::Binding(name, span) => {
+                self.env.define(name.clone(), expected_ty.clone());
+                Some(hir::Pattern::Binding {
+                    name: name.clone(),
+                    ty: expected_ty.clone(),
+                    span: *span,
+                })
+            }
+            ast::Pattern::Literal(expr) => {
+                let checked = self.check_expr(expr)?;
+                let lit_ty = checked.ty().clone();
+                if &lit_ty != expected_ty {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!(
+                            "pattern literal has type {}, but scrutinee has type {}",
+                            lit_ty, expected_ty
+                        ),
+                        expr.span(),
+                    ));
+                    return None;
+                }
+                Some(hir::Pattern::Literal(Box::new(checked)))
+            }
+            ast::Pattern::Constructor { name, args, span } => {
+                let union_ty = match expected_ty {
+                    VexType::Union { .. } => expected_ty,
+                    _ => {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!("constructor pattern used on non-union type {}", expected_ty),
+                            *span,
+                        ));
+                        return None;
+                    }
+                };
+
+                let (union_name, variants) = match union_ty {
+                    VexType::Union { name, variants } => (name, variants),
+                    _ => unreachable!(),
+                };
+
+                let variant = variants.iter().find(|v| v.name == *name);
+                let variant = match variant {
+                    Some(v) => v,
+                    None => {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!("{} is not a variant of {}", name, union_name),
+                            *span,
+                        ));
+                        return None;
+                    }
+                };
+
+                if args.len() != variant.types.len() {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!(
+                            "variant {} has {} field(s), but pattern has {} binding(s)",
+                            name,
+                            variant.types.len(),
+                            args.len()
+                        ),
+                        *span,
+                    ));
+                    return None;
+                }
+
+                let mut checked_bindings = Vec::new();
+                for (arg_pat, field_ty) in args.iter().zip(variant.types.iter()) {
+                    checked_bindings.push(self.check_pattern(arg_pat, field_ty)?);
+                }
+
+                Some(hir::Pattern::Constructor {
+                    union_name: union_name.clone(),
+                    variant_name: name.clone(),
+                    bindings: checked_bindings,
+                    span: *span,
+                })
             }
         }
     }
@@ -1563,5 +1705,109 @@ mod tests {
         let (_, diags) = check_source(source);
         assert_eq!(diags.len(), 1);
         assert!(diags[0].message.contains("unknown type"));
+    }
+
+    #[test]
+    fn match_simple_wildcard() {
+        let source = r#"
+            (defn f [x : Int] : Int
+              (match x
+                _ 0))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            assert!(matches!(&body[0], hir::Expr::Match { ty, .. } if *ty == VexType::Int));
+        }
+    }
+
+    #[test]
+    fn match_constructor_bindings() {
+        let source = r#"
+            (defunion Option (Some Int) (None))
+            (defn unwrap [o : Option] : Int
+              (match o
+                (Some x) x
+                (None) 0))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(module.top_forms.len(), 2);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[1] {
+            if let hir::Expr::Match { clauses, ty, .. } = &body[0] {
+                assert_eq!(clauses.len(), 2);
+                assert_eq!(*ty, VexType::Int);
+            } else {
+                panic!("expected match");
+            }
+        }
+    }
+
+    #[test]
+    fn match_branch_type_mismatch() {
+        let source = r#"
+            (defunion Option (Some Int) (None))
+            (defn f [o : Option] : Int
+              (match o
+                (Some x) x
+                (None) "bad"))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("match clause body has type"));
+    }
+
+    #[test]
+    fn match_unknown_variant() {
+        let source = r#"
+            (defunion Option (Some Int) (None))
+            (defn f [o : Option] : Int
+              (match o
+                (Bad x) 0))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("not a variant"));
+    }
+
+    #[test]
+    fn match_wrong_variant_arity() {
+        let source = r#"
+            (defunion Option (Some Int) (None))
+            (defn f [o : Option] : Int
+              (match o
+                (Some x y) 0))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("binding"));
+    }
+
+    #[test]
+    fn match_literal_pattern() {
+        let source = r#"
+            (defn f [x : Int] : String
+              (match x
+                1 "one"
+                2 "two"
+                _ "other"))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            assert!(matches!(&body[0], hir::Expr::Match { ty, .. } if *ty == VexType::String));
+        }
+    }
+
+    #[test]
+    fn match_constructor_on_non_union() {
+        let source = r#"
+            (defn f [x : Int] : Int
+              (match x
+                (Foo y) 0))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("non-union"));
     }
 }

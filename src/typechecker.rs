@@ -77,6 +77,16 @@ impl Checker {
                 clauses,
                 span,
             } => self.check_match(scrutinee, clauses, *span),
+            ast::Expr::Spawn { span, .. }
+            | ast::Expr::Channel { span, .. }
+            | ast::Expr::Send { span, .. }
+            | ast::Expr::Recv { span, .. } => {
+                self.diagnostics.push(Diagnostic::error(
+                    "concurrency primitives are not yet supported in the type checker",
+                    *span,
+                ));
+                None
+            }
         }
     }
 

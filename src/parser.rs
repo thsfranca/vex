@@ -902,13 +902,47 @@ impl<'a> Parser<'a> {
         self.pos += 1;
 
         let (name, _) = self.expect_symbol()?;
-        let params = self.parse_param_list()?;
+
+        if self.at_end() || !matches!(self.tokens[self.pos].kind, TokenKind::LeftBracket) {
+            self.diagnostics.push(Diagnostic::error(
+                "expected '[' for macro parameter list",
+                if self.at_end() {
+                    self.eof_span()
+                } else {
+                    self.tokens[self.pos].span
+                },
+            ));
+            return None;
+        }
+        let bracket_span = self.tokens[self.pos].span;
+        self.pos += 1;
+
+        let mut params = Vec::new();
+        let mut rest_param = None;
+
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightBracket)) {
+            let (sym, sym_span) = self.expect_symbol()?;
+            if sym == "&" {
+                let (rest_name, _) = self.expect_symbol()?;
+                rest_param = Some(rest_name);
+                break;
+            }
+            params.push(Param {
+                name: sym,
+                type_ann: None,
+                span: sym_span,
+            });
+        }
+
+        self.expect_right_bracket(bracket_span)?;
+
         let body = self.parse_body()?;
         let close_span = self.expect_right_paren(open_span)?;
 
         Some(TopForm::DefMacro {
             name,
             params,
+            rest_param,
             body,
             span: Span::new(open_span.file, open_span.start, close_span.end),
         })

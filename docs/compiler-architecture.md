@@ -108,9 +108,12 @@ src/
 
   codegen.rs        generate() function (HIR → Go source string)
   interpreter.rs    eval() function (HIR → Value), for REPL
+
+lib/
+  prelude.vx        Self-hosted macros (cond, and, or) — embedded into the binary via include_str!
 ```
 
-14 files, each with a single responsibility.
+14 Rust files in `src/`, each with a single responsibility. Vex library source lives in `lib/`, separate from compiler implementation.
 
 The key split is `ast.rs` vs `hir.rs`, mirroring the Lexer→Parser boundary:
 

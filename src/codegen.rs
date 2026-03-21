@@ -354,12 +354,12 @@ impl Generator {
                     self.write("}");
                 }
             }
-            hir::Expr::Spawn { .. }
-            | hir::Expr::Channel { .. }
-            | hir::Expr::Send { .. }
-            | hir::Expr::Recv { .. } => {
-                self.write("/* concurrency codegen not yet implemented */");
-            }
+            hir::Expr::Spawn { body, .. } => self.emit_spawn(body),
+            hir::Expr::Channel {
+                element_type, size, ..
+            } => self.emit_channel(element_type, size.as_deref()),
+            hir::Expr::Send { channel, value, .. } => self.emit_send(channel, value),
+            hir::Expr::Recv { channel, .. } => self.emit_recv(channel),
         }
     }
 
@@ -1053,6 +1053,38 @@ impl Generator {
         self.write(")");
         self.newline();
         self.write("}()");
+    }
+
+    fn emit_spawn(&mut self, body: &hir::Expr) {
+        self.write("go func() {\n");
+        self.indent += 1;
+        self.write_indent();
+        self.emit_expr(body);
+        self.newline();
+        self.indent -= 1;
+        self.write_indent();
+        self.write("}()");
+    }
+
+    fn emit_channel(&mut self, element_type: &VexType, size: Option<&hir::Expr>) {
+        self.write("make(chan ");
+        self.write(&go_type(element_type));
+        if let Some(s) = size {
+            self.write(", ");
+            self.emit_expr(s);
+        }
+        self.write(")");
+    }
+
+    fn emit_send(&mut self, channel: &hir::Expr, value: &hir::Expr) {
+        self.emit_expr(channel);
+        self.write(" <- ");
+        self.emit_expr(value);
+    }
+
+    fn emit_recv(&mut self, channel: &hir::Expr) {
+        self.write("<-");
+        self.emit_expr(channel);
     }
 }
 
@@ -2925,5 +2957,102 @@ mod tests {
         let output = generate(&module);
         assert!(output.contains("\"os\""), "{}", output);
         assert!(output.contains("os.Exit(1)"), "{}", output);
+    }
+
+    #[test]
+    fn expr_spawn() {
+        let mut cg = Generator::new();
+        let expr = hir::Expr::Spawn {
+            body: Box::new(hir::Expr::Call {
+                func: Box::new(hir::Expr::Var {
+                    name: "println".into(),
+                    span: span(7, 14),
+                    ty: VexType::Fn {
+                        params: vec![VexType::String],
+                        ret: Box::new(VexType::Unit),
+                    },
+                }),
+                args: vec![hir::Expr::String("hi".into(), span(15, 19))],
+                span: span(6, 20),
+                ty: VexType::Unit,
+            }),
+            span: span(0, 21),
+            ty: VexType::Unit,
+        };
+        cg.emit_expr(&expr);
+        assert!(cg.output.contains("go func()"), "{}", cg.output);
+        assert!(cg.output.contains("fmt.Println"), "{}", cg.output);
+        assert!(cg.output.contains("}()"), "{}", cg.output);
+    }
+
+    #[test]
+    fn expr_channel_buffered() {
+        let mut cg = Generator::new();
+        let expr = hir::Expr::Channel {
+            element_type: VexType::Int,
+            size: Some(Box::new(hir::Expr::Int(10, span(13, 15)))),
+            span: span(0, 16),
+            ty: VexType::Channel(Box::new(VexType::Int)),
+        };
+        cg.emit_expr(&expr);
+        assert_eq!(cg.output, "make(chan int64, 10)");
+    }
+
+    #[test]
+    fn expr_channel_unbuffered() {
+        let mut cg = Generator::new();
+        let expr = hir::Expr::Channel {
+            element_type: VexType::String,
+            size: None,
+            span: span(0, 16),
+            ty: VexType::Channel(Box::new(VexType::String)),
+        };
+        cg.emit_expr(&expr);
+        assert_eq!(cg.output, "make(chan string)");
+    }
+
+    #[test]
+    fn expr_send() {
+        let mut cg = Generator::new();
+        let expr = hir::Expr::Send {
+            channel: Box::new(hir::Expr::Var {
+                name: "ch".into(),
+                span: span(6, 8),
+                ty: VexType::Channel(Box::new(VexType::Int)),
+            }),
+            value: Box::new(hir::Expr::Int(42, span(9, 11))),
+            span: span(0, 12),
+            ty: VexType::Unit,
+        };
+        cg.emit_expr(&expr);
+        assert_eq!(cg.output, "ch <- 42");
+    }
+
+    #[test]
+    fn expr_recv() {
+        let mut cg = Generator::new();
+        let expr = hir::Expr::Recv {
+            channel: Box::new(hir::Expr::Var {
+                name: "ch".into(),
+                span: span(6, 8),
+                ty: VexType::Channel(Box::new(VexType::Int)),
+            }),
+            span: span(0, 9),
+            ty: VexType::Int,
+        };
+        cg.emit_expr(&expr);
+        assert_eq!(cg.output, "<-ch");
+    }
+
+    #[test]
+    fn go_type_channel() {
+        assert_eq!(
+            go_type(&VexType::Channel(Box::new(VexType::Int))),
+            "chan int64"
+        );
+        assert_eq!(
+            go_type(&VexType::Channel(Box::new(VexType::String))),
+            "chan string"
+        );
     }
 }

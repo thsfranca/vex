@@ -1594,9 +1594,63 @@ fn resolve_expr_type_vars(expr: &mut hir::Expr, target: &VexType) {
     }
 }
 
+fn validate_module_structure(program: &[ast::TopForm], diagnostics: &mut Vec<Diagnostic>) {
+    let mut seen_module = false;
+    let mut seen_export = false;
+
+    for (i, form) in program.iter().enumerate() {
+        match form {
+            ast::TopForm::Module { span, .. } => {
+                if seen_module {
+                    diagnostics.push(Diagnostic::error("duplicate module declaration", *span));
+                } else if i > 0 {
+                    diagnostics.push(Diagnostic::error(
+                        "module declaration must be the first form in the file",
+                        *span,
+                    ));
+                }
+                seen_module = true;
+            }
+            ast::TopForm::Export { span, .. } => {
+                if seen_export {
+                    diagnostics.push(Diagnostic::error("duplicate export declaration", *span));
+                }
+                seen_export = true;
+            }
+            _ => {}
+        }
+    }
+}
+
+fn validate_exports(program: &[ast::TopForm], diagnostics: &mut Vec<Diagnostic>) {
+    let defined: std::collections::HashSet<&str> = program
+        .iter()
+        .filter_map(|form| match form {
+            ast::TopForm::Defn { name, .. } | ast::TopForm::Def { name, .. } => Some(name.as_str()),
+            _ => None,
+        })
+        .collect();
+
+    for form in program {
+        if let ast::TopForm::Export { symbols, span } = form {
+            for sym in symbols {
+                if !defined.contains(sym.as_str()) {
+                    diagnostics.push(Diagnostic::error(
+                        format!("exported symbol '{}' is not defined in this module", sym),
+                        *span,
+                    ));
+                }
+            }
+        }
+    }
+}
+
 pub fn check(program: &[ast::TopForm]) -> (hir::Module, Vec<Diagnostic>) {
     let mut checker = Checker::new();
     let mut top_forms = Vec::new();
+
+    validate_module_structure(program, &mut checker.diagnostics);
+    validate_exports(program, &mut checker.diagnostics);
 
     for form in program {
         if let Some(checked) = checker.check_top_form(form) {
@@ -3123,5 +3177,98 @@ mod tests {
         if let hir::TopForm::Defn { return_type, .. } = &module.top_forms[0] {
             assert_eq!(*return_type, VexType::Option(Box::new(VexType::Int)));
         }
+    }
+
+    #[test]
+    fn module_declaration_valid() {
+        let source = r#"
+(module myapp)
+(defn main [] (println "hi"))
+"#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert!(
+            matches!(&module.top_forms[0], hir::TopForm::Module { name, .. } if name == "myapp")
+        );
+    }
+
+    #[test]
+    fn module_must_be_first() {
+        let source = r#"
+(defn main [] (println "hi"))
+(module myapp)
+"#;
+        let (_, diags) = check_source(source);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.message.contains("must be the first form"))
+        );
+    }
+
+    #[test]
+    fn duplicate_module() {
+        let source = r#"
+(module myapp)
+(module other)
+"#;
+        let (_, diags) = check_source(source);
+        assert!(diags.iter().any(|d| d.message.contains("duplicate module")));
+    }
+
+    #[test]
+    fn export_valid() {
+        let source = r#"
+(module myapp)
+(export [add])
+(defn add [a : Int b : Int] : Int (+ a b))
+"#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert!(
+            matches!(&module.top_forms[1], hir::TopForm::Export { symbols, .. } if symbols == &["add"])
+        );
+    }
+
+    #[test]
+    fn export_undefined_symbol() {
+        let source = r#"
+(module myapp)
+(export [add missing])
+(defn add [a : Int b : Int] : Int (+ a b))
+"#;
+        let (_, diags) = check_source(source);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.message.contains("'missing' is not defined"))
+        );
+    }
+
+    #[test]
+    fn duplicate_export() {
+        let source = r#"
+(module myapp)
+(export [foo])
+(export [bar])
+(defn foo [] (println "foo"))
+(defn bar [] (println "bar"))
+"#;
+        let (_, diags) = check_source(source);
+        assert!(diags.iter().any(|d| d.message.contains("duplicate export")));
+    }
+
+    #[test]
+    fn import_passes_through() {
+        let source = r#"
+(module myapp)
+(import math [add])
+"#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert!(
+            matches!(&module.top_forms[1], hir::TopForm::Import { module_path, symbols, .. }
+            if module_path == "math" && symbols == &["add"])
+        );
     }
 }

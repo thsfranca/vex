@@ -1,5 +1,7 @@
 use std::fmt::Write;
 
+use crate::builtins;
+use crate::builtins::GoTranslation;
 use crate::hir;
 use crate::types::VexType;
 
@@ -70,13 +72,183 @@ impl Generator {
             hir::Expr::Bool(b, _) => write!(self.output, "{}", b).unwrap(),
             hir::Expr::Nil(_) => {}
             hir::Expr::Var { name, .. } => {
-                if crate::builtins::is_builtin(name) {
+                if builtins::is_builtin(name) {
                     return;
                 }
                 self.write(&vex_to_go_name(name));
             }
-            _ => {}
+            hir::Expr::If {
+                test,
+                then_branch,
+                else_branch,
+                ty,
+                ..
+            } => self.emit_if(test, then_branch, else_branch, ty),
+            hir::Expr::Let { bindings, body, .. } => self.emit_let(bindings, body),
+            hir::Expr::Call { func, args, ty, .. } => self.emit_call(func, args, ty),
+            hir::Expr::Lambda {
+                params,
+                return_type,
+                body,
+                ..
+            } => self.emit_lambda(params, return_type, body),
         }
+    }
+
+    fn emit_if(
+        &mut self,
+        test: &hir::Expr,
+        then_branch: &hir::Expr,
+        else_branch: &hir::Expr,
+        ty: &VexType,
+    ) {
+        if ty == &VexType::Unit {
+            self.write("if ");
+            self.emit_expr(test);
+            self.write(" {\n");
+            self.indent += 1;
+            self.write_indent();
+            self.emit_expr(then_branch);
+            self.newline();
+            self.indent -= 1;
+            self.write_indent();
+            self.write("} else {\n");
+            self.indent += 1;
+            self.write_indent();
+            self.emit_expr(else_branch);
+            self.newline();
+            self.indent -= 1;
+            self.write_indent();
+            self.write("}");
+        } else {
+            self.write("func() ");
+            self.write(&go_type(ty));
+            self.write(" { if ");
+            self.emit_expr(test);
+            self.write(" { return ");
+            self.emit_expr(then_branch);
+            self.write(" } else { return ");
+            self.emit_expr(else_branch);
+            self.write(" } }()");
+        }
+    }
+
+    fn emit_let(&mut self, bindings: &[hir::Binding], body: &[hir::Expr]) {
+        self.write("func() ");
+        if let Some(last) = body.last() {
+            let ty = last.ty();
+            if ty != &VexType::Unit {
+                self.write(&go_type(ty));
+                self.write(" ");
+            }
+        }
+        self.write("{\n");
+        self.indent += 1;
+
+        for binding in bindings {
+            self.write_indent();
+            self.write(&vex_to_go_name(&binding.name));
+            self.write(" := ");
+            self.emit_expr(&binding.value);
+            self.newline();
+            let _ = &binding.name;
+        }
+
+        for (i, expr) in body.iter().enumerate() {
+            self.write_indent();
+            if i == body.len() - 1 && expr.ty() != &VexType::Unit {
+                self.write("return ");
+            }
+            self.emit_expr(expr);
+            self.newline();
+        }
+
+        self.indent -= 1;
+        self.write_indent();
+        self.write("}()");
+    }
+
+    fn emit_call(&mut self, func: &hir::Expr, args: &[hir::Expr], _ty: &VexType) {
+        let func_name = if let hir::Expr::Var { name, .. } = func {
+            Some(name.as_str())
+        } else {
+            None
+        };
+
+        if let Some(name) = func_name
+            && let Some(builtin) = builtins::lookup(name)
+        {
+            match &builtin.go {
+                GoTranslation::Infix(op) => {
+                    self.write("(");
+                    self.emit_expr(&args[0]);
+                    write!(self.output, " {} ", op).unwrap();
+                    self.emit_expr(&args[1]);
+                    self.write(")");
+                    return;
+                }
+                GoTranslation::Prefix(op) => {
+                    self.write(op);
+                    self.emit_expr(&args[0]);
+                    return;
+                }
+                GoTranslation::FuncCall { go_name, .. } => {
+                    self.write(go_name);
+                    self.write("(");
+                    for (i, arg) in args.iter().enumerate() {
+                        if i > 0 {
+                            self.write(", ");
+                        }
+                        self.emit_expr(arg);
+                    }
+                    self.write(")");
+                    return;
+                }
+            }
+        }
+
+        self.emit_expr(func);
+        self.write("(");
+        for (i, arg) in args.iter().enumerate() {
+            if i > 0 {
+                self.write(", ");
+            }
+            self.emit_expr(arg);
+        }
+        self.write(")");
+    }
+
+    fn emit_lambda(&mut self, params: &[hir::Param], return_type: &VexType, body: &[hir::Expr]) {
+        self.write("func(");
+        for (i, param) in params.iter().enumerate() {
+            if i > 0 {
+                self.write(", ");
+            }
+            self.write(&vex_to_go_name(&param.name));
+            self.write(" ");
+            self.write(&go_type(&param.ty));
+        }
+        self.write(")");
+        let ret_str = go_type(return_type);
+        if !ret_str.is_empty() {
+            self.write(" ");
+            self.write(&ret_str);
+        }
+        self.write(" {\n");
+        self.indent += 1;
+
+        for (i, expr) in body.iter().enumerate() {
+            self.write_indent();
+            if i == body.len() - 1 && return_type != &VexType::Unit {
+                self.write("return ");
+            }
+            self.emit_expr(expr);
+            self.newline();
+        }
+
+        self.indent -= 1;
+        self.write_indent();
+        self.write("}");
     }
 }
 
@@ -258,6 +430,210 @@ mod tests {
             ty: VexType::Int,
         });
         assert_eq!(cg.output, "myCount");
+    }
+
+    #[test]
+    fn expr_if_value() {
+        let mut cg = Generator::new();
+        cg.emit_expr(&hir::Expr::If {
+            test: Box::new(hir::Expr::Bool(true, span(0, 4))),
+            then_branch: Box::new(hir::Expr::Int(1, span(5, 6))),
+            else_branch: Box::new(hir::Expr::Int(2, span(7, 8))),
+            span: span(0, 9),
+            ty: VexType::Int,
+        });
+        assert_eq!(
+            cg.output,
+            "func() int64 { if true { return 1 } else { return 2 } }()"
+        );
+    }
+
+    #[test]
+    fn expr_if_unit() {
+        let mut cg = Generator::new();
+        cg.emit_expr(&hir::Expr::If {
+            test: Box::new(hir::Expr::Bool(true, span(0, 4))),
+            then_branch: Box::new(hir::Expr::Nil(span(5, 8))),
+            else_branch: Box::new(hir::Expr::Nil(span(9, 12))),
+            span: span(0, 13),
+            ty: VexType::Unit,
+        });
+        assert!(cg.output.starts_with("if true {\n"));
+        assert!(cg.output.contains("} else {\n"));
+        assert!(cg.output.ends_with("}"));
+    }
+
+    #[test]
+    fn expr_call_infix() {
+        let mut cg = Generator::new();
+        cg.emit_expr(&hir::Expr::Call {
+            func: Box::new(hir::Expr::Var {
+                name: "+".into(),
+                span: span(1, 2),
+                ty: VexType::Fn {
+                    params: vec![VexType::Int, VexType::Int],
+                    ret: Box::new(VexType::Int),
+                },
+            }),
+            args: vec![hir::Expr::Int(1, span(3, 4)), hir::Expr::Int(2, span(5, 6))],
+            span: span(0, 7),
+            ty: VexType::Int,
+        });
+        assert_eq!(cg.output, "(1 + 2)");
+    }
+
+    #[test]
+    fn expr_call_prefix() {
+        let mut cg = Generator::new();
+        cg.emit_expr(&hir::Expr::Call {
+            func: Box::new(hir::Expr::Var {
+                name: "not".into(),
+                span: span(1, 4),
+                ty: VexType::Fn {
+                    params: vec![VexType::Bool],
+                    ret: Box::new(VexType::Bool),
+                },
+            }),
+            args: vec![hir::Expr::Bool(true, span(5, 9))],
+            span: span(0, 10),
+            ty: VexType::Bool,
+        });
+        assert_eq!(cg.output, "!true");
+    }
+
+    #[test]
+    fn expr_call_func() {
+        let mut cg = Generator::new();
+        cg.emit_expr(&hir::Expr::Call {
+            func: Box::new(hir::Expr::Var {
+                name: "println".into(),
+                span: span(1, 8),
+                ty: VexType::Fn {
+                    params: vec![VexType::String],
+                    ret: Box::new(VexType::Unit),
+                },
+            }),
+            args: vec![hir::Expr::String("hello".into(), span(9, 16))],
+            span: span(0, 17),
+            ty: VexType::Unit,
+        });
+        assert_eq!(cg.output, "fmt.Println(\"hello\")");
+    }
+
+    #[test]
+    fn expr_call_user_func() {
+        let mut cg = Generator::new();
+        cg.emit_expr(&hir::Expr::Call {
+            func: Box::new(hir::Expr::Var {
+                name: "my-func".into(),
+                span: span(1, 8),
+                ty: VexType::Fn {
+                    params: vec![VexType::Int],
+                    ret: Box::new(VexType::Int),
+                },
+            }),
+            args: vec![hir::Expr::Int(42, span(9, 11))],
+            span: span(0, 12),
+            ty: VexType::Int,
+        });
+        assert_eq!(cg.output, "myFunc(42)");
+    }
+
+    #[test]
+    fn expr_call_nested() {
+        let mut cg = Generator::new();
+        cg.emit_expr(&hir::Expr::Call {
+            func: Box::new(hir::Expr::Var {
+                name: "+".into(),
+                span: span(1, 2),
+                ty: VexType::Fn {
+                    params: vec![VexType::Int, VexType::Int],
+                    ret: Box::new(VexType::Int),
+                },
+            }),
+            args: vec![
+                hir::Expr::Call {
+                    func: Box::new(hir::Expr::Var {
+                        name: "*".into(),
+                        span: span(4, 5),
+                        ty: VexType::Fn {
+                            params: vec![VexType::Int, VexType::Int],
+                            ret: Box::new(VexType::Int),
+                        },
+                    }),
+                    args: vec![hir::Expr::Int(2, span(6, 7)), hir::Expr::Int(3, span(8, 9))],
+                    span: span(3, 10),
+                    ty: VexType::Int,
+                },
+                hir::Expr::Int(1, span(11, 12)),
+            ],
+            span: span(0, 13),
+            ty: VexType::Int,
+        });
+        assert_eq!(cg.output, "((2 * 3) + 1)");
+    }
+
+    #[test]
+    fn expr_let_simple() {
+        let mut cg = Generator::new();
+        cg.emit_expr(&hir::Expr::Let {
+            bindings: vec![hir::Binding {
+                name: "x".into(),
+                ty: VexType::Int,
+                value: hir::Expr::Int(42, span(6, 8)),
+                span: span(5, 8),
+            }],
+            body: vec![hir::Expr::Var {
+                name: "x".into(),
+                span: span(10, 11),
+                ty: VexType::Int,
+            }],
+            span: span(0, 12),
+            ty: VexType::Int,
+        });
+        assert!(cg.output.contains("x := 42"));
+        assert!(cg.output.contains("return x"));
+        assert!(cg.output.starts_with("func() int64 {"));
+    }
+
+    #[test]
+    fn expr_lambda() {
+        let mut cg = Generator::new();
+        cg.emit_expr(&hir::Expr::Lambda {
+            params: vec![hir::Param {
+                name: "x".into(),
+                ty: VexType::Int,
+                span: span(5, 6),
+            }],
+            return_type: VexType::Int,
+            body: vec![hir::Expr::Call {
+                func: Box::new(hir::Expr::Var {
+                    name: "+".into(),
+                    span: span(8, 9),
+                    ty: VexType::Fn {
+                        params: vec![VexType::Int, VexType::Int],
+                        ret: Box::new(VexType::Int),
+                    },
+                }),
+                args: vec![
+                    hir::Expr::Var {
+                        name: "x".into(),
+                        span: span(10, 11),
+                        ty: VexType::Int,
+                    },
+                    hir::Expr::Int(1, span(12, 13)),
+                ],
+                span: span(7, 14),
+                ty: VexType::Int,
+            }],
+            span: span(0, 15),
+            ty: VexType::Fn {
+                params: vec![VexType::Int],
+                ret: Box::new(VexType::Int),
+            },
+        });
+        assert!(cg.output.contains("func(x int64) int64 {"));
+        assert!(cg.output.contains("return (x + 1)"));
     }
 
     #[test]

@@ -43,13 +43,6 @@ pub struct Binding {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct CondClause {
-    pub test: Expr,
-    pub value: Expr,
-    pub span: Span,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Wildcard(Span),
     Binding(String, Span),
@@ -93,12 +86,6 @@ pub enum Expr {
         test: Box<Expr>,
         then_branch: Box<Expr>,
         else_branch: Box<Expr>,
-        span: Span,
-    },
-
-    Cond {
-        clauses: Vec<CondClause>,
-        else_body: Option<Box<Expr>>,
         span: Span,
     },
 
@@ -182,7 +169,6 @@ impl Expr {
             | Expr::Symbol(_, s)
             | Expr::Keyword(_, s) => *s,
             Expr::If { span, .. }
-            | Expr::Cond { span, .. }
             | Expr::Let { span, .. }
             | Expr::Lambda { span, .. }
             | Expr::Call { span, .. }
@@ -326,27 +312,6 @@ mod tests {
         };
         assert_eq!(expr.span(), span(0, 13));
         assert!(matches!(expr, Expr::If { .. }));
-    }
-
-    #[test]
-    fn cond_expr() {
-        let expr = Expr::Cond {
-            clauses: vec![CondClause {
-                test: Expr::Bool(true, span(6, 10)),
-                value: Expr::Int(1, span(11, 12)),
-                span: span(6, 12),
-            }],
-            else_body: Some(Box::new(Expr::Int(0, span(19, 20)))),
-            span: span(0, 21),
-        };
-        assert_eq!(expr.span(), span(0, 21));
-        if let Expr::Cond {
-            clauses, else_body, ..
-        } = &expr
-        {
-            assert_eq!(clauses.len(), 1);
-            assert!(else_body.is_some());
-        }
     }
 
     #[test]

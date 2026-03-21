@@ -222,20 +222,6 @@ pub fn expr_to_syntax(expr: &ast::Expr) -> SyntaxValue {
             SyntaxValue::Sym("splice".into()),
             expr_to_syntax(inner),
         ]),
-        ast::Expr::Cond {
-            clauses, else_body, ..
-        } => {
-            let mut items = vec![SyntaxValue::Sym("cond".into())];
-            for clause in clauses {
-                items.push(expr_to_syntax(&clause.test));
-                items.push(expr_to_syntax(&clause.value));
-            }
-            if let Some(body) = else_body {
-                items.push(SyntaxValue::Kw("else".into()));
-                items.push(expr_to_syntax(body));
-            }
-            SyntaxValue::List(items)
-        }
         ast::Expr::Match {
             scrutinee, clauses, ..
         } => {

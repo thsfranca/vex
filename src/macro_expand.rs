@@ -5,7 +5,7 @@ use crate::ast::{self, Binding, Expr, TopForm};
 use crate::diagnostics::Diagnostic;
 use crate::lexer;
 use crate::parser;
-use crate::source::{FileId, Span};
+use crate::source::FileId;
 use crate::types::{SyntaxValue, expr_to_syntax, syntax_to_expr};
 
 const MAX_EXPANSION_DEPTH: usize = 64;
@@ -153,12 +153,6 @@ fn expand_expr(
     }
 
     match expr {
-        Expr::Cond {
-            clauses,
-            else_body,
-            span,
-        } => expand_cond(clauses, else_body, span, registry, diagnostics, depth),
-
         Expr::Call { func, args, span } => {
             if let Expr::Symbol(ref name, _) = *func
                 && let Some(macro_def) = registry.get(name.as_str())
@@ -724,31 +718,6 @@ fn rename_syntax_fn(items: Vec<SyntaxValue>, renames: &HashMap<String, String>) 
     SyntaxValue::List(result)
 }
 
-fn expand_cond(
-    clauses: Vec<ast::CondClause>,
-    else_body: Option<Box<Expr>>,
-    span: Span,
-    registry: &HashMap<String, MacroDef>,
-    diagnostics: &mut Vec<Diagnostic>,
-    depth: usize,
-) -> Expr {
-    let mut result = match else_body {
-        Some(e) => expand_expr(*e, registry, diagnostics, depth),
-        None => Expr::Nil(span),
-    };
-
-    for clause in clauses.into_iter().rev() {
-        result = Expr::If {
-            test: Box::new(expand_expr(clause.test, registry, diagnostics, depth)),
-            then_branch: Box::new(expand_expr(clause.value, registry, diagnostics, depth)),
-            else_branch: Box::new(result),
-            span,
-        };
-    }
-
-    result
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -756,77 +725,6 @@ mod tests {
 
     fn span(start: u32, end: u32) -> Span {
         Span::new(FileId::new(0), start, end)
-    }
-
-    #[test]
-    fn expand_cond_to_nested_if() {
-        let input = vec![TopForm::Expr(Expr::Cond {
-            clauses: vec![
-                ast::CondClause {
-                    test: Expr::Bool(true, span(0, 4)),
-                    value: Expr::Int(1, span(5, 6)),
-                    span: span(0, 6),
-                },
-                ast::CondClause {
-                    test: Expr::Bool(false, span(7, 12)),
-                    value: Expr::Int(2, span(13, 14)),
-                    span: span(7, 14),
-                },
-            ],
-            else_body: Some(Box::new(Expr::Int(3, span(21, 22)))),
-            span: span(0, 23),
-        })];
-
-        let (result, diags) = expand(input);
-        assert!(diags.is_empty());
-        if let TopForm::Expr(Expr::If {
-            test,
-            then_branch,
-            else_branch,
-            ..
-        }) = &result[0]
-        {
-            assert!(matches!(test.as_ref(), Expr::Bool(true, _)));
-            assert!(matches!(then_branch.as_ref(), Expr::Int(1, _)));
-            assert!(matches!(else_branch.as_ref(), Expr::If { .. }));
-
-            if let Expr::If {
-                test: inner_test,
-                then_branch: inner_then,
-                else_branch: inner_else,
-                ..
-            } = else_branch.as_ref()
-            {
-                assert!(matches!(inner_test.as_ref(), Expr::Bool(false, _)));
-                assert!(matches!(inner_then.as_ref(), Expr::Int(2, _)));
-                assert!(matches!(inner_else.as_ref(), Expr::Int(3, _)));
-            } else {
-                panic!("expected nested if");
-            }
-        } else {
-            panic!("expected if expression");
-        }
-    }
-
-    #[test]
-    fn expand_cond_no_else() {
-        let input = vec![TopForm::Expr(Expr::Cond {
-            clauses: vec![ast::CondClause {
-                test: Expr::Bool(true, span(0, 4)),
-                value: Expr::Int(1, span(5, 6)),
-                span: span(0, 6),
-            }],
-            else_body: None,
-            span: span(0, 7),
-        })];
-
-        let (result, diags) = expand(input);
-        assert!(diags.is_empty());
-        if let TopForm::Expr(Expr::If { else_branch, .. }) = &result[0] {
-            assert!(matches!(else_branch.as_ref(), Expr::Nil(_)));
-        } else {
-            panic!("expected if expression");
-        }
     }
 
     #[test]
@@ -951,14 +849,13 @@ mod tests {
             name: "test".into(),
             params: vec![],
             return_type: None,
-            body: vec![Expr::Cond {
-                clauses: vec![ast::CondClause {
-                    test: Expr::Bool(true, span(0, 4)),
-                    value: Expr::Int(1, span(5, 6)),
-                    span: span(0, 6),
-                }],
-                else_body: Some(Box::new(Expr::Int(0, span(13, 14)))),
-                span: span(0, 15),
+            body: vec![Expr::Call {
+                func: Box::new(Expr::Symbol("and".into(), span(1, 4))),
+                args: vec![
+                    Expr::Bool(true, span(5, 9)),
+                    Expr::Bool(false, span(10, 15)),
+                ],
+                span: span(0, 16),
             }],
             span: span(0, 20),
         }];

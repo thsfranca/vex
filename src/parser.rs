@@ -1,4 +1,4 @@
-use crate::ast::{Binding, CondClause, Expr, Field, Param, TopForm, TypeExpr};
+use crate::ast::{Binding, CondClause, Expr, Field, Param, TopForm, TypeExpr, Variant};
 use crate::diagnostics::{Diagnostic, Label};
 use crate::lexer::{Token, TokenKind};
 use crate::source::{FileId, Span};
@@ -151,6 +151,11 @@ impl<'a> Parser<'a> {
                     let open_span = self.tokens[self.pos].span;
                     self.pos += 1;
                     return self.parse_deftype(open_span);
+                }
+                "defunion" => {
+                    let open_span = self.tokens[self.pos].span;
+                    self.pos += 1;
+                    return self.parse_defunion(open_span);
                 }
                 _ => {}
             }
@@ -496,6 +501,61 @@ impl<'a> Parser<'a> {
         Some(Field {
             name,
             type_expr,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_defunion(&mut self, open_span: Span) -> Option<TopForm> {
+        self.pos += 1;
+
+        let (name, _) = self.expect_symbol()?;
+
+        let mut variants = Vec::new();
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightParen)) {
+            variants.push(self.parse_variant()?);
+        }
+
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(TopForm::Defunion {
+            name,
+            variants,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_variant(&mut self) -> Option<Variant> {
+        if self.at_end() {
+            self.diagnostics.push(Diagnostic::error(
+                "expected '(' for variant declaration but reached end of input",
+                self.eof_span(),
+            ));
+            return None;
+        }
+
+        let open_span = self.tokens[self.pos].span;
+        if !matches!(self.tokens[self.pos].kind, TokenKind::LeftParen) {
+            let desc = token_kind_name(&self.tokens[self.pos].kind);
+            self.diagnostics.push(Diagnostic::error(
+                format!("expected '(' for variant declaration, found {}", desc),
+                open_span,
+            ));
+            return None;
+        }
+        self.pos += 1;
+
+        let (name, _) = self.expect_symbol()?;
+
+        let mut types = Vec::new();
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightParen)) {
+            types.push(self.parse_type()?);
+        }
+
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(Variant {
+            name,
+            types,
             span: Span::new(open_span.file, open_span.start, close_span.end),
         })
     }
@@ -1491,5 +1551,62 @@ mod tests {
         let span = forms[0].span();
         assert_eq!(span.start, 0);
         assert_eq!(span.end, src.len() as u32);
+    }
+
+    #[test]
+    fn defunion_simple() {
+        let source = "(defunion Shape (Circle Float) (Rect Float Float))";
+        let (forms, diags) = parse_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Defunion { name, variants, .. } = &forms[0] {
+            assert_eq!(name, "Shape");
+            assert_eq!(variants.len(), 2);
+            assert_eq!(variants[0].name, "Circle");
+            assert_eq!(variants[0].types.len(), 1);
+            assert_eq!(variants[1].name, "Rect");
+            assert_eq!(variants[1].types.len(), 2);
+        } else {
+            panic!("expected defunion");
+        }
+    }
+
+    #[test]
+    fn defunion_no_data_variant() {
+        let source = "(defunion Option (Some Int) (None))";
+        let (forms, diags) = parse_source(source);
+        assert!(diags.is_empty());
+        if let TopForm::Defunion { variants, .. } = &forms[0] {
+            assert_eq!(variants[0].name, "Some");
+            assert_eq!(variants[0].types.len(), 1);
+            assert_eq!(variants[1].name, "None");
+            assert!(variants[1].types.is_empty());
+        } else {
+            panic!("expected defunion");
+        }
+    }
+
+    #[test]
+    fn defunion_spans() {
+        let source = "(defunion Msg (Req Int) (Resp String))";
+        let (forms, diags) = parse_source(source);
+        assert!(diags.is_empty());
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, source.len() as u32);
+    }
+
+    #[test]
+    fn error_defunion_missing_name() {
+        let source = "(defunion)";
+        let (_, diags) = parse_source(source);
+        assert!(!diags.is_empty());
+    }
+
+    #[test]
+    fn error_defunion_bad_variant() {
+        let source = "(defunion Foo bar)";
+        let (_, diags) = parse_source(source);
+        assert!(!diags.is_empty());
     }
 }

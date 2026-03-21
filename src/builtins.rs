@@ -90,6 +90,18 @@ pub fn all_builtins() -> Vec<Builtin> {
             },
             variadic: true,
         },
+        Builtin {
+            name: "range",
+            ty: VexType::Fn {
+                params: vec![VexType::Int, VexType::Int],
+                ret: Box::new(VexType::List(Box::new(VexType::Int))),
+            },
+            go: GoTranslation::FuncCall {
+                go_name: "vexrt.Range",
+                go_import: "vex_out/vexrt",
+            },
+            variadic: false,
+        },
     ]
 }
 
@@ -126,7 +138,7 @@ mod tests {
     #[test]
     fn all_builtins_count() {
         let builtins = all_builtins();
-        assert_eq!(builtins.len(), 16);
+        assert_eq!(builtins.len(), 17);
     }
 
     #[test]
@@ -214,6 +226,26 @@ mod tests {
             GoTranslation::FuncCall {
                 go_name: "fmt.Sprint",
                 go_import: "fmt",
+            }
+        );
+    }
+
+    #[test]
+    fn lookup_range() {
+        let r = lookup("range").unwrap();
+        assert_eq!(r.name, "range");
+        assert_eq!(
+            r.ty,
+            VexType::Fn {
+                params: vec![VexType::Int, VexType::Int],
+                ret: Box::new(VexType::List(Box::new(VexType::Int))),
+            }
+        );
+        assert_eq!(
+            r.go,
+            GoTranslation::FuncCall {
+                go_name: "vexrt.Range",
+                go_import: "vex_out/vexrt",
             }
         );
     }

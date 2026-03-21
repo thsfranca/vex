@@ -15,6 +15,7 @@ use source::SourceMap;
 pub struct VexrtFiles {
     pub option_go: String,
     pub result_go: String,
+    pub collections_go: String,
 }
 
 pub struct CompileResult {
@@ -71,6 +72,7 @@ pub fn compile(source: &str, file_name: &str) -> CompileResult {
         Some(VexrtFiles {
             option_go: codegen::generate_vexrt_option(),
             result_go: codegen::generate_vexrt_result(),
+            collections_go: codegen::generate_vexrt_collections(),
         })
     } else {
         None

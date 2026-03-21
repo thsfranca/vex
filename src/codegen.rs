@@ -4,7 +4,7 @@ use std::fmt::Write;
 use crate::builtins;
 use crate::builtins::GoTranslation;
 use crate::hir;
-use crate::types::VexType;
+use crate::types::{RecordField, VexType};
 
 pub fn generate(module: &hir::Module) -> String {
     let mut cg = Generator::new();
@@ -84,7 +84,7 @@ impl Generator {
             hir::TopForm::Def {
                 name, ty, value, ..
             } => self.emit_def(name, ty, value),
-            hir::TopForm::Deftype { .. } => {}
+            hir::TopForm::Deftype { name, fields, .. } => self.emit_deftype(name, fields),
             hir::TopForm::Expr(expr) => {
                 self.write_indent();
                 self.emit_expr(expr);
@@ -141,6 +141,23 @@ impl Generator {
         self.write(" = ");
         self.emit_expr(value);
         self.newline();
+    }
+
+    fn emit_deftype(&mut self, name: &str, fields: &[RecordField]) {
+        self.write("type ");
+        self.write(&vex_to_go_public_name(name));
+        self.write(" struct {");
+        self.newline();
+        self.indent += 1;
+        for field in fields {
+            self.write_indent();
+            self.write(&vex_to_go_public_name(&field.name));
+            self.write(" ");
+            self.write(&go_type(&field.ty));
+            self.newline();
+        }
+        self.indent -= 1;
+        self.writeln("}");
     }
 
     fn emit_expr(&mut self, expr: &hir::Expr) {
@@ -951,6 +968,62 @@ mod tests {
         let go_mod = generate_go_mod();
         assert!(go_mod.contains("module vex_out"));
         assert!(go_mod.contains("go 1.21"));
+    }
+
+    #[test]
+    fn top_form_deftype() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Deftype {
+                name: "Point".into(),
+                fields: vec![
+                    RecordField {
+                        name: "x".into(),
+                        ty: VexType::Float,
+                    },
+                    RecordField {
+                        name: "y".into(),
+                        ty: VexType::Float,
+                    },
+                ],
+                span: span(0, 35),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("type Point struct {"));
+        assert!(output.contains("\tX float64"));
+        assert!(output.contains("\tY float64"));
+        assert!(output.contains("}"));
+    }
+
+    #[test]
+    fn top_form_deftype_empty() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Deftype {
+                name: "Empty".into(),
+                fields: vec![],
+                span: span(0, 15),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("type Empty struct {"));
+        assert!(output.contains("}"));
+    }
+
+    #[test]
+    fn top_form_deftype_field_naming() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Deftype {
+                name: "tool-input".into(),
+                fields: vec![RecordField {
+                    name: "full-name".into(),
+                    ty: VexType::String,
+                }],
+                span: span(0, 40),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("type ToolInput struct {"));
+        assert!(output.contains("\tFullName string"));
     }
 
     #[test]

@@ -113,6 +113,13 @@ impl Expr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Field {
+    pub name: String,
+    pub type_expr: TypeExpr,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum TopForm {
     Defn {
         name: String,
@@ -129,13 +136,21 @@ pub enum TopForm {
         span: Span,
     },
 
+    Deftype {
+        name: String,
+        fields: Vec<Field>,
+        span: Span,
+    },
+
     Expr(Expr),
 }
 
 impl TopForm {
     pub fn span(&self) -> Span {
         match self {
-            TopForm::Defn { span, .. } | TopForm::Def { span, .. } => *span,
+            TopForm::Defn { span, .. }
+            | TopForm::Def { span, .. }
+            | TopForm::Deftype { span, .. } => *span,
             TopForm::Expr(expr) => expr.span(),
         }
     }
@@ -353,6 +368,66 @@ mod tests {
             assert_eq!(name, "List");
             assert_eq!(args.len(), 1);
         }
+    }
+
+    #[test]
+    fn field_struct() {
+        let field = Field {
+            name: "name".into(),
+            type_expr: TypeExpr::Named {
+                name: "String".into(),
+                span: span(6, 12),
+            },
+            span: span(1, 13),
+        };
+        assert_eq!(field.name, "name");
+        assert_eq!(field.span, span(1, 13));
+    }
+
+    #[test]
+    fn deftype_top_form() {
+        let form = TopForm::Deftype {
+            name: "Point".into(),
+            fields: vec![
+                Field {
+                    name: "x".into(),
+                    type_expr: TypeExpr::Named {
+                        name: "Float".into(),
+                        span: span(18, 23),
+                    },
+                    span: span(15, 24),
+                },
+                Field {
+                    name: "y".into(),
+                    type_expr: TypeExpr::Named {
+                        name: "Float".into(),
+                        span: span(28, 33),
+                    },
+                    span: span(25, 34),
+                },
+            ],
+            span: span(0, 35),
+        };
+        assert_eq!(form.span(), span(0, 35));
+        if let TopForm::Deftype { name, fields, .. } = &form {
+            assert_eq!(name, "Point");
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name, "x");
+            assert_eq!(fields[1].name, "y");
+        }
+    }
+
+    #[test]
+    fn deftype_no_fields() {
+        let form = TopForm::Deftype {
+            name: "Empty".into(),
+            fields: vec![],
+            span: span(0, 15),
+        };
+        assert_eq!(form.span(), span(0, 15));
+        assert!(
+            matches!(&form, TopForm::Deftype { name, fields, .. } if name == "Empty" && fields.is_empty())
+        );
     }
 
     #[test]

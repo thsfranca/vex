@@ -585,6 +585,7 @@ impl Checker {
                 value,
                 span,
             } => self.check_def(name, type_ann.as_ref(), value, *span),
+            ast::TopForm::Deftype { .. } => None,
         }
     }
 }

@@ -29,7 +29,7 @@ vex run hello.vx                # Build and run immediately
 
 ## Current Status
 
-Concurrency is implemented — `spawn`, `channel`, `send`, `recv` map directly to Go goroutines and channels.
+Tree-walking interpreter is implemented — evaluates typed HIR directly for instant feedback without the Go compile cycle.
 
 ### Compiler Phases
 
@@ -43,6 +43,7 @@ Concurrency is implemented — `spawn`, `channel`, `send`, `recv` map directly t
 | `types.rs` / `hir.rs` / `builtins.rs` — Type system | Done |
 | `typechecker.rs` — AST → HIR | Done |
 | `codegen.rs` — HIR → Go source | Done |
+| `interpreter.rs` — HIR → Value (tree-walking eval) | Done |
 | `lib.rs` / `main.rs` — Full pipeline, CLI | Done |
 
 ### Implemented Features
@@ -55,12 +56,14 @@ Concurrency is implemented — `spawn`, `channel`, `send`, `recv` map directly t
 - **Collections:** `each`, `range`, `map`, `filter`
 - **Modules:** `module`, `export`, `import`, Go interop (`import-go`)
 - **Concurrency:** `spawn`, `channel`, `send`, `recv`
+- **Interpreter:** tree-walking HIR evaluator with all expression forms
 - **Operators:** arithmetic, comparison, logical
 - **Built-in functions:** `println`, `str`, `mod`
 
 ## Architecture
 
 - Pipeline: Source → Lexer → Parser → Type Checker → Codegen → `go build` → Binary
+- Alternative: Source → Lexer → Parser → Type Checker → Interpreter (direct eval)
 - Design docs: [`docs/language-design.md`](docs/language-design.md), [`docs/compiler-architecture.md`](docs/compiler-architecture.md)
 
 ## Development

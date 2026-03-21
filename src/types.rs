@@ -2,6 +2,12 @@ use std::collections::HashMap;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordField {
+    pub name: std::string::String,
+    pub ty: VexType,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VexType {
     Int,
     Float,
@@ -12,12 +18,25 @@ pub enum VexType {
         params: Vec<VexType>,
         ret: Box<VexType>,
     },
+    Record {
+        name: std::string::String,
+        fields: Vec<RecordField>,
+    },
     TypeVar(u32),
 }
 
 impl VexType {
     pub fn is_numeric(&self) -> bool {
         matches!(self, VexType::Int | VexType::Float)
+    }
+
+    pub fn field_type(&self, field_name: &str) -> Option<&VexType> {
+        match self {
+            VexType::Record { fields, .. } => {
+                fields.iter().find(|f| f.name == field_name).map(|f| &f.ty)
+            }
+            _ => None,
+        }
     }
 }
 
@@ -39,6 +58,7 @@ impl fmt::Display for VexType {
                 }
                 write!(f, "] {})", ret)
             }
+            VexType::Record { name, .. } => write!(f, "{}", name),
             VexType::TypeVar(id) => write!(f, "?T{}", id),
         }
     }
@@ -171,6 +191,77 @@ mod tests {
         };
         assert_eq!(fn1, fn2);
         assert_ne!(fn1, fn3);
+    }
+
+    #[test]
+    fn display_record() {
+        let ty = VexType::Record {
+            name: "Point".into(),
+            fields: vec![
+                RecordField {
+                    name: "x".into(),
+                    ty: VexType::Float,
+                },
+                RecordField {
+                    name: "y".into(),
+                    ty: VexType::Float,
+                },
+            ],
+        };
+        assert_eq!(ty.to_string(), "Point");
+    }
+
+    #[test]
+    fn record_field_lookup() {
+        let ty = VexType::Record {
+            name: "Point".into(),
+            fields: vec![
+                RecordField {
+                    name: "x".into(),
+                    ty: VexType::Float,
+                },
+                RecordField {
+                    name: "y".into(),
+                    ty: VexType::Int,
+                },
+            ],
+        };
+        assert_eq!(ty.field_type("x"), Some(&VexType::Float));
+        assert_eq!(ty.field_type("y"), Some(&VexType::Int));
+        assert_eq!(ty.field_type("z"), None);
+    }
+
+    #[test]
+    fn record_field_lookup_non_record() {
+        assert_eq!(VexType::Int.field_type("x"), None);
+        assert_eq!(VexType::String.field_type("x"), None);
+    }
+
+    #[test]
+    fn record_equality() {
+        let r1 = VexType::Record {
+            name: "Point".into(),
+            fields: vec![RecordField {
+                name: "x".into(),
+                ty: VexType::Int,
+            }],
+        };
+        let r2 = VexType::Record {
+            name: "Point".into(),
+            fields: vec![RecordField {
+                name: "x".into(),
+                ty: VexType::Int,
+            }],
+        };
+        let r3 = VexType::Record {
+            name: "Other".into(),
+            fields: vec![RecordField {
+                name: "x".into(),
+                ty: VexType::Int,
+            }],
+        };
+        assert_eq!(r1, r2);
+        assert_ne!(r1, r3);
     }
 
     #[test]

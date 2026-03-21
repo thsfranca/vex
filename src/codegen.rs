@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt::Write;
 
 use crate::builtins;
@@ -16,7 +17,6 @@ struct Generator {
     indent: usize,
 }
 
-#[allow(dead_code)]
 impl Generator {
     fn new() -> Self {
         Self {
@@ -49,13 +49,98 @@ impl Generator {
         self.writeln("package main");
         self.newline();
 
+        let imports = collect_imports(module);
+        if !imports.is_empty() {
+            if imports.len() == 1 {
+                writeln!(self.output, "import \"{}\"", imports.iter().next().unwrap()).unwrap();
+            } else {
+                self.writeln("import (");
+                self.indent += 1;
+                for imp in &imports {
+                    self.write_indent();
+                    writeln!(self.output, "\"{}\"", imp).unwrap();
+                }
+                self.indent -= 1;
+                self.writeln(")");
+            }
+            self.newline();
+        }
+
         for form in &module.top_forms {
             self.emit_top_form(form);
             self.newline();
         }
     }
 
-    fn emit_top_form(&mut self, _form: &hir::TopForm) {}
+    fn emit_top_form(&mut self, form: &hir::TopForm) {
+        match form {
+            hir::TopForm::Defn {
+                name,
+                params,
+                return_type,
+                body,
+                ..
+            } => self.emit_defn(name, params, return_type, body),
+            hir::TopForm::Def {
+                name, ty, value, ..
+            } => self.emit_def(name, ty, value),
+            hir::TopForm::Expr(expr) => {
+                self.write_indent();
+                self.emit_expr(expr);
+                self.newline();
+            }
+        }
+    }
+
+    fn emit_defn(
+        &mut self,
+        name: &str,
+        params: &[hir::Param],
+        return_type: &VexType,
+        body: &[hir::Expr],
+    ) {
+        self.write("func ");
+        self.write(&vex_to_go_name(name));
+        self.write("(");
+        for (i, param) in params.iter().enumerate() {
+            if i > 0 {
+                self.write(", ");
+            }
+            self.write(&vex_to_go_name(&param.name));
+            self.write(" ");
+            self.write(&go_type(&param.ty));
+        }
+        self.write(")");
+        let ret_str = go_type(return_type);
+        if !ret_str.is_empty() {
+            self.write(" ");
+            self.write(&ret_str);
+        }
+        self.write(" {\n");
+        self.indent += 1;
+
+        for (i, expr) in body.iter().enumerate() {
+            self.write_indent();
+            if i == body.len() - 1 && return_type != &VexType::Unit {
+                self.write("return ");
+            }
+            self.emit_expr(expr);
+            self.newline();
+        }
+
+        self.indent -= 1;
+        self.writeln("}");
+    }
+
+    fn emit_def(&mut self, name: &str, ty: &VexType, value: &hir::Expr) {
+        self.write("var ");
+        self.write(&vex_to_go_name(name));
+        self.write(" ");
+        self.write(&go_type(ty));
+        self.write(" = ");
+        self.emit_expr(value);
+        self.newline();
+    }
 
     fn emit_expr(&mut self, expr: &hir::Expr) {
         match expr {
@@ -250,6 +335,80 @@ impl Generator {
         self.write_indent();
         self.write("}");
     }
+}
+
+fn collect_imports(module: &hir::Module) -> BTreeSet<&'static str> {
+    let mut names = Vec::new();
+    for form in &module.top_forms {
+        collect_builtin_calls_top_form(form, &mut names);
+    }
+    let name_refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
+    builtins::go_imports(&name_refs).into_iter().collect()
+}
+
+fn collect_builtin_calls_expr(expr: &hir::Expr, names: &mut Vec<String>) {
+    match expr {
+        hir::Expr::Int(..)
+        | hir::Expr::Float(..)
+        | hir::Expr::String(..)
+        | hir::Expr::Bool(..)
+        | hir::Expr::Nil(..) => {}
+        hir::Expr::Var { .. } => {}
+        hir::Expr::If {
+            test,
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            collect_builtin_calls_expr(test, names);
+            collect_builtin_calls_expr(then_branch, names);
+            collect_builtin_calls_expr(else_branch, names);
+        }
+        hir::Expr::Let { bindings, body, .. } => {
+            for binding in bindings {
+                collect_builtin_calls_expr(&binding.value, names);
+            }
+            for expr in body {
+                collect_builtin_calls_expr(expr, names);
+            }
+        }
+        hir::Expr::Call { func, args, .. } => {
+            if let hir::Expr::Var { name, .. } = func.as_ref()
+                && builtins::is_builtin(name)
+            {
+                names.push(name.clone());
+            }
+            collect_builtin_calls_expr(func, names);
+            for arg in args {
+                collect_builtin_calls_expr(arg, names);
+            }
+        }
+        hir::Expr::Lambda { body, .. } => {
+            for expr in body {
+                collect_builtin_calls_expr(expr, names);
+            }
+        }
+    }
+}
+
+fn collect_builtin_calls_top_form(form: &hir::TopForm, names: &mut Vec<String>) {
+    match form {
+        hir::TopForm::Defn { body, .. } => {
+            for expr in body {
+                collect_builtin_calls_expr(expr, names);
+            }
+        }
+        hir::TopForm::Def { value, .. } => {
+            collect_builtin_calls_expr(value, names);
+        }
+        hir::TopForm::Expr(expr) => {
+            collect_builtin_calls_expr(expr, names);
+        }
+    }
+}
+
+pub fn generate_go_mod() -> String {
+    "module vex_out\n\ngo 1.21\n".to_string()
 }
 
 pub fn go_type(ty: &VexType) -> String {
@@ -648,5 +807,176 @@ mod tests {
             },
         });
         assert_eq!(cg.output, "");
+    }
+
+    #[test]
+    fn top_form_defn() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Defn {
+                name: "add".into(),
+                params: vec![
+                    hir::Param {
+                        name: "x".into(),
+                        ty: VexType::Int,
+                        span: span(10, 11),
+                    },
+                    hir::Param {
+                        name: "y".into(),
+                        ty: VexType::Int,
+                        span: span(18, 19),
+                    },
+                ],
+                return_type: VexType::Int,
+                body: vec![hir::Expr::Call {
+                    func: Box::new(hir::Expr::Var {
+                        name: "+".into(),
+                        span: span(28, 29),
+                        ty: VexType::Fn {
+                            params: vec![VexType::Int, VexType::Int],
+                            ret: Box::new(VexType::Int),
+                        },
+                    }),
+                    args: vec![
+                        hir::Expr::Var {
+                            name: "x".into(),
+                            span: span(30, 31),
+                            ty: VexType::Int,
+                        },
+                        hir::Expr::Var {
+                            name: "y".into(),
+                            span: span(32, 33),
+                            ty: VexType::Int,
+                        },
+                    ],
+                    span: span(27, 34),
+                    ty: VexType::Int,
+                }],
+                span: span(0, 35),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("func add(x int64, y int64) int64 {"));
+        assert!(output.contains("return (x + y)"));
+    }
+
+    #[test]
+    fn top_form_defn_unit_return() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Defn {
+                name: "main".into(),
+                params: vec![],
+                return_type: VexType::Unit,
+                body: vec![hir::Expr::Call {
+                    func: Box::new(hir::Expr::Var {
+                        name: "println".into(),
+                        span: span(16, 23),
+                        ty: VexType::Fn {
+                            params: vec![VexType::String],
+                            ret: Box::new(VexType::Unit),
+                        },
+                    }),
+                    args: vec![hir::Expr::String("Hello, World!".into(), span(24, 39))],
+                    span: span(15, 40),
+                    ty: VexType::Unit,
+                }],
+                span: span(0, 41),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("func main() {\n"));
+        assert!(output.contains("fmt.Println(\"Hello, World!\")"));
+    }
+
+    #[test]
+    fn top_form_def() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Def {
+                name: "pi".into(),
+                ty: VexType::Float,
+                value: hir::Expr::Float(3.14, span(15, 19)),
+                span: span(0, 20),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("var pi float64 = 3.14"));
+    }
+
+    #[test]
+    fn imports_single() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Expr(hir::Expr::Call {
+                func: Box::new(hir::Expr::Var {
+                    name: "println".into(),
+                    span: span(1, 8),
+                    ty: VexType::Fn {
+                        params: vec![VexType::String],
+                        ret: Box::new(VexType::Unit),
+                    },
+                }),
+                args: vec![hir::Expr::String("hi".into(), span(9, 13))],
+                span: span(0, 14),
+                ty: VexType::Unit,
+            })],
+        };
+        let output = generate(&module);
+        assert!(output.contains("import \"fmt\""));
+    }
+
+    #[test]
+    fn imports_none() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Expr(hir::Expr::Call {
+                func: Box::new(hir::Expr::Var {
+                    name: "+".into(),
+                    span: span(1, 2),
+                    ty: VexType::Fn {
+                        params: vec![VexType::Int, VexType::Int],
+                        ret: Box::new(VexType::Int),
+                    },
+                }),
+                args: vec![hir::Expr::Int(1, span(3, 4)), hir::Expr::Int(2, span(5, 6))],
+                span: span(0, 7),
+                ty: VexType::Int,
+            })],
+        };
+        let output = generate(&module);
+        assert!(!output.contains("import"));
+    }
+
+    #[test]
+    fn go_mod() {
+        let go_mod = generate_go_mod();
+        assert!(go_mod.contains("module vex_out"));
+        assert!(go_mod.contains("go 1.21"));
+    }
+
+    #[test]
+    fn hello_world_full() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Defn {
+                name: "main".into(),
+                params: vec![],
+                return_type: VexType::Unit,
+                body: vec![hir::Expr::Call {
+                    func: Box::new(hir::Expr::Var {
+                        name: "println".into(),
+                        span: span(16, 23),
+                        ty: VexType::Fn {
+                            params: vec![VexType::String],
+                            ret: Box::new(VexType::Unit),
+                        },
+                    }),
+                    args: vec![hir::Expr::String("Hello, World!".into(), span(24, 39))],
+                    span: span(15, 40),
+                    ty: VexType::Unit,
+                }],
+                span: span(0, 41),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("package main"));
+        assert!(output.contains("import \"fmt\""));
+        assert!(output.contains("func main() {\n"));
+        assert!(output.contains("fmt.Println(\"Hello, World!\")"));
     }
 }

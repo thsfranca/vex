@@ -1,0 +1,23 @@
+(defn is-even [n : Int] : Bool
+  (= (mod n 2) 0))
+
+(defn double [n : Int] : Int
+  (* n 2))
+
+(defn main []
+  (println "--- range + each ---")
+  (each (range 0 5) (fn [x : Int] (println (str "  " x))))
+
+  (println "--- map ---")
+  (let [doubled (map (range 1 6) (fn [x : Int] : Int (* x 2)))]
+    (each doubled (fn [x : Int] (println (str "  " x)))))
+
+  (println "--- filter ---")
+  (let [evens (filter (range 0 10) (fn [x : Int] : Bool (is-even x)))]
+    (each evens (fn [x : Int] (println (str "  " x)))))
+
+  (println "--- map + filter ---")
+  (let [nums (range 1 11)
+        big (filter nums (fn [x : Int] : Bool (> x 5)))
+        doubled (map big double)]
+    (each doubled (fn [x : Int] (println (str "  " x))))))

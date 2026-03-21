@@ -19,7 +19,7 @@ Vex uses S-expression syntax with compile-time type checking, targeting networke
 
 ## Current Status
 
-Records (`deftype`) are implemented — define product types with named fields, construct instances, and access fields.
+Collections are implemented — `(List T)` and `(Map K V)` types with `each`, `range`, `map`, `filter` built-ins.
 
 | Phase | Status |
 |-------|--------|
@@ -33,7 +33,7 @@ Records (`deftype`) are implemented — define product types with named fields, 
 | `codegen.rs` — HIR → Go source | Done |
 | `lib.rs` / `main.rs` — Full pipeline, CLI | Done |
 
-**Implemented features:** integers, floats, strings, booleans, nil, `defn`, `def`, `if`, `cond`, `let`, `fn` (lambdas), higher-order functions, records (`deftype`), field access (`.`), record constructors, arithmetic/comparison/logical operators, `println`, `str`, `mod`.
+**Implemented features:** integers, floats, strings, booleans, nil, `defn`, `def`, `if`, `cond`, `let`, `fn` (lambdas), higher-order functions, records (`deftype`), field access (`.`), record constructors, unions (`defunion`), pattern matching (`match`), `Option`/`Result` types, collections (`List`, `Map`), `each`, `range`, `map`, `filter`, arithmetic/comparison/logical operators, `println`, `str`, `mod`.
 
 ## Architecture
 

@@ -73,9 +73,10 @@ Source (.vx)
 Macro expansion sits between Parser and Type Checker:
 
 - Compiler-internal macros (`cond`, `and`, `or`) expand to primitive forms (see `language-design.md` §14, Decisions 8–9)
-- User-defined macros (`defmacro`) execute at compile time via the interpreter (see `language-design.md` §4.5):
-  - Pass 1: collect `defmacro` forms, type-check each body as `(Fn [Syntax ...] Syntax)`, store HIR in a macro registry
-  - Pass 2: walk the AST — on macro call, convert arguments to `Syntax` values, evaluate the macro body via the interpreter, convert the result back to AST, re-expand
+- User-defined macros (`defmacro`) execute at compile time via a dedicated AST evaluator (see `language-design.md` §4.5):
+  - Pass 1: collect `defmacro` forms, store body AST + parameter names in a macro registry
+  - Pass 2: walk the AST — on macro call, convert arguments to `Syntax` values, evaluate the macro body via the AST evaluator, apply hygiene, convert the result back to AST, re-expand
+- Macro helper functions (`list`, `cons`, `first`, `rest`, `symbol?`, `list?`, `concat`) exist only in the AST evaluator — they are not global builtins
 - Macros operate on `ast::TopForm` (untyped S-expression-derived trees) and produce `ast::TopForm`
 - The type checker validates the fully expanded result
 - `defmacro` forms are erased — they do not appear in the HIR or generated Go output
@@ -97,7 +98,7 @@ src/
   lexer.rs          Lexer struct, TokenKind enum, Token struct, lex() function
   ast.rs            Untyped AST: Expr, TopForm, Pattern, TypeExpr, Param, Field, etc.
   parser.rs         Parser struct, parse() function (tokens → AST)
-  macro_expand.rs   expand() function (AST → AST), compiler-internal macros (cond, and, or), user-defined macro execution via interpreter
+  macro_expand.rs   expand() function (AST → AST), compiler-internal macros (cond, and, or), user-defined macro execution via AST evaluator
 
   hir.rs            Typed AST: mirrors ast.rs but every node has a resolved type
   types.rs          VexType enum (semantic types: Int, Float, Function, etc.), TypeEnv
@@ -105,7 +106,7 @@ src/
   typechecker.rs    check() function (AST → HIR), type inference, unification
 
   codegen.rs        generate() function (HIR → Go source string)
-  interpreter.rs    eval() function (HIR → Value), for REPL and compile-time macro execution
+  interpreter.rs    eval() function (HIR → Value), for REPL
 ```
 
 14 files, each with a single responsibility.
@@ -164,7 +165,7 @@ Precise per-file dependencies:
 | `lexer.rs` | `source`, `diagnostics` |
 | `ast.rs` | `source` |
 | `parser.rs` | `source`, `diagnostics`, `lexer`, `ast` |
-| `macro_expand.rs` | `source`, `ast` |
+| `macro_expand.rs` | `source`, `diagnostics`, `ast`, `types` |
 | `types.rs` | `source` |
 | `hir.rs` | `source`, `types` |
 | `builtins.rs` | `types` |
@@ -234,13 +235,13 @@ fn expand(program: Vec<ast::TopForm>) -> (Vec<ast::TopForm>, Vec<Diagnostic>)
 
 - Handles two kinds of macros:
   - **Compiler-internal** — `cond` → nested `if`, `and`/`or` → `if` expressions
-  - **User-defined** — `defmacro` bodies execute via the interpreter at compile time
+  - **User-defined** — `defmacro` bodies execute via a dedicated AST evaluator at compile time
 - For user-defined macros:
-  - Pass 1: collect `defmacro` forms, type-check each body, store HIR in a macro registry
-  - Pass 2: on macro call, convert arguments to `Syntax` values, evaluate via interpreter, convert result back to AST, re-expand
-  - Hygiene: the expander automatically renames macro-introduced bindings to unique names
+  - Pass 1: collect `defmacro` forms, store body AST and parameter names in a macro registry
+  - Pass 2: on macro call, convert arguments to `Syntax` values, evaluate body via AST evaluator, apply hygiene (rename macro-introduced bindings), convert result back to AST, re-expand
+- Macro helper functions (`list`, `cons`, `first`, `rest`, `symbol?`, `list?`, `concat`) exist only in the AST evaluator — not as global builtins
 - Produces an AST with only primitive forms — no `defmacro` forms or macro calls survive this phase
-- Diagnostics: malformed macro invocations, type errors in macro bodies, expansion depth limit exceeded
+- Diagnostics: malformed macro invocations, evaluation errors in macro bodies, expansion depth limit exceeded
 
 ### Type Checker
 
@@ -630,7 +631,7 @@ Build bottom-up, one phase at a time, each immediately testable.
 | 2 | `lexer.rs` | Lexer | `lex()` tokenizes `(defn main [] (println "Hello, World!"))` into the correct token sequence. Tests assert token kinds, values, and spans. |
 | 3 | `ast.rs` | AST | All untyped AST node types (`Expr`, `TopForm`, `Param`, `TypeExpr`, etc.) are defined and can represent the hello world program. |
 | 4 | `parser.rs` | Parser | `parse()` converts hello world tokens into the expected AST. Tests assert the resulting tree structure by pattern-matching on nodes. |
-| 5 | `macro_expand.rs` | Macro expansion | `expand()` rewrites compiler-internal macros (`cond` → nested `if`, `and`/`or` → `if`). Tests assert expanded AST matches expected primitive forms. |
+| 5 | `macro_expand.rs` | Macro expansion | `expand()` rewrites compiler-internal macros (`cond` → nested `if`, `and`/`or` → `if`) and executes user-defined macros (`defmacro`) via a dedicated AST evaluator with automatic hygiene. |
 | 6 | `types.rs`, `hir.rs`, `builtins.rs` | Type system | `VexType` enum covers all primitive and compound types. `hir::Module` mirrors the AST with resolved types. `BuiltinRegistry` contains `println` with its type signature. Unit tests pass. |
 | 7 | `typechecker.rs` | Type checker | `check()` transforms the expanded AST into a valid `hir::Module` where every node carries a resolved type. Tests assert HIR types and diagnostic output for invalid programs. |
 | 8 | `codegen.rs` | Codegen | `generate()` produces valid Go source from the hello world HIR. Tests assert the output contains `package main`, `func main()`, and the `fmt.Println` call. |
@@ -650,7 +651,7 @@ Planned PR sequence:
 | 2 | `lexer` | `lexer.rs` — tokenizer for hello world |
 | 3 | `ast` | `ast.rs` — untyped AST types |
 | 4 | `parser` | `parser.rs` — recursive descent parser |
-| 5 | `macro-expand` | `macro_expand.rs` — compiler-internal macro expansion (cond, and, or) |
+| 5 | `macro-expand` | `macro_expand.rs` — compiler-internal macros (cond, and, or) + user-defined macros (defmacro) with AST evaluator and hygiene |
 | 6 | `types-hir-builtins` | `types.rs` + `hir.rs` + `builtins.rs` — type representations and built-in registry |
 | 7 | `typechecker` | `typechecker.rs` — AST → HIR |
 | 8 | `codegen` | `codegen.rs` — HIR → Go source |
@@ -703,7 +704,7 @@ The following serve MCP server authors specifically and will be part of the futu
 |---------|-----------|
 | **String interning** | Use `String` everywhere. Optimize later if profiling shows it matters. |
 | **Arena allocation** | Use `Box` and `Vec`. Swap for arenas later if needed. |
-| **User-defined macros (`defmacro`)** | Designed (see `language-design.md` §4.5 and §14.11) but not yet implemented. The macro expansion phase handles compiler-internal macros (`cond`, `and`, `or`); `defmacro` support requires AST nodes for `Quote`/`Unquote`/`Splice`, the `Syntax` built-in type, and interpreter integration. |
+| **User-defined macros (`defmacro`)** | Implemented. The macro expansion phase handles both compiler-internal macros (`cond`, `and`, `or`) and user-defined macros via a dedicated AST evaluator with automatic hygiene. See `language-design.md` §4.5 and §14.11. |
 | **Multi-file compilation** | `SourceMap` supports `FileId` from day one, but the pipeline processes one file at a time. |
 | **Error recovery in parser** | Stop at first error initially. Accumulate multiple errors later. |
 | **LSP / incremental compilation** | Not a concern at this stage. |

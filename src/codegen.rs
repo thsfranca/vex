@@ -709,6 +709,10 @@ pub fn go_type(ty: &VexType) -> String {
         }
         VexType::Record { name, .. } => vex_to_go_public_name(name),
         VexType::Union { name, .. } => vex_to_go_public_name(name),
+        VexType::Option(inner) => format!("vexrt.Option[{}]", go_type(inner)),
+        VexType::Result { ok, err } => {
+            format!("vexrt.Result[{}, {}]", go_type(ok), go_type(err))
+        }
         VexType::TypeVar(id) => format!("T{}", id),
     }
 }

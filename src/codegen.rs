@@ -524,6 +524,9 @@ impl Generator {
         }
 
         self.write_indent();
+        self.write("}");
+        self.newline();
+        self.write_indent();
         self.write("return *new(");
         if let Some(first) = clauses.first() {
             self.write(&go_type(first.body.ty()));
@@ -577,6 +580,9 @@ impl Generator {
             }
         }
 
+        self.write_indent();
+        self.write("}");
+        self.newline();
         self.write_indent();
         self.write("return *new(");
         if let Some(first) = clauses.first() {

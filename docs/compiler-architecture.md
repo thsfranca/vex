@@ -73,9 +73,12 @@ Source (.vx)
 Macro expansion sits between Parser and Type Checker:
 
 - Compiler-internal macros (`cond`, `and`, `or`) expand to primitive forms (see `language-design.md` §14, Decisions 8–9)
-- User-defined macros (`defmacro`) will use the same slot when added later
+- User-defined macros (`defmacro`) execute at compile time via the interpreter (see `language-design.md` §4.5):
+  - Pass 1: collect `defmacro` forms, type-check each body as `(Fn [Syntax ...] Syntax)`, store HIR in a macro registry
+  - Pass 2: walk the AST — on macro call, convert arguments to `Syntax` values, evaluate the macro body via the interpreter, convert the result back to AST, re-expand
 - Macros operate on `ast::TopForm` (untyped S-expression-derived trees) and produce `ast::TopForm`
 - The type checker validates the fully expanded result
+- `defmacro` forms are erased — they do not appear in the HIR or generated Go output
 
 ---
 
@@ -94,7 +97,7 @@ src/
   lexer.rs          Lexer struct, TokenKind enum, Token struct, lex() function
   ast.rs            Untyped AST: Expr, TopForm, Pattern, TypeExpr, Param, Field, etc.
   parser.rs         Parser struct, parse() function (tokens → AST)
-  macro_expand.rs   expand() function (AST → AST), compiler-internal macros (cond, and, or)
+  macro_expand.rs   expand() function (AST → AST), compiler-internal macros (cond, and, or), user-defined macro execution via interpreter
 
   hir.rs            Typed AST: mirrors ast.rs but every node has a resolved type
   types.rs          VexType enum (semantic types: Int, Float, Function, etc.), TypeEnv
@@ -102,7 +105,7 @@ src/
   typechecker.rs    check() function (AST → HIR), type inference, unification
 
   codegen.rs        generate() function (HIR → Go source string)
-  interpreter.rs    eval() function (HIR → Value), for REPL
+  interpreter.rs    eval() function (HIR → Value), for REPL and compile-time macro execution
 ```
 
 14 files, each with a single responsibility.
@@ -226,12 +229,18 @@ fn parse(tokens: &[Token]) -> (Vec<ast::TopForm>, Vec<Diagnostic>)
 ### Macro Expansion
 
 ```
-fn expand(program: Vec<ast::TopForm>) -> Vec<ast::TopForm>
+fn expand(program: Vec<ast::TopForm>) -> (Vec<ast::TopForm>, Vec<Diagnostic>)
 ```
 
-- Rewrites compiler-internal macros (`cond` → nested `if`, `and`/`or` → `if` expressions)
-- Produces an AST with only primitive forms — no macro forms survive this phase
-- When user-defined macros (`defmacro`) are added, this phase expands those too
+- Handles two kinds of macros:
+  - **Compiler-internal** — `cond` → nested `if`, `and`/`or` → `if` expressions
+  - **User-defined** — `defmacro` bodies execute via the interpreter at compile time
+- For user-defined macros:
+  - Pass 1: collect `defmacro` forms, type-check each body, store HIR in a macro registry
+  - Pass 2: on macro call, convert arguments to `Syntax` values, evaluate via interpreter, convert result back to AST, re-expand
+  - Hygiene: the expander automatically renames macro-introduced bindings to unique names
+- Produces an AST with only primitive forms — no `defmacro` forms or macro calls survive this phase
+- Diagnostics: malformed macro invocations, type errors in macro bodies, expansion depth limit exceeded
 
 ### Type Checker
 
@@ -694,7 +703,7 @@ The following serve MCP server authors specifically and will be part of the futu
 |---------|-----------|
 | **String interning** | Use `String` everywhere. Optimize later if profiling shows it matters. |
 | **Arena allocation** | Use `Box` and `Vec`. Swap for arenas later if needed. |
-| **User-defined macros (`defmacro`)** | The macro expansion phase handles compiler-internal macros (`cond`, `and`, `or`); user-defined macros are deferred. |
+| **User-defined macros (`defmacro`)** | Designed (see `language-design.md` §4.5 and §14.11) but not yet implemented. The macro expansion phase handles compiler-internal macros (`cond`, `and`, `or`); `defmacro` support requires AST nodes for `Quote`/`Unquote`/`Splice`, the `Syntax` built-in type, and interpreter integration. |
 | **Multi-file compilation** | `SourceMap` supports `FileId` from day one, but the pipeline processes one file at a time. |
 | **Error recovery in parser** | Stop at first error initially. Accumulate multiple errors later. |
 | **LSP / incremental compilation** | Not a concern at this stage. |

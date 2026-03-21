@@ -397,18 +397,6 @@ impl Interpreter {
             ">=" => numeric_cmp(&args, |a, b| a >= b, |a, b| a >= b),
             "=" => numeric_cmp(&args, |a, b| a == b, |a, b| a == b),
             "!=" => numeric_cmp(&args, |a, b| a != b, |a, b| a != b),
-            "&&" => match (&args[0], &args[1]) {
-                (Value::Bool(a), Value::Bool(b)) => Ok(Value::Bool(*a && *b)),
-                _ => Err(RuntimeError {
-                    message: "&& requires Bool arguments".into(),
-                }),
-            },
-            "||" => match (&args[0], &args[1]) {
-                (Value::Bool(a), Value::Bool(b)) => Ok(Value::Bool(*a || *b)),
-                _ => Err(RuntimeError {
-                    message: "|| requires Bool arguments".into(),
-                }),
-            },
             "not" => match &args[0] {
                 Value::Bool(b) => Ok(Value::Bool(!b)),
                 _ => Err(RuntimeError {
@@ -545,6 +533,7 @@ pub fn eval(module: &hir::Module) -> Result<Value, RuntimeError> {
 mod tests {
     use super::*;
     use crate::lexer;
+    use crate::macro_expand;
     use crate::parser;
     use crate::source::SourceMap;
     use crate::typechecker;
@@ -556,6 +545,7 @@ mod tests {
         assert!(lex_diags.is_empty(), "lex errors: {:?}", lex_diags);
         let (ast, parse_diags) = parser::parse(&tokens);
         assert!(parse_diags.is_empty(), "parse errors: {:?}", parse_diags);
+        let ast = macro_expand::expand(ast);
         let (hir_module, check_diags) = typechecker::check(&ast);
         assert!(
             check_diags.is_empty(),
@@ -627,11 +617,11 @@ mod tests {
     #[test]
     fn logical_ops() {
         assert!(matches!(
-            eval_source("(&& true false)").unwrap(),
+            eval_source("(and true false)").unwrap(),
             Value::Bool(false)
         ));
         assert!(matches!(
-            eval_source("(|| true false)").unwrap(),
+            eval_source("(or false true)").unwrap(),
             Value::Bool(true)
         ));
         assert!(matches!(

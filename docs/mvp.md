@@ -7,7 +7,7 @@
 
 ## Goal
 
-Prove the complete compiler pipeline works end-to-end: Vex source → lexer → parser → type checker → codegen → Go source → `go build` → native binary.
+Prove the complete compiler pipeline works end-to-end: Vex source → lexer → parser → macro expansion → type checker → codegen → Go source → `go build` → native binary.
 
 The MVP is the smallest useful subset of Vex that exercises every compiler phase and produces correct, runnable programs.
 
@@ -85,8 +85,8 @@ These forms are available to the user but expand to primitive forms before type 
 | Macro | Expansion | Description |
 |-------|-----------|-------------|
 | `cond` | Nested `if` | `(cond t1 v1 t2 v2 :else d)` → `(if t1 v1 (if t2 v2 d))` |
-| `&&` | `if` | `(&& a b)` → `(if a b false)` |
-| `\|\|` | `let` + `if` | `(\|\| a b)` → `(let [tmp a] (if tmp tmp b))` |
+| `and` | `if` | `(and a b)` → `(if a b false)` |
+| `or` | `let` + `if` | `(or a b)` → `(let [tmp a] (if tmp tmp b))` |
 
 ### Types
 
@@ -148,7 +148,7 @@ Exit codes: `0` success, `1` compilation error, `2` Go build error, `3` CLI usag
 | Traits | Requires `deftype` first |
 | `Result` / `Option` | Requires `defunion` and pattern matching on ADTs |
 | Pattern matching (`match`) | Only useful with ADTs; `if`/`cond` cover MVP needs |
-| User-defined macros (`defmacro`) | Entire subsystem deferred to post-MVP; compiler-internal macros (`cond`, `&&`, `||`) are included |
+| User-defined macros (`defmacro`) | Entire subsystem deferred to post-MVP; compiler-internal macros (`cond`, `and`, `or`) are included |
 | Modules / imports | Single-file compilation only |
 | Go interop (`import-go`) | Not needed until stdlib work begins |
 | Concurrency (`spawn`, `channel`) | Requires runtime support beyond basic codegen |
@@ -170,8 +170,9 @@ The MVP is built bottom-up. Each step is independently testable.
 | `lexer.rs` | Tokenizer: source → token stream |
 | `ast.rs` | Untyped AST types for all MVP forms |
 | `parser.rs` | Recursive descent parser: tokens → AST |
+| `expand.rs` | Compiler-internal macro expansion: `cond`, `&&`, `\|\|` → primitive forms |
 | `types.rs`, `hir.rs`, `builtins.rs` | Type representations, typed AST, built-in function registry |
-| `typechecker.rs` | Type inference and checking: AST → HIR |
+| `typechecker.rs` | Type inference and checking: expanded AST → HIR |
 | `codegen.rs` | Go code generation: HIR → `.go` source |
 | `lib.rs`, `main.rs` | Full pipeline wiring, CLI, `go build` invocation |
 

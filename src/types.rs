@@ -32,6 +32,11 @@ pub enum VexType {
         name: std::string::String,
         variants: Vec<UnionVariant>,
     },
+    Option(Box<VexType>),
+    Result {
+        ok: Box<VexType>,
+        err: Box<VexType>,
+    },
     TypeVar(u32),
 }
 
@@ -70,6 +75,8 @@ impl fmt::Display for VexType {
             }
             VexType::Record { name, .. } => write!(f, "{}", name),
             VexType::Union { name, .. } => write!(f, "{}", name),
+            VexType::Option(inner) => write!(f, "(Option {})", inner),
+            VexType::Result { ok, err } => write!(f, "(Result {} {})", ok, err),
             VexType::TypeVar(id) => write!(f, "?T{}", id),
         }
     }
@@ -334,6 +341,54 @@ mod tests {
             ],
         };
         assert_eq!(format!("{}", ty), "Shape");
+    }
+
+    #[test]
+    fn display_option() {
+        let ty = VexType::Option(Box::new(VexType::Int));
+        assert_eq!(format!("{}", ty), "(Option Int)");
+    }
+
+    #[test]
+    fn display_option_nested() {
+        let ty = VexType::Option(Box::new(VexType::Option(Box::new(VexType::String))));
+        assert_eq!(format!("{}", ty), "(Option (Option String))");
+    }
+
+    #[test]
+    fn display_result() {
+        let ty = VexType::Result {
+            ok: Box::new(VexType::Int),
+            err: Box::new(VexType::String),
+        };
+        assert_eq!(format!("{}", ty), "(Result Int String)");
+    }
+
+    #[test]
+    fn option_equality() {
+        let a = VexType::Option(Box::new(VexType::Int));
+        let b = VexType::Option(Box::new(VexType::Int));
+        let c = VexType::Option(Box::new(VexType::String));
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn result_equality() {
+        let a = VexType::Result {
+            ok: Box::new(VexType::Int),
+            err: Box::new(VexType::String),
+        };
+        let b = VexType::Result {
+            ok: Box::new(VexType::Int),
+            err: Box::new(VexType::String),
+        };
+        let c = VexType::Result {
+            ok: Box::new(VexType::Float),
+            err: Box::new(VexType::String),
+        };
+        assert_eq!(a, b);
+        assert_ne!(a, c);
     }
 
     #[test]

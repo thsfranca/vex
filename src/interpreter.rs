@@ -3,7 +3,7 @@ use std::fmt;
 
 use crate::builtins;
 use crate::hir;
-use crate::types::VexType;
+use crate::types::{SyntaxValue, VexType};
 
 #[derive(Debug, Clone)]
 pub struct RuntimeError {
@@ -39,6 +39,7 @@ pub enum Value {
         body: Vec<hir::Expr>,
     },
     BuiltinFn(String),
+    Syntax(SyntaxValue),
 }
 
 impl fmt::Display for Value {
@@ -93,7 +94,42 @@ impl fmt::Display for Value {
             }
             Value::Fn { .. } => write!(f, "<fn>"),
             Value::BuiltinFn(name) => write!(f, "<builtin:{}>", name),
+            Value::Syntax(s) => write!(f, "{}", s),
         }
+    }
+}
+
+pub fn value_to_syntax(value: &Value) -> Result<SyntaxValue, RuntimeError> {
+    match value {
+        Value::Int(n) => Ok(SyntaxValue::Int(*n)),
+        Value::Float(n) => Ok(SyntaxValue::Float(*n)),
+        Value::Bool(b) => Ok(SyntaxValue::Bool(*b)),
+        Value::String(s) => Ok(SyntaxValue::Str(s.clone())),
+        Value::Unit => Ok(SyntaxValue::Nil),
+        Value::Syntax(s) => Ok(s.clone()),
+        Value::List(items) => {
+            let mut result = Vec::new();
+            for item in items {
+                result.push(value_to_syntax(item)?);
+            }
+            Ok(SyntaxValue::List(result))
+        }
+        _ => Err(RuntimeError {
+            message: format!("cannot convert {} to Syntax", value),
+        }),
+    }
+}
+
+pub fn syntax_to_value(syntax: &SyntaxValue) -> Value {
+    match syntax {
+        SyntaxValue::Int(n) => Value::Syntax(SyntaxValue::Int(*n)),
+        SyntaxValue::Float(n) => Value::Syntax(SyntaxValue::Float(*n)),
+        SyntaxValue::Str(s) => Value::Syntax(SyntaxValue::Str(s.clone())),
+        SyntaxValue::Bool(b) => Value::Syntax(SyntaxValue::Bool(*b)),
+        SyntaxValue::Nil => Value::Syntax(SyntaxValue::Nil),
+        SyntaxValue::Sym(s) => Value::Syntax(SyntaxValue::Sym(s.clone())),
+        SyntaxValue::Kw(s) => Value::Syntax(SyntaxValue::Kw(s.clone())),
+        SyntaxValue::List(items) => Value::Syntax(SyntaxValue::List(items.clone())),
     }
 }
 
@@ -858,5 +894,78 @@ mod tests {
         let source = r#"(println "hello")"#;
         let result = eval_source(source).unwrap();
         assert!(matches!(result, Value::Unit));
+    }
+
+    #[test]
+    fn value_to_syntax_int() {
+        let result = value_to_syntax(&Value::Int(42)).unwrap();
+        assert_eq!(result, SyntaxValue::Int(42));
+    }
+
+    #[test]
+    fn value_to_syntax_string() {
+        let result = value_to_syntax(&Value::String("hello".into())).unwrap();
+        assert_eq!(result, SyntaxValue::Str("hello".into()));
+    }
+
+    #[test]
+    fn value_to_syntax_bool() {
+        let result = value_to_syntax(&Value::Bool(true)).unwrap();
+        assert_eq!(result, SyntaxValue::Bool(true));
+    }
+
+    #[test]
+    fn value_to_syntax_unit() {
+        let result = value_to_syntax(&Value::Unit).unwrap();
+        assert_eq!(result, SyntaxValue::Nil);
+    }
+
+    #[test]
+    fn value_to_syntax_passthrough() {
+        let syn = SyntaxValue::Sym("x".into());
+        let result = value_to_syntax(&Value::Syntax(syn.clone())).unwrap();
+        assert_eq!(result, syn);
+    }
+
+    #[test]
+    fn value_to_syntax_list() {
+        let val = Value::List(vec![Value::Int(1), Value::Int(2)]);
+        let result = value_to_syntax(&val).unwrap();
+        assert_eq!(
+            result,
+            SyntaxValue::List(vec![SyntaxValue::Int(1), SyntaxValue::Int(2)])
+        );
+    }
+
+    #[test]
+    fn value_to_syntax_fn_fails() {
+        let val = Value::Fn {
+            params: vec![],
+            body: vec![],
+        };
+        assert!(value_to_syntax(&val).is_err());
+    }
+
+    #[test]
+    fn syntax_to_value_roundtrip() {
+        let original = SyntaxValue::List(vec![
+            SyntaxValue::Sym("+".into()),
+            SyntaxValue::Int(1),
+            SyntaxValue::Int(2),
+        ]);
+        let val = syntax_to_value(&original);
+        let back = value_to_syntax(&val).unwrap();
+        assert_eq!(back, original);
+    }
+
+    #[test]
+    fn syntax_value_display() {
+        let val = Value::Syntax(SyntaxValue::List(vec![
+            SyntaxValue::Sym("if".into()),
+            SyntaxValue::Bool(true),
+            SyntaxValue::Int(1),
+            SyntaxValue::Int(0),
+        ]));
+        assert_eq!(format!("{}", val), "(if true 1 0)");
     }
 }

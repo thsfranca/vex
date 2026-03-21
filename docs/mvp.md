@@ -155,23 +155,18 @@ Exit codes: `0` success, `1` compilation error, `2` Go build error, `3` CLI usag
 
 ## Implementation Plan
 
-The MVP is built through six PRs that follow the existing implementation order. Each PR is independently testable.
+The MVP is built bottom-up. Each step is independently testable.
 
-| PR | Branch | Files | What It Delivers |
-|----|--------|-------|------------------|
-| 3 | `ast` | `ast.rs` | Untyped AST types for all MVP forms |
-| 4 | `parser` | `parser.rs` | Recursive descent parser: tokens → AST |
-| 5 | `types-hir-builtins` | `types.rs`, `hir.rs`, `builtins.rs` | Type representations, typed AST, built-in function registry |
-| 6 | `typechecker` | `typechecker.rs` | Type inference and checking: AST → HIR |
-| 7 | `codegen` | `codegen.rs` | Go code generation: HIR → `.go` source |
-| 8 | `pipeline` | `lib.rs`, `main.rs` | Full pipeline wiring, CLI, `go build` invocation |
-
-### Already Complete
-
-| PR | Branch | Files | Status |
-|----|--------|-------|--------|
-| 1 | `source-diagnostics` | `source.rs`, `diagnostics.rs` | Merged |
-| 2 | `lexer` | `lexer.rs` | Merged |
+| Files | What It Delivers |
+|-------|------------------|
+| `source.rs`, `diagnostics.rs` | Source tracking and error reporting |
+| `lexer.rs` | Tokenizer: source → token stream |
+| `ast.rs` | Untyped AST types for all MVP forms |
+| `parser.rs` | Recursive descent parser: tokens → AST |
+| `types.rs`, `hir.rs`, `builtins.rs` | Type representations, typed AST, built-in function registry |
+| `typechecker.rs` | Type inference and checking: AST → HIR |
+| `codegen.rs` | Go code generation: HIR → `.go` source |
+| `lib.rs`, `main.rs` | Full pipeline wiring, CLI, `go build` invocation |
 
 ---
 

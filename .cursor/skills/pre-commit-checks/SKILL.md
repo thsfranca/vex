@@ -18,3 +18,5 @@ cargo clippy -- -D warnings
 2. **`cargo clippy -- -D warnings`** — if it reports warnings, fix them before committing.
 
 Only create the commit after both commands succeed with no errors.
+
+3. **README check** — if the commit reaches a new implementation milestone or changes the status of a compiler phase, also run the **update-readme** skill before committing.

@@ -2,8 +2,8 @@
 name: update-readme
 description: >-
   Updates the project README.md with current project information, development state,
-  and next steps. Use when the user asks to update the README, after merging a PR
-  that completes a pipeline milestone, or when the project state has changed significantly.
+  and next steps. Use proactively when the project reaches a new implementation
+  milestone or a compiler phase changes status. Do not wait for PRs to be merged.
 ---
 
 # Update README
@@ -12,10 +12,11 @@ The README lives at the project root (`README.md`). It is the public face of the
 
 ## When to Trigger
 
-- User asks to update the README
-- A PR completing a compiler pipeline milestone was merged
-- New compiler phase implemented or significant feature added
-- Project structure changed (new files, changed dependencies)
+Use this skill proactively — do not wait for the user to ask or for a PR to merge.
+
+- A commit reaches an implementation milestone — see the "Done when" column in `docs/compiler-architecture.md` §12 for the concrete criteria
+- A new compiler phase is added to the pipeline
+- User explicitly asks to update the README
 
 ## Gather Current State
 

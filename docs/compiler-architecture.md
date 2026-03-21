@@ -602,18 +602,18 @@ Each phase is tested independently by constructing its input and asserting its o
 
 Build bottom-up, one phase at a time, each immediately testable.
 
-| Step | Files | Milestone |
-|------|-------|-----------|
-| 1 | `source.rs`, `diagnostics.rs` | Foundation compiles, Span and Diagnostic types exist |
-| 2 | `lexer.rs` | Can lex `(defn main [] (println "Hello, World!"))` into tokens |
-| 3 | `ast.rs` | Untyped AST types defined |
-| 4 | `parser.rs` | Can parse hello world tokens into AST |
-| 5 | `types.rs`, `hir.rs`, `builtins.rs` | Type representations, typed AST, and built-in function registry defined |
-| 6 | `typechecker.rs` | Can type-check hello world AST into HIR |
-| 7 | `codegen.rs` | Can generate Go source from hello world HIR |
-| 8 | `lib.rs`, `main.rs` | Full pipeline wired; `vex build hello.vx` produces a Go binary |
+| Step | Files | Milestone | Done when |
+|------|-------|-----------|-----------|
+| 1 | `source.rs`, `diagnostics.rs` | Foundation | `SourceMap` can store a file and convert byte offsets to line/column; `Diagnostic` can render an error with source snippet and underline. Unit tests pass. |
+| 2 | `lexer.rs` | Lexer | `lex()` tokenizes `(defn main [] (println "Hello, World!"))` into the correct token sequence. Tests assert token kinds, values, and spans. |
+| 3 | `ast.rs` | AST | All untyped AST node types (`Expr`, `TopForm`, `Param`, `TypeExpr`, etc.) are defined and can represent the hello world program. |
+| 4 | `parser.rs` | Parser | `parse()` converts hello world tokens into the expected AST. Tests assert the resulting tree structure by pattern-matching on nodes. |
+| 5 | `types.rs`, `hir.rs`, `builtins.rs` | Type system | `VexType` enum covers all primitive and compound types. `hir::Module` mirrors the AST with resolved types. `BuiltinRegistry` contains `println` with its type signature. Unit tests pass. |
+| 6 | `typechecker.rs` | Type checker | `check()` transforms the hello world AST into a valid `hir::Module` where every node carries a resolved type. Tests assert HIR types and diagnostic output for invalid programs. |
+| 7 | `codegen.rs` | Codegen | `generate()` produces valid Go source from the hello world HIR. Tests assert the output contains `package main`, `func main()`, and the `fmt.Println` call. |
+| 8 | `lib.rs`, `main.rs` | Pipeline | `vex build hello.vx` runs the full pipeline and `go build` produces a working binary. Integration tests pass end-to-end from `.vx` source to Go output. |
 
-**First milestone:** `(defn main [] (println "Hello, World!"))` compiles to a working Go binary via `go build`.
+**End-to-end milestone:** `(defn main [] (println "Hello, World!"))` compiles to a working Go binary via `go build`.
 
 ### Development Process
 

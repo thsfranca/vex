@@ -179,6 +179,11 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     return self.parse_defunion(open_span);
                 }
+                "defmacro" => {
+                    let open_span = self.tokens[self.pos].span;
+                    self.pos += 1;
+                    return self.parse_defmacro(open_span);
+                }
                 _ => {}
             }
         }
@@ -422,6 +427,9 @@ impl<'a> Parser<'a> {
                 "channel" => return self.parse_channel(open_span),
                 "send" => return self.parse_send(open_span),
                 "recv" => return self.parse_recv(open_span),
+                "quote" => return self.parse_quote(open_span),
+                "unquote" => return self.parse_unquote(open_span),
+                "splice" => return self.parse_splice(open_span),
                 _ => {}
             }
         }
@@ -473,6 +481,36 @@ impl<'a> Parser<'a> {
         let close_span = self.expect_right_paren(open_span)?;
         Some(Expr::Recv {
             channel: Box::new(channel),
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_quote(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+        let expr = self.parse_expr()?;
+        let close_span = self.expect_right_paren(open_span)?;
+        Some(Expr::Quote {
+            expr: Box::new(expr),
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_unquote(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+        let expr = self.parse_expr()?;
+        let close_span = self.expect_right_paren(open_span)?;
+        Some(Expr::Unquote {
+            expr: Box::new(expr),
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_splice(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+        let expr = self.parse_expr()?;
+        let close_span = self.expect_right_paren(open_span)?;
+        Some(Expr::Splice {
+            expr: Box::new(expr),
             span: Span::new(open_span.file, open_span.start, close_span.end),
         })
     }
@@ -856,6 +894,22 @@ impl<'a> Parser<'a> {
         Some(TopForm::Defunion {
             name,
             variants,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_defmacro(&mut self, open_span: Span) -> Option<TopForm> {
+        self.pos += 1;
+
+        let (name, _) = self.expect_symbol()?;
+        let params = self.parse_param_list()?;
+        let body = self.parse_body()?;
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(TopForm::DefMacro {
+            name,
+            params,
+            body,
             span: Span::new(open_span.file, open_span.start, close_span.end),
         })
     }
@@ -2279,5 +2333,112 @@ mod tests {
         assert!(diags.is_empty(), "{:?}", diags);
         assert_eq!(forms.len(), 1);
         assert!(matches!(&forms[0], TopForm::Defn { name, .. } if name == "main"));
+    }
+
+    #[test]
+    fn quote_symbol() {
+        let (forms, diags) = parse_source("(quote if)");
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Expr(Expr::Quote { expr, .. }) = &forms[0] {
+            assert!(matches!(expr.as_ref(), Expr::Symbol(s, _) if s == "if"));
+        } else {
+            panic!("expected Quote");
+        }
+    }
+
+    #[test]
+    fn quote_list() {
+        let (forms, diags) = parse_source("(quote (+ 1 2))");
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let TopForm::Expr(Expr::Quote { expr, .. }) = &forms[0] {
+            assert!(matches!(expr.as_ref(), Expr::Call { .. }));
+        } else {
+            panic!("expected Quote");
+        }
+    }
+
+    #[test]
+    fn quote_spans() {
+        let src = "(quote x)";
+        let (forms, diags) = parse_source(src);
+        assert!(diags.is_empty(), "{:?}", diags);
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, src.len() as u32);
+    }
+
+    #[test]
+    fn unquote_simple() {
+        let (forms, diags) = parse_source("(unquote val)");
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let TopForm::Expr(Expr::Unquote { expr, .. }) = &forms[0] {
+            assert!(matches!(expr.as_ref(), Expr::Symbol(s, _) if s == "val"));
+        } else {
+            panic!("expected Unquote");
+        }
+    }
+
+    #[test]
+    fn splice_simple() {
+        let (forms, diags) = parse_source("(splice args)");
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let TopForm::Expr(Expr::Splice { expr, .. }) = &forms[0] {
+            assert!(matches!(expr.as_ref(), Expr::Symbol(s, _) if s == "args"));
+        } else {
+            panic!("expected Splice");
+        }
+    }
+
+    #[test]
+    fn defmacro_simple() {
+        let source = "(defmacro unless [test body] (list (quote if) test (quote nil) body))";
+        let (forms, diags) = parse_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(forms.len(), 1);
+        if let TopForm::DefMacro {
+            name, params, body, ..
+        } = &forms[0]
+        {
+            assert_eq!(name, "unless");
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0].name, "test");
+            assert_eq!(params[1].name, "body");
+            assert_eq!(body.len(), 1);
+            assert!(matches!(&body[0], Expr::Call { .. }));
+        } else {
+            panic!("expected DefMacro");
+        }
+    }
+
+    #[test]
+    fn defmacro_spans() {
+        let src = "(defmacro foo [x] x)";
+        let (forms, diags) = parse_source(src);
+        assert!(diags.is_empty(), "{:?}", diags);
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, src.len() as u32);
+    }
+
+    #[test]
+    fn defmacro_multi_body() {
+        let (forms, diags) = parse_source("(defmacro foo [x] (println x) x)");
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let TopForm::DefMacro { body, .. } = &forms[0] {
+            assert_eq!(body.len(), 2);
+        } else {
+            panic!("expected DefMacro");
+        }
+    }
+
+    #[test]
+    fn nested_quote_unquote() {
+        let source =
+            "(defmacro when [test body] (list (quote if) test (unquote body) (quote nil)))";
+        let (forms, diags) = parse_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(forms.len(), 1);
+        assert!(matches!(&forms[0], TopForm::DefMacro { name, .. } if name == "when"));
     }
 }

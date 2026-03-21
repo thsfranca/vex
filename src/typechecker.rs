@@ -95,6 +95,12 @@ impl Checker {
         args: &[ast::Expr],
         span: Span,
     ) -> Option<hir::Expr> {
+        if let ast::Expr::Symbol(name, _) = func
+            && let Some(record_ty) = self.type_defs.get(name).cloned()
+        {
+            return self.check_record_constructor(name, &record_ty, args, span);
+        }
+
         let checked_func = self.check_expr(func)?;
         let mut checked_args = Vec::new();
         for arg in args {
@@ -482,6 +488,57 @@ impl Checker {
                 None
             }
         }
+    }
+
+    fn check_record_constructor(
+        &mut self,
+        name: &str,
+        record_ty: &VexType,
+        args: &[ast::Expr],
+        span: Span,
+    ) -> Option<hir::Expr> {
+        let fields = match record_ty {
+            VexType::Record { fields, .. } => fields,
+            _ => return None,
+        };
+
+        if fields.len() != args.len() {
+            self.diagnostics.push(Diagnostic::error(
+                format!(
+                    "{} has {} field(s), but {} argument(s) were provided",
+                    name,
+                    fields.len(),
+                    args.len()
+                ),
+                span,
+            ));
+            return None;
+        }
+
+        let mut checked_args = Vec::new();
+        for (field, arg) in fields.iter().zip(args.iter()) {
+            let checked_arg = self.check_expr(arg)?;
+            if checked_arg.ty() != &field.ty {
+                self.diagnostics.push(Diagnostic::error(
+                    format!(
+                        "field '{}' expects type {}, got {}",
+                        field.name,
+                        field.ty,
+                        checked_arg.ty()
+                    ),
+                    checked_arg.span(),
+                ));
+                return None;
+            }
+            checked_args.push(checked_arg);
+        }
+
+        Some(hir::Expr::RecordConstructor {
+            name: name.to_string(),
+            args: checked_args,
+            span,
+            ty: record_ty.clone(),
+        })
     }
 
     fn check_defn(
@@ -1349,6 +1406,65 @@ mod tests {
         let (module, diags) = check_source(source);
         assert!(diags.is_empty());
         if let hir::TopForm::Defn { body, .. } = &module.top_forms[2] {
+            assert_eq!(body[0].ty(), &VexType::Float);
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn record_constructor_simple() {
+        let source = r#"
+            (deftype Point (x Float) (y Float))
+            (defn make-point [] : Point
+              (Point 1.0 2.0))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[1] {
+            assert!(
+                matches!(&body[0], hir::Expr::RecordConstructor { name, .. } if name == "Point")
+            );
+            assert!(matches!(body[0].ty(), VexType::Record { name, .. } if name == "Point"));
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn record_constructor_wrong_arity() {
+        let source = r#"
+            (deftype Point (x Float) (y Float))
+            (defn bad [] (Point 1.0))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("2 field(s)"));
+        assert!(diags[0].message.contains("1 argument(s)"));
+    }
+
+    #[test]
+    fn record_constructor_wrong_field_type() {
+        let source = r#"
+            (deftype Point (x Float) (y Float))
+            (defn bad [] (Point 1 2.0))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("field 'x'"));
+        assert!(diags[0].message.contains("Float"));
+    }
+
+    #[test]
+    fn record_constructor_and_field_access() {
+        let source = r#"
+            (deftype Point (x Float) (y Float))
+            (defn get-x [] : Float
+              (. (Point 1.0 2.0) x))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[1] {
             assert_eq!(body[0].ty(), &VexType::Float);
         } else {
             panic!("expected defn");

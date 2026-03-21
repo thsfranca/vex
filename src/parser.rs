@@ -1,4 +1,4 @@
-use crate::ast::{Expr, TopForm};
+use crate::ast::{Binding, CondClause, Expr, TopForm};
 use crate::diagnostics::{Diagnostic, Label};
 use crate::lexer::{Token, TokenKind};
 use crate::source::{FileId, Span};
@@ -73,6 +73,51 @@ impl<'a> Parser<'a> {
             );
         }
         None
+    }
+
+    fn expect_right_bracket(&mut self, open_span: Span) -> Option<Span> {
+        if let Some(token) = self.tokens.get(self.pos) {
+            if matches!(token.kind, TokenKind::RightBracket) {
+                let span = token.span;
+                self.pos += 1;
+                return Some(span);
+            }
+            let desc = token_kind_name(&token.kind);
+            let span = token.span;
+            self.diagnostics.push(
+                Diagnostic::error(format!("expected ']', found {}", desc), span)
+                    .with_label(Label::new(open_span, "to match this '['")),
+            );
+        } else {
+            self.diagnostics.push(
+                Diagnostic::error("expected ']' but reached end of input", self.eof_span())
+                    .with_label(Label::new(open_span, "to match this '['")),
+            );
+        }
+        None
+    }
+
+    fn expect_symbol(&mut self) -> Option<(String, Span)> {
+        if self.at_end() {
+            self.diagnostics.push(Diagnostic::error(
+                "expected symbol but reached end of input",
+                self.eof_span(),
+            ));
+            return None;
+        }
+        let span = self.tokens[self.pos].span;
+        if let TokenKind::Symbol(ref name) = self.tokens[self.pos].kind {
+            let name = name.clone();
+            self.pos += 1;
+            Some((name, span))
+        } else {
+            let desc = token_kind_name(&self.tokens[self.pos].kind);
+            self.diagnostics.push(Diagnostic::error(
+                format!("expected symbol, found {}", desc),
+                span,
+            ));
+            None
+        }
     }
 
     fn parse_program(&mut self) -> Vec<TopForm> {
@@ -158,6 +203,15 @@ impl<'a> Parser<'a> {
             return None;
         }
 
+        if let Some(TokenKind::Symbol(name)) = self.tokens.get(self.pos).map(|t| &t.kind) {
+            match name.as_str() {
+                "if" => return self.parse_if(open_span),
+                "let" => return self.parse_let(open_span),
+                "cond" => return self.parse_cond(open_span),
+                _ => {}
+            }
+        }
+
         self.parse_call(open_span)
     }
 
@@ -174,6 +228,111 @@ impl<'a> Parser<'a> {
         Some(Expr::Call {
             func: Box::new(func),
             args,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_if(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+
+        let test = self.parse_expr()?;
+        let then_branch = self.parse_expr()?;
+        let else_branch = self.parse_expr()?;
+
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(Expr::If {
+            test: Box::new(test),
+            then_branch: Box::new(then_branch),
+            else_branch: Box::new(else_branch),
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_let(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+
+        let bindings = self.parse_binding_list()?;
+        let body = self.parse_body()?;
+
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(Expr::Let {
+            bindings,
+            body,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_binding_list(&mut self) -> Option<Vec<Binding>> {
+        if self.at_end() {
+            self.diagnostics.push(Diagnostic::error(
+                "expected '[' for binding list but reached end of input",
+                self.eof_span(),
+            ));
+            return None;
+        }
+
+        let open_span = self.tokens[self.pos].span;
+        if !matches!(self.tokens[self.pos].kind, TokenKind::LeftBracket) {
+            let desc = token_kind_name(&self.tokens[self.pos].kind);
+            self.diagnostics.push(Diagnostic::error(
+                format!("expected '[' for binding list, found {}", desc),
+                open_span,
+            ));
+            return None;
+        }
+        self.pos += 1;
+
+        let mut bindings = Vec::new();
+
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightBracket)) {
+            let (name, name_span) = self.expect_symbol()?;
+            let value = self.parse_expr()?;
+            let span = Span::new(name_span.file, name_span.start, value.span().end);
+            bindings.push(Binding { name, value, span });
+        }
+
+        self.expect_right_bracket(open_span)?;
+
+        Some(bindings)
+    }
+
+    fn parse_body(&mut self) -> Option<Vec<Expr>> {
+        let first = self.parse_expr()?;
+        let mut body = vec![first];
+
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightParen)) {
+            body.push(self.parse_expr()?);
+        }
+
+        Some(body)
+    }
+
+    fn parse_cond(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+
+        let mut clauses = Vec::new();
+        let mut else_body = None;
+
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightParen)) {
+            if self.check(|k| matches!(k, TokenKind::Keyword(s) if s == "else")) {
+                self.pos += 1;
+                else_body = Some(Box::new(self.parse_expr()?));
+                break;
+            }
+
+            let test = self.parse_expr()?;
+            let value = self.parse_expr()?;
+            let span = Span::new(test.span().file, test.span().start, value.span().end);
+            clauses.push(CondClause { test, value, span });
+        }
+
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(Expr::Cond {
+            clauses,
+            else_body,
             span: Span::new(open_span.file, open_span.start, close_span.end),
         })
     }
@@ -338,5 +497,192 @@ mod tests {
         let (_, diags) = parse_source("]");
         assert!(!diags.is_empty());
         assert!(diags[0].message.contains("unexpected"));
+    }
+
+    #[test]
+    fn if_expression() {
+        let (forms, diags) = parse_source("(if true 1 0)");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Expr(Expr::If {
+            test,
+            then_branch,
+            else_branch,
+            ..
+        }) = &forms[0]
+        {
+            assert!(matches!(test.as_ref(), Expr::Bool(true, _)));
+            assert!(matches!(then_branch.as_ref(), Expr::Int(1, _)));
+            assert!(matches!(else_branch.as_ref(), Expr::Int(0, _)));
+        } else {
+            panic!("expected if expression");
+        }
+    }
+
+    #[test]
+    fn if_with_nested_exprs() {
+        let (forms, diags) = parse_source("(if (> x 0) (+ x 1) (- x 1))");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::If {
+            test,
+            then_branch,
+            else_branch,
+            ..
+        }) = &forms[0]
+        {
+            assert!(matches!(test.as_ref(), Expr::Call { .. }));
+            assert!(matches!(then_branch.as_ref(), Expr::Call { .. }));
+            assert!(matches!(else_branch.as_ref(), Expr::Call { .. }));
+        } else {
+            panic!("expected if expression");
+        }
+    }
+
+    #[test]
+    fn if_spans() {
+        let (forms, _) = parse_source("(if true 1 0)");
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, 13);
+    }
+
+    #[test]
+    fn let_simple() {
+        let (forms, diags) = parse_source("(let [x 42] x)");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Let { bindings, body, .. }) = &forms[0] {
+            assert_eq!(bindings.len(), 1);
+            assert_eq!(bindings[0].name, "x");
+            assert!(matches!(&bindings[0].value, Expr::Int(42, _)));
+            assert_eq!(body.len(), 1);
+            assert!(matches!(&body[0], Expr::Symbol(s, _) if s == "x"));
+        } else {
+            panic!("expected let expression");
+        }
+    }
+
+    #[test]
+    fn let_multiple_bindings() {
+        let (forms, diags) = parse_source("(let [x 1 y 2] (+ x y))");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Let { bindings, body, .. }) = &forms[0] {
+            assert_eq!(bindings.len(), 2);
+            assert_eq!(bindings[0].name, "x");
+            assert_eq!(bindings[1].name, "y");
+            assert_eq!(body.len(), 1);
+        } else {
+            panic!("expected let expression");
+        }
+    }
+
+    #[test]
+    fn let_multiple_body_exprs() {
+        let (forms, diags) = parse_source("(let [x 1] (println x) x)");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Let { body, .. }) = &forms[0] {
+            assert_eq!(body.len(), 2);
+        } else {
+            panic!("expected let expression");
+        }
+    }
+
+    #[test]
+    fn let_empty_bindings() {
+        let (forms, diags) = parse_source("(let [] 42)");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Let { bindings, body, .. }) = &forms[0] {
+            assert!(bindings.is_empty());
+            assert_eq!(body.len(), 1);
+        } else {
+            panic!("expected let expression");
+        }
+    }
+
+    #[test]
+    fn let_spans() {
+        let (forms, _) = parse_source("(let [x 42] x)");
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, 14);
+    }
+
+    #[test]
+    fn cond_basic() {
+        let (forms, diags) = parse_source("(cond (< x 0) \"neg\" (> x 0) \"pos\")");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Cond {
+            clauses, else_body, ..
+        }) = &forms[0]
+        {
+            assert_eq!(clauses.len(), 2);
+            assert!(matches!(&clauses[0].test, Expr::Call { .. }));
+            assert!(matches!(&clauses[0].value, Expr::String(s, _) if s == "neg"));
+            assert!(matches!(&clauses[1].test, Expr::Call { .. }));
+            assert!(matches!(&clauses[1].value, Expr::String(s, _) if s == "pos"));
+            assert!(else_body.is_none());
+        } else {
+            panic!("expected cond expression");
+        }
+    }
+
+    #[test]
+    fn cond_with_else() {
+        let (forms, diags) = parse_source("(cond (< x 0) \"neg\" :else \"zero\")");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Cond {
+            clauses, else_body, ..
+        }) = &forms[0]
+        {
+            assert_eq!(clauses.len(), 1);
+            assert!(else_body.is_some());
+            assert!(
+                matches!(else_body.as_ref().unwrap().as_ref(), Expr::String(s, _) if s == "zero")
+            );
+        } else {
+            panic!("expected cond expression");
+        }
+    }
+
+    #[test]
+    fn cond_empty() {
+        let (forms, diags) = parse_source("(cond)");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Cond {
+            clauses, else_body, ..
+        }) = &forms[0]
+        {
+            assert!(clauses.is_empty());
+            assert!(else_body.is_none());
+        } else {
+            panic!("expected cond expression");
+        }
+    }
+
+    #[test]
+    fn cond_spans() {
+        let (forms, _) = parse_source("(cond :else 0)");
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, 14);
+    }
+
+    #[test]
+    fn error_let_missing_bracket() {
+        let (_, diags) = parse_source("(let x 42 x)");
+        assert!(!diags.is_empty());
+        assert!(diags[0].message.contains("'['"));
+    }
+
+    #[test]
+    fn error_let_non_symbol_binding() {
+        let (_, diags) = parse_source("(let [42 1] x)");
+        assert!(!diags.is_empty());
+        assert!(diags[0].message.contains("expected symbol"));
+    }
+
+    #[test]
+    fn error_if_missing_else() {
+        let (_, diags) = parse_source("(if true 1)");
+        assert!(!diags.is_empty());
     }
 }

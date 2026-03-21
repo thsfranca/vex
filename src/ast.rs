@@ -154,10 +154,7 @@ mod tests {
     fn literal_spans() {
         assert_eq!(Expr::Int(42, span(0, 2)).span(), span(0, 2));
         assert_eq!(Expr::Float(3.14, span(0, 4)).span(), span(0, 4));
-        assert_eq!(
-            Expr::String("hi".into(), span(0, 4)).span(),
-            span(0, 4)
-        );
+        assert_eq!(Expr::String("hi".into(), span(0, 4)).span(), span(0, 4));
         assert_eq!(Expr::Bool(true, span(0, 4)).span(), span(0, 4));
         assert_eq!(Expr::Nil(span(0, 3)).span(), span(0, 3));
     }
@@ -165,10 +162,7 @@ mod tests {
     #[test]
     fn symbol_and_keyword_spans() {
         assert_eq!(Expr::Symbol("x".into(), span(0, 1)).span(), span(0, 1));
-        assert_eq!(
-            Expr::Keyword("name".into(), span(0, 5)).span(),
-            span(0, 5)
-        );
+        assert_eq!(Expr::Keyword("name".into(), span(0, 5)).span(), span(0, 5));
     }
 
     #[test]

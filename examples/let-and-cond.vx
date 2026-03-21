@@ -1,0 +1,12 @@
+(defn classify [n : Int] : String
+  (let [abs-n (if (< n 0) (* n -1) n)]
+    (cond
+      (= abs-n 0) "zero"
+      (<= abs-n 10) "small"
+      :else "large")))
+
+(defn main []
+  (println (str "0 is " (classify 0)))
+  (println (str "7 is " (classify 7)))
+  (println (str "-3 is " (classify -3)))
+  (println (str "100 is " (classify 100))))

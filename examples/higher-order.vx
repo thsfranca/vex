@@ -1,0 +1,8 @@
+(defn apply-twice [f : (Fn [Int] Int) x : Int] : Int
+  (f (f x)))
+
+(defn main []
+  (let [double (fn [n : Int] : Int (* n 2))
+        inc    (fn [n : Int] : Int (+ n 1))]
+    (println (str "double twice 3 = " (apply-twice double 3)))
+    (println (str "inc twice 10 = " (apply-twice inc 10)))))

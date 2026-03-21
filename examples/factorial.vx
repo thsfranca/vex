@@ -1,0 +1,8 @@
+(defn factorial [n : Int] : Int
+  (if (<= n 1)
+    1
+    (* n (factorial (- n 1)))))
+
+(defn main []
+  (println (str "5! = " (factorial 5)))
+  (println (str "10! = " (factorial 10))))

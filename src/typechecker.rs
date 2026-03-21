@@ -65,7 +65,11 @@ impl Checker {
                 body,
                 span,
             } => self.check_lambda(params, return_type.as_ref(), body, *span),
-            ast::Expr::FieldAccess { .. } => None,
+            ast::Expr::FieldAccess {
+                object,
+                field,
+                span,
+            } => self.check_field_access(object, field, *span),
         }
     }
 
@@ -449,6 +453,35 @@ impl Checker {
             span,
             ty: fn_ty,
         })
+    }
+
+    fn check_field_access(
+        &mut self,
+        object: &ast::Expr,
+        field: &str,
+        span: Span,
+    ) -> Option<hir::Expr> {
+        let checked_object = self.check_expr(object)?;
+        let object_ty = checked_object.ty().clone();
+
+        match object_ty.field_type(field) {
+            Some(field_ty) => {
+                let ty = field_ty.clone();
+                Some(hir::Expr::FieldAccess {
+                    object: Box::new(checked_object),
+                    field: field.to_string(),
+                    span,
+                    ty,
+                })
+            }
+            None => {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("type {} has no field '{}'", object_ty, field),
+                    span,
+                ));
+                None
+            }
+        }
     }
 
     fn check_defn(
@@ -1261,6 +1294,64 @@ mod tests {
             assert!(matches!(&fields[1].ty, VexType::Record { name, .. } if name == "Point"));
         } else {
             panic!("expected deftype");
+        }
+    }
+
+    #[test]
+    fn field_access_simple() {
+        let source = r#"
+            (deftype Point (x Float) (y Float))
+            (defn get-x [p : Point] : Float
+              (. p x))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 2);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[1] {
+            assert_eq!(body[0].ty(), &VexType::Float);
+            assert!(matches!(&body[0], hir::Expr::FieldAccess { field, .. } if field == "x"));
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn field_access_non_record() {
+        let source = r#"
+            (defn bad [n : Int]
+              (. n x))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("has no field"));
+    }
+
+    #[test]
+    fn field_access_unknown_field() {
+        let source = r#"
+            (deftype Point (x Float) (y Float))
+            (defn bad [p : Point]
+              (. p z))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("has no field 'z'"));
+    }
+
+    #[test]
+    fn field_access_nested() {
+        let source = r#"
+            (deftype Point (x Float) (y Float))
+            (deftype Line (start Point) (end Point))
+            (defn get-start-x [l : Line] : Float
+              (. (. l start) x))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[2] {
+            assert_eq!(body[0].ty(), &VexType::Float);
+        } else {
+            panic!("expected defn");
         }
     }
 }

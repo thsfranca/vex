@@ -2646,6 +2646,18 @@ mod tests {
     }
 
     #[test]
+    fn range_returns_list_int() {
+        let source = "(range 0 10)";
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Expr(expr) = &module.top_forms[0] {
+            assert_eq!(expr.ty(), &VexType::List(Box::new(VexType::Int)));
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
     fn if_with_option_branches() {
         let source = r#"
             (defn f [x : Int] : (Option Int)

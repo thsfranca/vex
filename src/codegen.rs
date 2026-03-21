@@ -877,7 +877,10 @@ pub fn generate_go_mod() -> String {
 
 pub fn needs_vexrt(module: &hir::Module) -> bool {
     fn check_type(ty: &VexType) -> bool {
-        matches!(ty, VexType::Option(_) | VexType::Result { .. })
+        matches!(
+            ty,
+            VexType::Option(_) | VexType::Result { .. } | VexType::List(_) | VexType::Map { .. }
+        )
     }
 
     fn check_expr(expr: &hir::Expr) -> bool {
@@ -892,7 +895,14 @@ pub fn needs_vexrt(module: &hir::Module) -> bool {
                     if union_name == "Option" || union_name == "Result"
                 )
             }),
-            hir::Expr::Call { args, .. } => args.iter().any(check_expr),
+            hir::Expr::Call { func, args, .. } => {
+                if let hir::Expr::Var { name, .. } = func.as_ref()
+                    && name == "range"
+                {
+                    return true;
+                }
+                args.iter().any(check_expr)
+            }
             hir::Expr::If {
                 test,
                 then_branch,
@@ -972,6 +982,23 @@ func Ok[T any, E any](v T) Result[T, E] {
 
 func Err[T any, E any](e E) Result[T, E] {
 	return Result[T, E]{Error: e}
+}
+"#
+    .to_string()
+}
+
+pub fn generate_vexrt_collections() -> String {
+    r#"package vexrt
+
+func Range(start, end int64) []int64 {
+	if end <= start {
+		return nil
+	}
+	result := make([]int64, 0, end-start)
+	for i := start; i < end; i++ {
+		result = append(result, i)
+	}
+	return result
 }
 "#
     .to_string()
@@ -2093,6 +2120,72 @@ mod tests {
         assert!(output.contains("} else {"), "{}", output);
         assert!(output.contains("e := r.Error"), "{}", output);
         assert!(output.contains("return -1"), "{}", output);
+    }
+
+    #[test]
+    fn expr_range_call() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Expr(hir::Expr::Call {
+                func: Box::new(hir::Expr::Var {
+                    name: "range".into(),
+                    span: span(1, 6),
+                    ty: VexType::Fn {
+                        params: vec![VexType::Int, VexType::Int],
+                        ret: Box::new(VexType::List(Box::new(VexType::Int))),
+                    },
+                }),
+                args: vec![
+                    hir::Expr::Int(0, span(7, 8)),
+                    hir::Expr::Int(10, span(9, 11)),
+                ],
+                span: span(0, 12),
+                ty: VexType::List(Box::new(VexType::Int)),
+            })],
+        };
+        let output = generate(&module);
+        assert!(output.contains("vexrt.Range(0, 10)"), "{}", output);
+        assert!(output.contains("\"vex_out/vexrt\""), "{}", output);
+    }
+
+    #[test]
+    fn needs_vexrt_true_for_range() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Expr(hir::Expr::Call {
+                func: Box::new(hir::Expr::Var {
+                    name: "range".into(),
+                    span: span(1, 6),
+                    ty: VexType::Fn {
+                        params: vec![VexType::Int, VexType::Int],
+                        ret: Box::new(VexType::List(Box::new(VexType::Int))),
+                    },
+                }),
+                args: vec![
+                    hir::Expr::Int(0, span(7, 8)),
+                    hir::Expr::Int(10, span(9, 11)),
+                ],
+                span: span(0, 12),
+                ty: VexType::List(Box::new(VexType::Int)),
+            })],
+        };
+        assert!(needs_vexrt(&module));
+    }
+
+    #[test]
+    fn needs_vexrt_true_for_list_param() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Defn {
+                name: "f".into(),
+                params: vec![hir::Param {
+                    name: "xs".into(),
+                    ty: VexType::List(Box::new(VexType::Int)),
+                    span: span(0, 5),
+                }],
+                return_type: VexType::Unit,
+                body: vec![hir::Expr::Nil(span(10, 13))],
+                span: span(0, 14),
+            }],
+        };
+        assert!(needs_vexrt(&module));
     }
 
     #[test]

@@ -91,6 +91,8 @@ fn main() {
             .expect("failed to write option.go");
         fs::write(vexrt_dir.join("result.go"), &vexrt.result_go)
             .expect("failed to write result.go");
+        fs::write(vexrt_dir.join("collections.go"), &vexrt.collections_go)
+            .expect("failed to write collections.go");
     }
 
     if let Some(ref dir) = emit_go_dir {
@@ -105,6 +107,8 @@ fn main() {
                 .expect("failed to write option.go");
             fs::write(vexrt_dest.join("result.go"), &vexrt.result_go)
                 .expect("failed to write result.go");
+            fs::write(vexrt_dest.join("collections.go"), &vexrt.collections_go)
+                .expect("failed to write collections.go");
         }
     }
 

@@ -641,7 +641,12 @@ mod tests {
         assert!(lex_diags.is_empty(), "lex errors: {:?}", lex_diags);
         let (ast, parse_diags) = parser::parse(&tokens);
         assert!(parse_diags.is_empty(), "parse errors: {:?}", parse_diags);
-        let ast = macro_expand::expand(ast);
+        let (ast, expand_diags) = macro_expand::expand(ast);
+        assert!(
+            expand_diags.is_empty(),
+            "macro expand errors: {:?}",
+            expand_diags
+        );
         let (hir_module, check_diags) = typechecker::check(&ast);
         assert!(
             check_diags.is_empty(),

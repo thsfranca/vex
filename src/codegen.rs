@@ -254,23 +254,28 @@ impl Generator {
                 union_name,
                 variant_name,
                 args,
+                ty,
                 ..
             } => {
-                let go_variant = format!(
-                    "{}_{}",
-                    vex_to_go_public_name(union_name),
-                    vex_to_go_public_name(variant_name)
-                );
-                self.write(&go_variant);
-                self.write("{");
-                for (i, arg) in args.iter().enumerate() {
-                    if i > 0 {
-                        self.write(", ");
+                if union_name == "Option" || union_name == "Result" {
+                    self.emit_builtin_variant_constructor(union_name, variant_name, args, ty);
+                } else {
+                    let go_variant = format!(
+                        "{}_{}",
+                        vex_to_go_public_name(union_name),
+                        vex_to_go_public_name(variant_name)
+                    );
+                    self.write(&go_variant);
+                    self.write("{");
+                    for (i, arg) in args.iter().enumerate() {
+                        if i > 0 {
+                            self.write(", ");
+                        }
+                        write!(self.output, "V{}: ", i).unwrap();
+                        self.emit_expr(arg);
                     }
-                    write!(self.output, "V{}: ", i).unwrap();
-                    self.emit_expr(arg);
+                    self.write("}");
                 }
-                self.write("}");
             }
         }
     }
@@ -449,7 +454,63 @@ impl Generator {
         self.write("}");
     }
 
+    fn emit_builtin_variant_constructor(
+        &mut self,
+        union_name: &str,
+        variant_name: &str,
+        args: &[hir::Expr],
+        ty: &VexType,
+    ) {
+        match (union_name, variant_name) {
+            ("Option", "Some") => {
+                if let VexType::Option(inner) = ty {
+                    write!(self.output, "vexrt.Some[{}]", go_type(inner)).unwrap();
+                    self.write("(");
+                    if let Some(arg) = args.first() {
+                        self.emit_expr(arg);
+                    }
+                    self.write(")");
+                }
+            }
+            ("Option", "None") => {
+                if let VexType::Option(inner) = ty {
+                    write!(self.output, "vexrt.None[{}]()", go_type(inner)).unwrap();
+                }
+            }
+            ("Result", "Ok") => {
+                if let VexType::Result { ok, err } = ty {
+                    write!(self.output, "vexrt.Ok[{}, {}]", go_type(ok), go_type(err)).unwrap();
+                    self.write("(");
+                    if let Some(arg) = args.first() {
+                        self.emit_expr(arg);
+                    }
+                    self.write(")");
+                }
+            }
+            ("Result", "Err") => {
+                if let VexType::Result { ok, err } = ty {
+                    write!(self.output, "vexrt.Err[{}, {}]", go_type(ok), go_type(err)).unwrap();
+                    self.write("(");
+                    if let Some(arg) = args.first() {
+                        self.emit_expr(arg);
+                    }
+                    self.write(")");
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn emit_match(&mut self, scrutinee: &hir::Expr, clauses: &[hir::MatchClause]) {
+        let scrutinee_ty = scrutinee.ty();
+        let is_option_or_result =
+            matches!(scrutinee_ty, VexType::Option(_) | VexType::Result { .. });
+
+        if is_option_or_result {
+            self.emit_match_option_result(scrutinee, clauses);
+            return;
+        }
+
         let is_type_switch = clauses
             .iter()
             .any(|c| matches!(&c.pattern, hir::Pattern::Constructor { .. }));
@@ -459,6 +520,122 @@ impl Generator {
         } else {
             self.emit_match_value_switch(scrutinee, clauses);
         }
+    }
+
+    fn emit_match_option_result(&mut self, scrutinee: &hir::Expr, clauses: &[hir::MatchClause]) {
+        self.write("func() ");
+        if let Some(first) = clauses.first() {
+            let ret_type = go_type(first.body.ty());
+            if !ret_type.is_empty() {
+                self.write(&ret_type);
+                self.write(" ");
+            }
+        }
+        self.write("{");
+        self.newline();
+        self.indent += 1;
+
+        let mut some_ok_clause: Option<&hir::MatchClause> = None;
+        let mut none_err_clause: Option<&hir::MatchClause> = None;
+        let mut wildcard_clause: Option<&hir::MatchClause> = None;
+
+        for clause in clauses {
+            match &clause.pattern {
+                hir::Pattern::Constructor { variant_name, .. }
+                    if variant_name == "Some" || variant_name == "Ok" =>
+                {
+                    some_ok_clause = Some(clause);
+                }
+                hir::Pattern::Constructor { variant_name, .. }
+                    if variant_name == "None" || variant_name == "Err" =>
+                {
+                    none_err_clause = Some(clause);
+                }
+                hir::Pattern::Wildcard(_) | hir::Pattern::Binding { .. } => {
+                    wildcard_clause = Some(clause);
+                }
+                _ => {}
+            }
+        }
+
+        let is_option = clauses.iter().any(|c| {
+            matches!(&c.pattern, hir::Pattern::Constructor { union_name, .. } if union_name == "Option")
+        });
+
+        let condition_field = if is_option { "IsSome" } else { "IsOk" };
+
+        self.write_indent();
+        self.write("if ");
+        self.emit_expr(scrutinee);
+        write!(self.output, ".{} ", condition_field).unwrap();
+        self.write("{");
+        self.newline();
+        self.indent += 1;
+
+        if let Some(clause) = some_ok_clause {
+            if let hir::Pattern::Constructor { bindings, .. } = &clause.pattern {
+                for binding in bindings {
+                    if let hir::Pattern::Binding { name, .. } = binding {
+                        self.write_indent();
+                        self.write(&vex_to_go_name(name));
+                        self.write(" := ");
+                        self.emit_expr(scrutinee);
+                        self.write(".Value");
+                        self.newline();
+                    }
+                }
+            }
+            self.write_indent();
+            self.write("return ");
+            self.emit_expr(&clause.body);
+            self.newline();
+        }
+
+        self.indent -= 1;
+        self.write_indent();
+        self.write("} else {");
+        self.newline();
+        self.indent += 1;
+
+        if let Some(clause) = none_err_clause {
+            if let hir::Pattern::Constructor { bindings, .. } = &clause.pattern {
+                for binding in bindings {
+                    if let hir::Pattern::Binding { name, .. } = binding {
+                        self.write_indent();
+                        self.write(&vex_to_go_name(name));
+                        self.write(" := ");
+                        self.emit_expr(scrutinee);
+                        self.write(".Error");
+                        self.newline();
+                    }
+                }
+            }
+            self.write_indent();
+            self.write("return ");
+            self.emit_expr(&clause.body);
+            self.newline();
+        } else if let Some(clause) = wildcard_clause {
+            self.write_indent();
+            self.write("return ");
+            self.emit_expr(&clause.body);
+            self.newline();
+        } else {
+            self.write_indent();
+            self.write("return *new(");
+            if let Some(first) = clauses.first() {
+                self.write(&go_type(first.body.ty()));
+            }
+            self.write(")");
+            self.newline();
+        }
+
+        self.indent -= 1;
+        self.write_indent();
+        self.write("}");
+        self.newline();
+
+        self.indent -= 1;
+        self.write("}()");
     }
 
     fn emit_match_type_switch(&mut self, scrutinee: &hir::Expr, clauses: &[hir::MatchClause]) {
@@ -594,13 +771,20 @@ impl Generator {
     }
 }
 
-fn collect_imports(module: &hir::Module) -> BTreeSet<&'static str> {
+fn collect_imports(module: &hir::Module) -> BTreeSet<String> {
     let mut names = Vec::new();
     for form in &module.top_forms {
         collect_builtin_calls_top_form(form, &mut names);
     }
     let name_refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
-    builtins::go_imports(&name_refs).into_iter().collect()
+    let mut imports: BTreeSet<String> = builtins::go_imports(&name_refs)
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect();
+    if needs_vexrt(module) {
+        imports.insert("vex_out/vexrt".to_string());
+    }
+    imports
 }
 
 fn collect_builtin_calls_expr(expr: &hir::Expr, names: &mut Vec<String>) {
@@ -689,6 +873,108 @@ fn collect_builtin_calls_top_form(form: &hir::TopForm, names: &mut Vec<String>) 
 
 pub fn generate_go_mod() -> String {
     "module vex_out\n\ngo 1.21\n".to_string()
+}
+
+pub fn needs_vexrt(module: &hir::Module) -> bool {
+    fn check_type(ty: &VexType) -> bool {
+        matches!(ty, VexType::Option(_) | VexType::Result { .. })
+    }
+
+    fn check_expr(expr: &hir::Expr) -> bool {
+        match expr {
+            hir::Expr::VariantConstructor { union_name, .. } => {
+                union_name == "Option" || union_name == "Result"
+            }
+            hir::Expr::Match { clauses, .. } => clauses.iter().any(|c| {
+                matches!(
+                    &c.pattern,
+                    hir::Pattern::Constructor { union_name, .. }
+                    if union_name == "Option" || union_name == "Result"
+                )
+            }),
+            hir::Expr::Call { args, .. } => args.iter().any(check_expr),
+            hir::Expr::If {
+                test,
+                then_branch,
+                else_branch,
+                ..
+            } => check_expr(test) || check_expr(then_branch) || check_expr(else_branch),
+            hir::Expr::Let { bindings, body, .. } => {
+                bindings.iter().any(|b| check_expr(&b.value)) || body.iter().any(check_expr)
+            }
+            hir::Expr::Lambda { body, .. } => body.iter().any(check_expr),
+            _ => false,
+        }
+    }
+
+    for form in &module.top_forms {
+        match form {
+            hir::TopForm::Defn {
+                params,
+                return_type,
+                body,
+                ..
+            } => {
+                if check_type(return_type) || params.iter().any(|p| check_type(&p.ty)) {
+                    return true;
+                }
+                if body.iter().any(check_expr) {
+                    return true;
+                }
+            }
+            hir::TopForm::Def { ty, value, .. } => {
+                if check_type(ty) || check_expr(value) {
+                    return true;
+                }
+            }
+            hir::TopForm::Expr(expr) => {
+                if check_expr(expr) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+pub fn generate_vexrt_option() -> String {
+    r#"package vexrt
+
+type Option[T any] struct {
+	IsSome bool
+	Value  T
+}
+
+func Some[T any](v T) Option[T] {
+	return Option[T]{IsSome: true, Value: v}
+}
+
+func None[T any]() Option[T] {
+	return Option[T]{}
+}
+"#
+    .to_string()
+}
+
+pub fn generate_vexrt_result() -> String {
+    r#"package vexrt
+
+type Result[T any, E any] struct {
+	IsOk  bool
+	Value T
+	Error E
+}
+
+func Ok[T any, E any](v T) Result[T, E] {
+	return Result[T, E]{IsOk: true, Value: v}
+}
+
+func Err[T any, E any](e E) Result[T, E] {
+	return Result[T, E]{Error: e}
+}
+"#
+    .to_string()
 }
 
 pub fn go_type(ty: &VexType) -> String {
@@ -1605,5 +1891,224 @@ mod tests {
         assert!(output.contains("return \"one\""), "{}", output);
         assert!(output.contains("default:"), "{}", output);
         assert!(output.contains("return \"other\""), "{}", output);
+    }
+
+    #[test]
+    fn expr_option_some_constructor() {
+        let expr = hir::Expr::VariantConstructor {
+            union_name: "Option".into(),
+            variant_name: "Some".into(),
+            args: vec![hir::Expr::Int(42, span(5, 7))],
+            span: span(0, 8),
+            ty: VexType::Option(Box::new(VexType::Int)),
+        };
+        let output = generate(&wrap_in_defn(expr));
+        assert!(output.contains("vexrt.Some[int64](42)"), "{}", output);
+    }
+
+    #[test]
+    fn expr_option_none_constructor() {
+        let expr = hir::Expr::VariantConstructor {
+            union_name: "Option".into(),
+            variant_name: "None".into(),
+            args: vec![],
+            span: span(0, 4),
+            ty: VexType::Option(Box::new(VexType::Int)),
+        };
+        let output = generate(&wrap_in_defn(expr));
+        assert!(output.contains("vexrt.None[int64]()"), "{}", output);
+    }
+
+    #[test]
+    fn expr_result_ok_constructor() {
+        let expr = hir::Expr::VariantConstructor {
+            union_name: "Result".into(),
+            variant_name: "Ok".into(),
+            args: vec![hir::Expr::Int(1, span(3, 4))],
+            span: span(0, 5),
+            ty: VexType::Result {
+                ok: Box::new(VexType::Int),
+                err: Box::new(VexType::String),
+            },
+        };
+        let output = generate(&wrap_in_defn(expr));
+        assert!(output.contains("vexrt.Ok[int64, string](1)"), "{}", output);
+    }
+
+    #[test]
+    fn expr_result_err_constructor() {
+        let expr = hir::Expr::VariantConstructor {
+            union_name: "Result".into(),
+            variant_name: "Err".into(),
+            args: vec![hir::Expr::String("bad".into(), span(4, 9))],
+            span: span(0, 10),
+            ty: VexType::Result {
+                ok: Box::new(VexType::Int),
+                err: Box::new(VexType::String),
+            },
+        };
+        let output = generate(&wrap_in_defn(expr));
+        assert!(
+            output.contains("vexrt.Err[int64, string](\"bad\")"),
+            "{}",
+            output
+        );
+    }
+
+    #[test]
+    fn expr_match_option() {
+        let option_ty = VexType::Option(Box::new(VexType::Int));
+        let expr = hir::Expr::Match {
+            scrutinee: Box::new(hir::Expr::Var {
+                name: "o".into(),
+                span: span(0, 1),
+                ty: option_ty,
+            }),
+            clauses: vec![
+                hir::MatchClause {
+                    pattern: hir::Pattern::Constructor {
+                        union_name: "Option".into(),
+                        variant_name: "Some".into(),
+                        bindings: vec![hir::Pattern::Binding {
+                            name: "x".into(),
+                            ty: VexType::Int,
+                            span: span(10, 11),
+                        }],
+                        span: span(5, 12),
+                    },
+                    body: hir::Expr::Var {
+                        name: "x".into(),
+                        span: span(13, 14),
+                        ty: VexType::Int,
+                    },
+                    span: span(5, 14),
+                },
+                hir::MatchClause {
+                    pattern: hir::Pattern::Constructor {
+                        union_name: "Option".into(),
+                        variant_name: "None".into(),
+                        bindings: vec![],
+                        span: span(15, 19),
+                    },
+                    body: hir::Expr::Int(0, span(20, 21)),
+                    span: span(15, 21),
+                },
+            ],
+            span: span(0, 22),
+            ty: VexType::Int,
+        };
+        let output = generate(&wrap_in_defn(expr));
+        assert!(output.contains("if o.IsSome {"), "{}", output);
+        assert!(output.contains("x := o.Value"), "{}", output);
+        assert!(output.contains("return x"), "{}", output);
+        assert!(output.contains("} else {"), "{}", output);
+        assert!(output.contains("return 0"), "{}", output);
+    }
+
+    #[test]
+    fn expr_match_result() {
+        let result_ty = VexType::Result {
+            ok: Box::new(VexType::Int),
+            err: Box::new(VexType::String),
+        };
+        let expr = hir::Expr::Match {
+            scrutinee: Box::new(hir::Expr::Var {
+                name: "r".into(),
+                span: span(0, 1),
+                ty: result_ty,
+            }),
+            clauses: vec![
+                hir::MatchClause {
+                    pattern: hir::Pattern::Constructor {
+                        union_name: "Result".into(),
+                        variant_name: "Ok".into(),
+                        bindings: vec![hir::Pattern::Binding {
+                            name: "v".into(),
+                            ty: VexType::Int,
+                            span: span(10, 11),
+                        }],
+                        span: span(5, 12),
+                    },
+                    body: hir::Expr::Var {
+                        name: "v".into(),
+                        span: span(13, 14),
+                        ty: VexType::Int,
+                    },
+                    span: span(5, 14),
+                },
+                hir::MatchClause {
+                    pattern: hir::Pattern::Constructor {
+                        union_name: "Result".into(),
+                        variant_name: "Err".into(),
+                        bindings: vec![hir::Pattern::Binding {
+                            name: "e".into(),
+                            ty: VexType::String,
+                            span: span(20, 21),
+                        }],
+                        span: span(15, 22),
+                    },
+                    body: hir::Expr::Int(-1, span(23, 25)),
+                    span: span(15, 25),
+                },
+            ],
+            span: span(0, 26),
+            ty: VexType::Int,
+        };
+        let output = generate(&wrap_in_defn(expr));
+        assert!(output.contains("if r.IsOk {"), "{}", output);
+        assert!(output.contains("v := r.Value"), "{}", output);
+        assert!(output.contains("return v"), "{}", output);
+        assert!(output.contains("} else {"), "{}", output);
+        assert!(output.contains("e := r.Error"), "{}", output);
+        assert!(output.contains("return -1"), "{}", output);
+    }
+
+    #[test]
+    fn needs_vexrt_false_for_basic() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Expr(hir::Expr::Int(42, span(0, 2)))],
+        };
+        assert!(!needs_vexrt(&module));
+    }
+
+    #[test]
+    fn needs_vexrt_true_for_option_return() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Defn {
+                name: "f".into(),
+                params: vec![],
+                return_type: VexType::Option(Box::new(VexType::Int)),
+                body: vec![hir::Expr::VariantConstructor {
+                    union_name: "Option".into(),
+                    variant_name: "None".into(),
+                    args: vec![],
+                    span: span(0, 4),
+                    ty: VexType::Option(Box::new(VexType::Int)),
+                }],
+                span: span(0, 10),
+            }],
+        };
+        assert!(needs_vexrt(&module));
+    }
+
+    #[test]
+    fn import_vexrt_when_needed() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Defn {
+                name: "f".into(),
+                params: vec![],
+                return_type: VexType::Option(Box::new(VexType::Int)),
+                body: vec![hir::Expr::VariantConstructor {
+                    union_name: "Option".into(),
+                    variant_name: "None".into(),
+                    args: vec![],
+                    span: span(0, 4),
+                    ty: VexType::Option(Box::new(VexType::Int)),
+                }],
+                span: span(0, 10),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("\"vex_out/vexrt\""), "{}", output);
     }
 }

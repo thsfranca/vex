@@ -84,11 +84,28 @@ fn main() {
     fs::write(tmp_dir.join("go.mod"), &result.go_mod).expect("failed to write go.mod");
     fs::write(tmp_dir.join("main.go"), &result.go_source).expect("failed to write main.go");
 
+    if let Some(ref vexrt) = result.vexrt {
+        let vexrt_dir = tmp_dir.join("vexrt");
+        fs::create_dir_all(&vexrt_dir).expect("failed to create vexrt directory");
+        fs::write(vexrt_dir.join("option.go"), &vexrt.option_go)
+            .expect("failed to write option.go");
+        fs::write(vexrt_dir.join("result.go"), &vexrt.result_go)
+            .expect("failed to write result.go");
+    }
+
     if let Some(ref dir) = emit_go_dir {
         let dest = Path::new(dir);
         fs::create_dir_all(dest).expect("failed to create emit-go directory");
         fs::write(dest.join("go.mod"), &result.go_mod).expect("failed to write go.mod");
         fs::write(dest.join("main.go"), &result.go_source).expect("failed to write main.go");
+        if let Some(ref vexrt) = result.vexrt {
+            let vexrt_dest = dest.join("vexrt");
+            fs::create_dir_all(&vexrt_dest).expect("failed to create vexrt directory");
+            fs::write(vexrt_dest.join("option.go"), &vexrt.option_go)
+                .expect("failed to write option.go");
+            fs::write(vexrt_dest.join("result.go"), &vexrt.result_go)
+                .expect("failed to write result.go");
+        }
     }
 
     let output_path = env::current_dir().unwrap().join(&binary_name);

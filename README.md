@@ -30,7 +30,7 @@ vex repl                        # Interactive REPL
 
 ## Current Status
 
-REPL is implemented — `vex repl` provides an interactive read-eval-print loop with multi-line input, persistent definitions, and instant feedback via the tree-walking interpreter.
+All compiler phases are implemented, including macro expansion (`cond`, `and`, `or`) and a tree-walking interpreter powering `vex repl`.
 
 ### Compiler Phases
 
@@ -42,6 +42,7 @@ REPL is implemented — `vex repl` provides an interactive read-eval-print loop 
 | `ast.rs` — Untyped AST types | Done |
 | `parser.rs` — Recursive descent parser | Done |
 | `types.rs` / `hir.rs` / `builtins.rs` — Type system | Done |
+| `macro_expand.rs` — Compiler-internal macros (cond, and, or) | Done |
 | `typechecker.rs` — AST → HIR | Done |
 | `codegen.rs` — HIR → Go source | Done |
 | `interpreter.rs` — HIR → Value (tree-walking eval) | Done |
@@ -51,7 +52,7 @@ REPL is implemented — `vex repl` provides an interactive read-eval-print loop 
 
 - **Primitives:** integers, floats, strings, booleans, nil
 - **Functions:** `defn`, `def`, `fn` (lambdas), higher-order functions
-- **Control flow:** `if`, `cond`, `let`, pattern matching (`match`)
+- **Control flow:** `if`, `cond`, `and`, `or`, `let`, pattern matching (`match`)
 - **Data types:** records (`deftype`), field access (`.`), record constructors, unions (`defunion`)
 - **Built-in types:** `Option`, `Result`, `List`, `Map`
 - **Collections:** `each`, `range`, `map`, `filter`
@@ -59,13 +60,12 @@ REPL is implemented — `vex repl` provides an interactive read-eval-print loop 
 - **Concurrency:** `spawn`, `channel`, `send`, `recv`
 - **REPL:** interactive `vex repl` with multi-line input and persistent state
 - **Interpreter:** tree-walking HIR evaluator with all expression forms
-- **Operators:** arithmetic, comparison, logical
-- **Built-in functions:** `println`, `str`, `mod`
+- **Built-in functions:** `println`, `str`, `mod`, arithmetic/comparison operators
 
 ## Architecture
 
-- Pipeline: Source → Lexer → Parser → Type Checker → Codegen → `go build` → Binary
-- Alternative: Source → Lexer → Parser → Type Checker → Interpreter (direct eval)
+- Pipeline: Source → Lexer → Parser → Macro Expand → Type Checker → Codegen → `go build` → Binary
+- Alternative: Source → Lexer → Parser → Macro Expand → Type Checker → Interpreter (direct eval)
 - Design docs: [`docs/language-design.md`](docs/language-design.md), [`docs/compiler-architecture.md`](docs/compiler-architecture.md)
 
 ## Development

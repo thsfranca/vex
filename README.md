@@ -19,7 +19,7 @@ Vex uses S-expression syntax with compile-time type checking, targeting networke
 
 ## Current Status
 
-Modules are implemented — multi-file compilation with `(module)`, `(export)`, `(import)` declarations.
+Go interop is implemented — `(import-go)` for direct access to Go packages alongside multi-file modules.
 
 | Phase | Status |
 |-------|--------|
@@ -33,7 +33,7 @@ Modules are implemented — multi-file compilation with `(module)`, `(export)`, 
 | `codegen.rs` — HIR → Go source | Done |
 | `lib.rs` / `main.rs` — Full pipeline, CLI | Done |
 
-**Implemented features:** integers, floats, strings, booleans, nil, `defn`, `def`, `if`, `cond`, `let`, `fn` (lambdas), higher-order functions, records (`deftype`), field access (`.`), record constructors, unions (`defunion`), pattern matching (`match`), `Option`/`Result` types, collections (`List`, `Map`), `each`, `range`, `map`, `filter`, modules (`module`, `export`, `import`), arithmetic/comparison/logical operators, `println`, `str`, `mod`.
+**Implemented features:** integers, floats, strings, booleans, nil, `defn`, `def`, `if`, `cond`, `let`, `fn` (lambdas), higher-order functions, records (`deftype`), field access (`.`), record constructors, unions (`defunion`), pattern matching (`match`), `Option`/`Result` types, collections (`List`, `Map`), `each`, `range`, `map`, `filter`, modules (`module`, `export`, `import`), Go interop (`import-go`), arithmetic/comparison/logical operators, `println`, `str`, `mod`.
 
 ## Architecture
 

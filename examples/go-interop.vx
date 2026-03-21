@@ -1,0 +1,6 @@
+(import-go "strings" [ToUpper Contains])
+
+(defn main []
+  (println (str "upper: " (ToUpper "hello vex")))
+  (println (str "contains 'vex': " (Contains "hello vex" "vex")))
+  (println (str "contains 'world': " (Contains "hello vex" "world"))))

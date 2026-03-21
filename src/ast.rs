@@ -154,6 +154,21 @@ pub enum Expr {
         channel: Box<Expr>,
         span: Span,
     },
+
+    Quote {
+        expr: Box<Expr>,
+        span: Span,
+    },
+
+    Unquote {
+        expr: Box<Expr>,
+        span: Span,
+    },
+
+    Splice {
+        expr: Box<Expr>,
+        span: Span,
+    },
 }
 
 impl Expr {
@@ -176,7 +191,10 @@ impl Expr {
             | Expr::Spawn { span, .. }
             | Expr::Channel { span, .. }
             | Expr::Send { span, .. }
-            | Expr::Recv { span, .. } => *span,
+            | Expr::Recv { span, .. }
+            | Expr::Quote { span, .. }
+            | Expr::Unquote { span, .. }
+            | Expr::Splice { span, .. } => *span,
         }
     }
 }
@@ -239,6 +257,13 @@ pub enum TopForm {
         span: Span,
     },
 
+    DefMacro {
+        name: String,
+        params: Vec<Param>,
+        body: Vec<Expr>,
+        span: Span,
+    },
+
     Expr(Expr),
 }
 
@@ -252,7 +277,8 @@ impl TopForm {
             | TopForm::Defn { span, .. }
             | TopForm::Def { span, .. }
             | TopForm::Deftype { span, .. }
-            | TopForm::Defunion { span, .. } => *span,
+            | TopForm::Defunion { span, .. }
+            | TopForm::DefMacro { span, .. } => *span,
             TopForm::Expr(expr) => expr.span(),
         }
     }
@@ -868,6 +894,89 @@ mod tests {
         assert_eq!(expr.span(), span(0, 9));
         if let Expr::Recv { channel, .. } = &expr {
             assert!(matches!(channel.as_ref(), Expr::Symbol(s, _) if s == "ch"));
+        }
+    }
+
+    #[test]
+    fn quote_expr() {
+        let expr = Expr::Quote {
+            expr: Box::new(Expr::Symbol("x".into(), span(7, 8))),
+            span: span(0, 9),
+        };
+        assert_eq!(expr.span(), span(0, 9));
+        if let Expr::Quote { expr: inner, .. } = &expr {
+            assert!(matches!(inner.as_ref(), Expr::Symbol(s, _) if s == "x"));
+        }
+    }
+
+    #[test]
+    fn unquote_expr() {
+        let expr = Expr::Unquote {
+            expr: Box::new(Expr::Symbol("val".into(), span(9, 12))),
+            span: span(0, 13),
+        };
+        assert_eq!(expr.span(), span(0, 13));
+        if let Expr::Unquote { expr: inner, .. } = &expr {
+            assert!(matches!(inner.as_ref(), Expr::Symbol(s, _) if s == "val"));
+        }
+    }
+
+    #[test]
+    fn splice_expr() {
+        let expr = Expr::Splice {
+            expr: Box::new(Expr::Symbol("args".into(), span(8, 12))),
+            span: span(0, 13),
+        };
+        assert_eq!(expr.span(), span(0, 13));
+        if let Expr::Splice { expr: inner, .. } = &expr {
+            assert!(matches!(inner.as_ref(), Expr::Symbol(s, _) if s == "args"));
+        }
+    }
+
+    #[test]
+    fn defmacro_top_form() {
+        let form = TopForm::DefMacro {
+            name: "unless".into(),
+            params: vec![
+                Param {
+                    name: "test".into(),
+                    type_ann: None,
+                    span: span(17, 21),
+                },
+                Param {
+                    name: "body".into(),
+                    type_ann: None,
+                    span: span(22, 26),
+                },
+            ],
+            body: vec![Expr::Call {
+                func: Box::new(Expr::Symbol("list".into(), span(30, 34))),
+                args: vec![
+                    Expr::Quote {
+                        expr: Box::new(Expr::Symbol("if".into(), span(42, 44))),
+                        span: span(35, 45),
+                    },
+                    Expr::Symbol("test".into(), span(46, 50)),
+                    Expr::Quote {
+                        expr: Box::new(Expr::Nil(span(58, 61))),
+                        span: span(51, 62),
+                    },
+                    Expr::Symbol("body".into(), span(63, 67)),
+                ],
+                span: span(29, 68),
+            }],
+            span: span(0, 69),
+        };
+        assert_eq!(form.span(), span(0, 69));
+        if let TopForm::DefMacro {
+            name, params, body, ..
+        } = &form
+        {
+            assert_eq!(name, "unless");
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0].name, "test");
+            assert_eq!(params[1].name, "body");
+            assert_eq!(body.len(), 1);
         }
     }
 }

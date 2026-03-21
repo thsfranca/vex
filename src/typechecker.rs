@@ -89,6 +89,15 @@ impl Checker {
                 span,
             } => self.check_send(channel, value, *span),
             ast::Expr::Recv { channel, span } => self.check_recv(channel, *span),
+            ast::Expr::Quote { span, .. }
+            | ast::Expr::Unquote { span, .. }
+            | ast::Expr::Splice { span, .. } => {
+                self.diagnostics.push(Diagnostic::error(
+                    "quote/unquote/splice should be expanded before type checking".to_string(),
+                    *span,
+                ));
+                None
+            }
         }
     }
 
@@ -1713,6 +1722,13 @@ impl Checker {
                 variants,
                 span,
             } => self.check_defunion(name, variants, *span),
+            ast::TopForm::DefMacro { span, .. } => {
+                self.diagnostics.push(Diagnostic::error(
+                    "defmacro should be expanded before type checking".to_string(),
+                    *span,
+                ));
+                None
+            }
         }
     }
 }

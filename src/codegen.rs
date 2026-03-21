@@ -200,6 +200,7 @@ impl Generator {
                 self.write(".");
                 self.write(&vex_to_go_public_name(field));
             }
+            hir::Expr::RecordConstructor { .. } => {}
         }
     }
 
@@ -413,6 +414,11 @@ fn collect_builtin_calls_expr(expr: &hir::Expr, names: &mut Vec<String>) {
         }
         hir::Expr::FieldAccess { object, .. } => {
             collect_builtin_calls_expr(object, names);
+        }
+        hir::Expr::RecordConstructor { args, .. } => {
+            for arg in args {
+                collect_builtin_calls_expr(arg, names);
+            }
         }
     }
 }

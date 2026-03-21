@@ -66,6 +66,13 @@ pub enum Expr {
         span: Span,
         ty: VexType,
     },
+
+    RecordConstructor {
+        name: String,
+        args: Vec<Expr>,
+        span: Span,
+        ty: VexType,
+    },
 }
 
 impl Expr {
@@ -81,7 +88,8 @@ impl Expr {
             | Expr::Let { span, .. }
             | Expr::Lambda { span, .. }
             | Expr::Call { span, .. }
-            | Expr::FieldAccess { span, .. } => *span,
+            | Expr::FieldAccess { span, .. }
+            | Expr::RecordConstructor { span, .. } => *span,
         }
     }
 
@@ -97,7 +105,8 @@ impl Expr {
             | Expr::Let { ty, .. }
             | Expr::Lambda { ty, .. }
             | Expr::Call { ty, .. }
-            | Expr::FieldAccess { ty, .. } => ty,
+            | Expr::FieldAccess { ty, .. }
+            | Expr::RecordConstructor { ty, .. } => ty,
         }
     }
 }
@@ -392,6 +401,34 @@ mod tests {
         };
         assert_eq!(expr.ty(), &VexType::Float);
         assert_eq!(expr.span(), span(0, 11));
+    }
+
+    #[test]
+    fn record_constructor_type() {
+        let point_ty = VexType::Record {
+            name: "Point".into(),
+            fields: vec![
+                RecordField {
+                    name: "x".into(),
+                    ty: VexType::Float,
+                },
+                RecordField {
+                    name: "y".into(),
+                    ty: VexType::Float,
+                },
+            ],
+        };
+        let expr = Expr::RecordConstructor {
+            name: "Point".into(),
+            args: vec![
+                Expr::Float(1.0, span(7, 10)),
+                Expr::Float(2.0, span(11, 14)),
+            ],
+            span: span(0, 15),
+            ty: point_ty.clone(),
+        };
+        assert_eq!(expr.ty(), &point_ty);
+        assert_eq!(expr.span(), span(0, 15));
     }
 
     #[test]

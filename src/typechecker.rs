@@ -100,10 +100,16 @@ impl Checker {
         args: &[ast::Expr],
         span: Span,
     ) -> Option<hir::Expr> {
-        if let ast::Expr::Symbol(name, _) = func
-            && let Some(record_ty) = self.type_defs.get(name).cloned()
-        {
-            return self.check_record_constructor(name, &record_ty, args, span);
+        if let ast::Expr::Symbol(name, _) = func {
+            if let Some(record_ty) = self.type_defs.get(name).cloned()
+                && matches!(&record_ty, VexType::Record { .. })
+            {
+                return self.check_record_constructor(name, &record_ty, args, span);
+            }
+
+            if let Some((union_name, union_ty)) = self.find_variant_union(name) {
+                return self.check_variant_constructor(&union_name, name, &union_ty, args, span);
+            }
         }
 
         let checked_func = self.check_expr(func)?;
@@ -631,6 +637,71 @@ impl Checker {
                 })
             }
         }
+    }
+
+    fn find_variant_union(&self, variant_name: &str) -> Option<(String, VexType)> {
+        for ty in self.type_defs.values() {
+            if let VexType::Union { name, variants } = ty
+                && variants.iter().any(|v| v.name == variant_name)
+            {
+                return Some((name.clone(), ty.clone()));
+            }
+        }
+        None
+    }
+
+    fn check_variant_constructor(
+        &mut self,
+        union_name: &str,
+        variant_name: &str,
+        union_ty: &VexType,
+        args: &[ast::Expr],
+        span: Span,
+    ) -> Option<hir::Expr> {
+        let variants = match union_ty {
+            VexType::Union { variants, .. } => variants,
+            _ => return None,
+        };
+
+        let variant = variants.iter().find(|v| v.name == variant_name)?;
+
+        if variant.types.len() != args.len() {
+            self.diagnostics.push(Diagnostic::error(
+                format!(
+                    "variant {} has {} field(s), but {} argument(s) were provided",
+                    variant_name,
+                    variant.types.len(),
+                    args.len()
+                ),
+                span,
+            ));
+            return None;
+        }
+
+        let mut checked_args = Vec::new();
+        for (arg, expected_ty) in args.iter().zip(variant.types.iter()) {
+            let checked = self.check_expr(arg)?;
+            let actual_ty = checked.ty().clone();
+            if &actual_ty != expected_ty {
+                self.diagnostics.push(Diagnostic::error(
+                    format!(
+                        "expected {} for variant field, found {}",
+                        expected_ty, actual_ty
+                    ),
+                    arg.span(),
+                ));
+                return None;
+            }
+            checked_args.push(checked);
+        }
+
+        Some(hir::Expr::VariantConstructor {
+            union_name: union_name.to_string(),
+            variant_name: variant_name.to_string(),
+            args: checked_args,
+            span,
+            ty: union_ty.clone(),
+        })
     }
 
     fn check_record_constructor(
@@ -1809,5 +1880,61 @@ mod tests {
         let (_, diags) = check_source(source);
         assert_eq!(diags.len(), 1);
         assert!(diags[0].message.contains("non-union"));
+    }
+
+    #[test]
+    fn variant_constructor_simple() {
+        let source = r#"
+            (defunion Shape (Circle Float) (Rect Float Float))
+            (defn make-circle [] : Shape
+              (Circle 5.0))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[1] {
+            assert!(matches!(&body[0], hir::Expr::VariantConstructor {
+                union_name, variant_name, ..
+            } if union_name == "Shape" && variant_name == "Circle"));
+        }
+    }
+
+    #[test]
+    fn variant_constructor_wrong_arity() {
+        let source = r#"
+            (defunion Shape (Circle Float) (Rect Float Float))
+            (defn bad [] : Shape
+              (Circle 5.0 6.0))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("field"));
+    }
+
+    #[test]
+    fn variant_constructor_wrong_type() {
+        let source = r#"
+            (defunion Shape (Circle Float) (Rect Float Float))
+            (defn bad [] : Shape
+              (Circle "bad"))
+        "#;
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("expected"));
+    }
+
+    #[test]
+    fn variant_constructor_no_args() {
+        let source = r#"
+            (defunion Option (Some Int) (None))
+            (defn make-none [] : Option
+              (None))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[1] {
+            assert!(matches!(&body[0], hir::Expr::VariantConstructor {
+                variant_name, args, ..
+            } if variant_name == "None" && args.is_empty()));
+        }
     }
 }

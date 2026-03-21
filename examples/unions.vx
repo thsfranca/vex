@@ -1,0 +1,14 @@
+(defunion Shape
+  (Circle Float)
+  (Rect Float Float))
+
+(defn describe [s : Shape] : String
+  (match s
+    (Circle r) (str "circle with radius " r)
+    (Rect w h) (str "rect " w "x" h)))
+
+(defn main []
+  (let [c (Circle 5.0)
+        r (Rect 3.0 4.0)]
+    (println (describe c))
+    (println (describe r))))

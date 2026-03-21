@@ -5,3 +5,13 @@
   (list (quote let)
     (list (quote tmp) a)
     (list (quote if) (quote tmp) (quote tmp) b)))
+
+(defmacro cond [& clauses]
+  (if (empty? clauses)
+    (quote nil)
+    (if (keyword? (first clauses))
+      (first (rest clauses))
+      (list (quote if)
+        (first clauses)
+        (first (rest clauses))
+        (cons (quote cond) (rest (rest clauses)))))))

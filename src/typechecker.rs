@@ -56,11 +56,6 @@ impl Checker {
                 body,
                 span,
             } => self.check_let(bindings, body, *span),
-            ast::Expr::Cond {
-                clauses,
-                else_body,
-                span,
-            } => self.check_cond(clauses, else_body.as_deref(), *span),
             ast::Expr::Lambda {
                 params,
                 return_type,
@@ -487,60 +482,6 @@ impl Checker {
             span,
             ty,
         })
-    }
-
-    fn check_cond(
-        &mut self,
-        clauses: &[ast::CondClause],
-        else_body: Option<&ast::Expr>,
-        span: Span,
-    ) -> Option<hir::Expr> {
-        let else_expr = if let Some(e) = else_body {
-            self.check_expr(e)?
-        } else {
-            hir::Expr::Nil(span)
-        };
-
-        let mut result = else_expr;
-
-        for clause in clauses.iter().rev() {
-            let checked_test = self.check_expr(&clause.test)?;
-
-            if checked_test.ty() != &VexType::Bool {
-                self.diagnostics.push(Diagnostic::error(
-                    format!("cond test must be Bool, found {}", checked_test.ty()),
-                    checked_test.span(),
-                ));
-                return None;
-            }
-
-            let checked_value = self.check_expr(&clause.value)?;
-
-            let ty = match VexType::types_compatible(checked_value.ty(), result.ty()) {
-                Some(merged) => merged,
-                None => {
-                    self.diagnostics.push(Diagnostic::error(
-                        format!(
-                            "cond branches have different types: {} and {}",
-                            checked_value.ty(),
-                            result.ty()
-                        ),
-                        clause.span,
-                    ));
-                    return None;
-                }
-            };
-
-            result = hir::Expr::If {
-                test: Box::new(checked_test),
-                then_branch: Box::new(checked_value),
-                else_branch: Box::new(result),
-                span: clause.span,
-                ty,
-            };
-        }
-
-        Some(result)
     }
 
     fn check_lambda(
@@ -1856,7 +1797,11 @@ mod tests {
     fn check_source(source: &str) -> (hir::Module, Vec<Diagnostic>) {
         let (tokens, _) = lex(source, FileId::new(0));
         let (ast, _) = parse(&tokens);
-        check(&ast)
+        let (expanded, expand_diags) = crate::macro_expand::expand(ast);
+        if !expand_diags.is_empty() {
+            return (hir::Module { top_forms: vec![] }, expand_diags);
+        }
+        check(&expanded)
     }
 
     #[test]

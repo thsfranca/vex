@@ -1,6 +1,4 @@
-use crate::ast::{
-    Binding, CondClause, Expr, Field, MatchClause, Param, Pattern, TopForm, TypeExpr, Variant,
-};
+use crate::ast::{Binding, Expr, Field, MatchClause, Param, Pattern, TopForm, TypeExpr, Variant};
 use crate::diagnostics::{Diagnostic, Label};
 use crate::lexer::{Token, TokenKind};
 use crate::source::{FileId, Span};
@@ -420,7 +418,6 @@ impl<'a> Parser<'a> {
             match name.as_str() {
                 "if" => return self.parse_if(open_span),
                 "let" => return self.parse_let(open_span),
-                "cond" => return self.parse_cond(open_span),
                 "match" => return self.parse_match(open_span),
                 "fn" => return self.parse_lambda(open_span),
                 "spawn" => return self.parse_spawn(open_span),
@@ -607,34 +604,6 @@ impl<'a> Parser<'a> {
         }
 
         Some(body)
-    }
-
-    fn parse_cond(&mut self, open_span: Span) -> Option<Expr> {
-        self.pos += 1;
-
-        let mut clauses = Vec::new();
-        let mut else_body = None;
-
-        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightParen)) {
-            if self.check(|k| matches!(k, TokenKind::Keyword(s) if s == "else")) {
-                self.pos += 1;
-                else_body = Some(Box::new(self.parse_expr()?));
-                break;
-            }
-
-            let test = self.parse_expr()?;
-            let value = self.parse_expr()?;
-            let span = Span::new(test.span().file, test.span().start, value.span().end);
-            clauses.push(CondClause { test, value, span });
-        }
-
-        let close_span = self.expect_right_paren(open_span)?;
-
-        Some(Expr::Cond {
-            clauses,
-            else_body,
-            span: Span::new(open_span.file, open_span.start, close_span.end),
-        })
     }
 
     fn parse_match(&mut self, open_span: Span) -> Option<Expr> {
@@ -1402,54 +1371,44 @@ mod tests {
     }
 
     #[test]
-    fn cond_basic() {
+    fn cond_parses_as_call() {
         let (forms, diags) = parse_source("(cond (< x 0) \"neg\" (> x 0) \"pos\")");
         assert!(diags.is_empty());
-        if let TopForm::Expr(Expr::Cond {
-            clauses, else_body, ..
-        }) = &forms[0]
-        {
-            assert_eq!(clauses.len(), 2);
-            assert!(matches!(&clauses[0].test, Expr::Call { .. }));
-            assert!(matches!(&clauses[0].value, Expr::String(s, _) if s == "neg"));
-            assert!(matches!(&clauses[1].test, Expr::Call { .. }));
-            assert!(matches!(&clauses[1].value, Expr::String(s, _) if s == "pos"));
-            assert!(else_body.is_none());
+        if let TopForm::Expr(Expr::Call { func, args, .. }) = &forms[0] {
+            assert!(matches!(func.as_ref(), Expr::Symbol(s, _) if s == "cond"));
+            assert_eq!(args.len(), 4);
+            assert!(matches!(&args[0], Expr::Call { .. }));
+            assert!(matches!(&args[1], Expr::String(s, _) if s == "neg"));
+            assert!(matches!(&args[2], Expr::Call { .. }));
+            assert!(matches!(&args[3], Expr::String(s, _) if s == "pos"));
         } else {
-            panic!("expected cond expression");
+            panic!("expected call expression");
         }
     }
 
     #[test]
-    fn cond_with_else() {
+    fn cond_with_else_parses_as_call() {
         let (forms, diags) = parse_source("(cond (< x 0) \"neg\" :else \"zero\")");
         assert!(diags.is_empty());
-        if let TopForm::Expr(Expr::Cond {
-            clauses, else_body, ..
-        }) = &forms[0]
-        {
-            assert_eq!(clauses.len(), 1);
-            assert!(else_body.is_some());
-            assert!(
-                matches!(else_body.as_ref().unwrap().as_ref(), Expr::String(s, _) if s == "zero")
-            );
+        if let TopForm::Expr(Expr::Call { func, args, .. }) = &forms[0] {
+            assert!(matches!(func.as_ref(), Expr::Symbol(s, _) if s == "cond"));
+            assert_eq!(args.len(), 4);
+            assert!(matches!(&args[2], Expr::Keyword(s, _) if s == "else"));
+            assert!(matches!(&args[3], Expr::String(s, _) if s == "zero"));
         } else {
-            panic!("expected cond expression");
+            panic!("expected call expression");
         }
     }
 
     #[test]
-    fn cond_empty() {
+    fn cond_empty_parses_as_call() {
         let (forms, diags) = parse_source("(cond)");
         assert!(diags.is_empty());
-        if let TopForm::Expr(Expr::Cond {
-            clauses, else_body, ..
-        }) = &forms[0]
-        {
-            assert!(clauses.is_empty());
-            assert!(else_body.is_none());
+        if let TopForm::Expr(Expr::Call { func, args, .. }) = &forms[0] {
+            assert!(matches!(func.as_ref(), Expr::Symbol(s, _) if s == "cond"));
+            assert!(args.is_empty());
         } else {
-            panic!("expected cond expression");
+            panic!("expected call expression");
         }
     }
 

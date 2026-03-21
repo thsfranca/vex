@@ -247,7 +247,9 @@ impl Generator {
             hir::Expr::RecordConstructor { name, args, ty, .. } => {
                 self.emit_record_constructor(name, args, ty);
             }
-            hir::Expr::Match { .. } => {}
+            hir::Expr::Match {
+                scrutinee, clauses, ..
+            } => self.emit_match(scrutinee, clauses),
         }
     }
 
@@ -423,6 +425,144 @@ impl Generator {
             self.emit_expr(arg);
         }
         self.write("}");
+    }
+
+    fn emit_match(&mut self, scrutinee: &hir::Expr, clauses: &[hir::MatchClause]) {
+        let is_type_switch = clauses
+            .iter()
+            .any(|c| matches!(&c.pattern, hir::Pattern::Constructor { .. }));
+
+        if is_type_switch {
+            self.emit_match_type_switch(scrutinee, clauses);
+        } else {
+            self.emit_match_value_switch(scrutinee, clauses);
+        }
+    }
+
+    fn emit_match_type_switch(&mut self, scrutinee: &hir::Expr, clauses: &[hir::MatchClause]) {
+        self.write("func() ");
+        if let Some(first) = clauses.first() {
+            let ret_type = go_type(first.body.ty());
+            if !ret_type.is_empty() {
+                self.write(&ret_type);
+                self.write(" ");
+            }
+        }
+        self.write("{ switch _v := ");
+        self.emit_expr(scrutinee);
+        self.write(".(type) {");
+        self.newline();
+
+        for clause in clauses {
+            match &clause.pattern {
+                hir::Pattern::Constructor {
+                    union_name,
+                    variant_name,
+                    bindings,
+                    ..
+                } => {
+                    let variant_go = format!(
+                        "{}_{}",
+                        vex_to_go_public_name(union_name),
+                        vex_to_go_public_name(variant_name)
+                    );
+                    self.write_indent();
+                    self.write("case ");
+                    self.write(&variant_go);
+                    self.write(":");
+                    self.newline();
+                    self.indent += 1;
+                    for (i, binding) in bindings.iter().enumerate() {
+                        if let hir::Pattern::Binding { name, .. } = binding {
+                            self.write_indent();
+                            self.write(&vex_to_go_name(name));
+                            write!(self.output, " := _v.V{}", i).unwrap();
+                            self.newline();
+                        }
+                    }
+                    self.write_indent();
+                    self.write("return ");
+                    self.emit_expr(&clause.body);
+                    self.newline();
+                    self.indent -= 1;
+                }
+                hir::Pattern::Wildcard(_) | hir::Pattern::Binding { .. } => {
+                    self.write_indent();
+                    self.write("default:");
+                    self.newline();
+                    self.indent += 1;
+                    self.write_indent();
+                    self.write("return ");
+                    self.emit_expr(&clause.body);
+                    self.newline();
+                    self.indent -= 1;
+                }
+                _ => {}
+            }
+        }
+
+        self.write_indent();
+        self.write("return *new(");
+        if let Some(first) = clauses.first() {
+            self.write(&go_type(first.body.ty()));
+        }
+        self.write(")");
+        self.newline();
+        self.write("}()");
+    }
+
+    fn emit_match_value_switch(&mut self, scrutinee: &hir::Expr, clauses: &[hir::MatchClause]) {
+        self.write("func() ");
+        if let Some(first) = clauses.first() {
+            let ret_type = go_type(first.body.ty());
+            if !ret_type.is_empty() {
+                self.write(&ret_type);
+                self.write(" ");
+            }
+        }
+        self.write("{ switch ");
+        self.emit_expr(scrutinee);
+        self.write(" {");
+        self.newline();
+
+        for clause in clauses {
+            match &clause.pattern {
+                hir::Pattern::Literal(expr) => {
+                    self.write_indent();
+                    self.write("case ");
+                    self.emit_expr(expr);
+                    self.write(":");
+                    self.newline();
+                    self.indent += 1;
+                    self.write_indent();
+                    self.write("return ");
+                    self.emit_expr(&clause.body);
+                    self.newline();
+                    self.indent -= 1;
+                }
+                hir::Pattern::Wildcard(_) | hir::Pattern::Binding { .. } => {
+                    self.write_indent();
+                    self.write("default:");
+                    self.newline();
+                    self.indent += 1;
+                    self.write_indent();
+                    self.write("return ");
+                    self.emit_expr(&clause.body);
+                    self.newline();
+                    self.indent -= 1;
+                }
+                _ => {}
+            }
+        }
+
+        self.write_indent();
+        self.write("return *new(");
+        if let Some(first) = clauses.first() {
+            self.write(&go_type(first.body.ty()));
+        }
+        self.write(")");
+        self.newline();
+        self.write("}()");
     }
 }
 
@@ -1327,5 +1467,106 @@ mod tests {
         };
         let output = generate(&module);
         assert!(output.contains("ToolInput{FullName: \"test\"}"));
+    }
+
+    fn wrap_in_defn(body: hir::Expr) -> hir::Module {
+        hir::Module {
+            top_forms: vec![hir::TopForm::Defn {
+                name: "test".into(),
+                params: vec![],
+                return_type: body.ty().clone(),
+                body: vec![body],
+                span: span(0, 100),
+            }],
+        }
+    }
+
+    #[test]
+    fn expr_match_type_switch() {
+        let union_ty = VexType::Union {
+            name: "Option".into(),
+            variants: vec![
+                UnionVariant {
+                    name: "Some".into(),
+                    types: vec![VexType::Int],
+                },
+                UnionVariant {
+                    name: "None".into(),
+                    types: vec![],
+                },
+            ],
+        };
+        let expr = hir::Expr::Match {
+            scrutinee: Box::new(hir::Expr::Var {
+                name: "o".into(),
+                span: span(0, 1),
+                ty: union_ty,
+            }),
+            clauses: vec![
+                hir::MatchClause {
+                    pattern: hir::Pattern::Constructor {
+                        union_name: "Option".into(),
+                        variant_name: "Some".into(),
+                        bindings: vec![hir::Pattern::Binding {
+                            name: "x".into(),
+                            ty: VexType::Int,
+                            span: span(10, 11),
+                        }],
+                        span: span(5, 12),
+                    },
+                    body: hir::Expr::Var {
+                        name: "x".into(),
+                        span: span(13, 14),
+                        ty: VexType::Int,
+                    },
+                    span: span(5, 14),
+                },
+                hir::MatchClause {
+                    pattern: hir::Pattern::Wildcard(span(15, 16)),
+                    body: hir::Expr::Int(0, span(17, 18)),
+                    span: span(15, 18),
+                },
+            ],
+            span: span(0, 19),
+            ty: VexType::Int,
+        };
+        let output = generate(&wrap_in_defn(expr));
+        assert!(output.contains("switch _v := o.(type)"), "{}", output);
+        assert!(output.contains("case Option_Some:"), "{}", output);
+        assert!(output.contains("x := _v.V0"), "{}", output);
+        assert!(output.contains("return x"), "{}", output);
+        assert!(output.contains("default:"), "{}", output);
+        assert!(output.contains("return 0"), "{}", output);
+    }
+
+    #[test]
+    fn expr_match_value_switch() {
+        let expr = hir::Expr::Match {
+            scrutinee: Box::new(hir::Expr::Var {
+                name: "x".into(),
+                span: span(0, 1),
+                ty: VexType::Int,
+            }),
+            clauses: vec![
+                hir::MatchClause {
+                    pattern: hir::Pattern::Literal(Box::new(hir::Expr::Int(1, span(5, 6)))),
+                    body: hir::Expr::String("one".into(), span(7, 12)),
+                    span: span(5, 12),
+                },
+                hir::MatchClause {
+                    pattern: hir::Pattern::Wildcard(span(13, 14)),
+                    body: hir::Expr::String("other".into(), span(15, 22)),
+                    span: span(13, 22),
+                },
+            ],
+            span: span(0, 23),
+            ty: VexType::String,
+        };
+        let output = generate(&wrap_in_defn(expr));
+        assert!(output.contains("switch x {"), "{}", output);
+        assert!(output.contains("case 1:"), "{}", output);
+        assert!(output.contains("return \"one\""), "{}", output);
+        assert!(output.contains("default:"), "{}", output);
+        assert!(output.contains("return \"other\""), "{}", output);
     }
 }

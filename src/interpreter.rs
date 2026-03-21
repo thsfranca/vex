@@ -459,6 +459,66 @@ impl Interpreter {
                     message: "range requires Int arguments".into(),
                 }),
             },
+            "syntax-list" => {
+                let mut items = Vec::new();
+                for arg in &args {
+                    items.push(value_to_syntax(arg)?);
+                }
+                Ok(Value::Syntax(SyntaxValue::List(items)))
+            }
+            "syntax-cons" => {
+                let head = value_to_syntax(&args[0])?;
+                match value_to_syntax(&args[1])? {
+                    SyntaxValue::List(mut items) => {
+                        items.insert(0, head);
+                        Ok(Value::Syntax(SyntaxValue::List(items)))
+                    }
+                    _ => Err(RuntimeError {
+                        message: "syntax-cons: second argument must be an SList".into(),
+                    }),
+                }
+            }
+            "syntax-first" => match value_to_syntax(&args[0])? {
+                SyntaxValue::List(items) if !items.is_empty() => Ok(syntax_to_value(&items[0])),
+                SyntaxValue::List(_) => Err(RuntimeError {
+                    message: "syntax-first: empty list".into(),
+                }),
+                _ => Err(RuntimeError {
+                    message: "syntax-first: argument must be an SList".into(),
+                }),
+            },
+            "syntax-rest" => match value_to_syntax(&args[0])? {
+                SyntaxValue::List(items) if !items.is_empty() => {
+                    Ok(Value::Syntax(SyntaxValue::List(items[1..].to_vec())))
+                }
+                SyntaxValue::List(_) => Err(RuntimeError {
+                    message: "syntax-rest: empty list".into(),
+                }),
+                _ => Err(RuntimeError {
+                    message: "syntax-rest: argument must be an SList".into(),
+                }),
+            },
+            "syntax-symbol?" => match value_to_syntax(&args[0])? {
+                SyntaxValue::Sym(_) => Ok(Value::Bool(true)),
+                _ => Ok(Value::Bool(false)),
+            },
+            "syntax-list?" => match value_to_syntax(&args[0])? {
+                SyntaxValue::List(_) => Ok(Value::Bool(true)),
+                _ => Ok(Value::Bool(false)),
+            },
+            "syntax-concat" => {
+                let a = value_to_syntax(&args[0])?;
+                let b = value_to_syntax(&args[1])?;
+                match (a, b) {
+                    (SyntaxValue::List(mut a_items), SyntaxValue::List(b_items)) => {
+                        a_items.extend(b_items);
+                        Ok(Value::Syntax(SyntaxValue::List(a_items)))
+                    }
+                    _ => Err(RuntimeError {
+                        message: "syntax-concat: both arguments must be SList".into(),
+                    }),
+                }
+            }
             _ => Err(RuntimeError {
                 message: format!("unknown builtin: {}", name),
             }),
@@ -967,5 +1027,107 @@ mod tests {
             SyntaxValue::Int(0),
         ]));
         assert_eq!(format!("{}", val), "(if true 1 0)");
+    }
+
+    #[test]
+    fn builtin_syntax_list() {
+        let mut interp = Interpreter::new();
+        let args = vec![
+            Value::Syntax(SyntaxValue::Sym("if".into())),
+            Value::Syntax(SyntaxValue::Bool(true)),
+            Value::Syntax(SyntaxValue::Int(1)),
+        ];
+        let result = interp.call_builtin("syntax-list", args).unwrap();
+        assert!(matches!(result, Value::Syntax(SyntaxValue::List(ref items)) if items.len() == 3));
+    }
+
+    #[test]
+    fn builtin_syntax_cons() {
+        let mut interp = Interpreter::new();
+        let args = vec![
+            Value::Syntax(SyntaxValue::Sym("x".into())),
+            Value::Syntax(SyntaxValue::List(vec![SyntaxValue::Int(1)])),
+        ];
+        let result = interp.call_builtin("syntax-cons", args).unwrap();
+        if let Value::Syntax(SyntaxValue::List(items)) = result {
+            assert_eq!(items.len(), 2);
+            assert_eq!(items[0], SyntaxValue::Sym("x".into()));
+            assert_eq!(items[1], SyntaxValue::Int(1));
+        } else {
+            panic!("expected SList");
+        }
+    }
+
+    #[test]
+    fn builtin_syntax_first_and_rest() {
+        let mut interp = Interpreter::new();
+        let list = Value::Syntax(SyntaxValue::List(vec![
+            SyntaxValue::Int(1),
+            SyntaxValue::Int(2),
+            SyntaxValue::Int(3),
+        ]));
+
+        let first = interp
+            .call_builtin("syntax-first", vec![list.clone()])
+            .unwrap();
+        assert!(matches!(first, Value::Syntax(SyntaxValue::Int(1))));
+
+        let rest = interp.call_builtin("syntax-rest", vec![list]).unwrap();
+        if let Value::Syntax(SyntaxValue::List(items)) = rest {
+            assert_eq!(items, vec![SyntaxValue::Int(2), SyntaxValue::Int(3)]);
+        } else {
+            panic!("expected SList");
+        }
+    }
+
+    #[test]
+    fn builtin_syntax_predicates() {
+        let mut interp = Interpreter::new();
+
+        let sym = Value::Syntax(SyntaxValue::Sym("x".into()));
+        let list = Value::Syntax(SyntaxValue::List(vec![]));
+        let num = Value::Syntax(SyntaxValue::Int(42));
+
+        assert!(matches!(
+            interp.call_builtin("syntax-symbol?", vec![sym]).unwrap(),
+            Value::Bool(true)
+        ));
+        assert!(matches!(
+            interp.call_builtin("syntax-list?", vec![list]).unwrap(),
+            Value::Bool(true)
+        ));
+        assert!(matches!(
+            interp
+                .call_builtin("syntax-symbol?", vec![num.clone()])
+                .unwrap(),
+            Value::Bool(false)
+        ));
+        assert!(matches!(
+            interp.call_builtin("syntax-list?", vec![num]).unwrap(),
+            Value::Bool(false)
+        ));
+    }
+
+    #[test]
+    fn builtin_syntax_concat() {
+        let mut interp = Interpreter::new();
+        let a = Value::Syntax(SyntaxValue::List(vec![SyntaxValue::Int(1)]));
+        let b = Value::Syntax(SyntaxValue::List(vec![
+            SyntaxValue::Int(2),
+            SyntaxValue::Int(3),
+        ]));
+        let result = interp.call_builtin("syntax-concat", vec![a, b]).unwrap();
+        if let Value::Syntax(SyntaxValue::List(items)) = result {
+            assert_eq!(
+                items,
+                vec![
+                    SyntaxValue::Int(1),
+                    SyntaxValue::Int(2),
+                    SyntaxValue::Int(3)
+                ]
+            );
+        } else {
+            panic!("expected SList");
+        }
     }
 }

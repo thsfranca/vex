@@ -84,6 +84,7 @@ impl Generator {
             hir::TopForm::Def {
                 name, ty, value, ..
             } => self.emit_def(name, ty, value),
+            hir::TopForm::Deftype { .. } => {}
             hir::TopForm::Expr(expr) => {
                 self.write_indent();
                 self.emit_expr(expr);
@@ -401,6 +402,7 @@ fn collect_builtin_calls_top_form(form: &hir::TopForm, names: &mut Vec<String>) 
         hir::TopForm::Def { value, .. } => {
             collect_builtin_calls_expr(value, names);
         }
+        hir::TopForm::Deftype { .. } => {}
         hir::TopForm::Expr(expr) => {
             collect_builtin_calls_expr(expr, names);
         }

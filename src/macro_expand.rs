@@ -9,7 +9,7 @@ use crate::source::{FileId, Span};
 use crate::types::{SyntaxValue, expr_to_syntax, syntax_to_expr};
 
 const MAX_EXPANSION_DEPTH: usize = 64;
-const PRELUDE_SOURCE: &str = include_str!("../lib/prelude.vx");
+const PRELUDE_SOURCE: &str = include_str!("../stdlib/prelude.vx");
 
 static GENSYM_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

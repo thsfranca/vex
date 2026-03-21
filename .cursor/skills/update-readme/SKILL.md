@@ -96,6 +96,17 @@ cargo test
 MIT
 ```
 
+## Review Existing Documentation
+
+After updating the README, review all files in `docs/` against `docs/documentation-guidelines.md`. Fix any violations you find:
+
+- Rewrite passive voice sentences into active voice
+- Break dense paragraphs into bullet points or numbered lists
+- Remove filler words ("basically," "simply," "just," "actually," "really")
+- Ensure each section starts with a clear one-line summary
+
+Only fix style and structure — do not change technical content or meaning.
+
 ## Rules
 
 - **Only report what is actually implemented.** Read the source files — do not guess.
@@ -104,3 +115,4 @@ MIT
 - Don't add verbose descriptions of planned features — the design docs handle that.
 - Keep the README under 80 lines. It's a quick reference, not documentation.
 - Preserve the CI badge and "study project" note — these are intentional.
+- **Follow `docs/documentation-guidelines.md`** — use active voice, prefer bullet points over paragraphs, remove filler words, write for humans first.

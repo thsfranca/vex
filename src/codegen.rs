@@ -995,6 +995,8 @@ pub fn go_type(ty: &VexType) -> String {
         }
         VexType::Record { name, .. } => vex_to_go_public_name(name),
         VexType::Union { name, .. } => vex_to_go_public_name(name),
+        VexType::List(inner) => format!("[]{}", go_type(inner)),
+        VexType::Map { key, value } => format!("map[{}]{}", go_type(key), go_type(value)),
         VexType::Option(inner) => format!("vexrt.Option[{}]", go_type(inner)),
         VexType::Result { ok, err } => {
             format!("vexrt.Result[{}, {}]", go_type(ok), go_type(err))
@@ -1057,6 +1059,36 @@ mod tests {
         assert_eq!(go_type(&VexType::Bool), "bool");
         assert_eq!(go_type(&VexType::String), "string");
         assert_eq!(go_type(&VexType::Unit), "");
+    }
+
+    #[test]
+    fn go_type_list() {
+        assert_eq!(go_type(&VexType::List(Box::new(VexType::Int))), "[]int64");
+        assert_eq!(
+            go_type(&VexType::List(Box::new(VexType::String))),
+            "[]string"
+        );
+    }
+
+    #[test]
+    fn go_type_list_nested() {
+        assert_eq!(
+            go_type(&VexType::List(Box::new(VexType::List(Box::new(
+                VexType::Int
+            ))))),
+            "[][]int64"
+        );
+    }
+
+    #[test]
+    fn go_type_map() {
+        assert_eq!(
+            go_type(&VexType::Map {
+                key: Box::new(VexType::String),
+                value: Box::new(VexType::Int),
+            }),
+            "map[string]int64"
+        );
     }
 
     #[test]

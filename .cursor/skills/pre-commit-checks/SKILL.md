@@ -19,4 +19,4 @@ cargo clippy -- -D warnings
 
 Only create the commit after both commands succeed with no errors.
 
-3. **README check** — if the commit reaches a new implementation milestone or changes the status of a compiler phase, also run the **update-readme** skill before committing.
+3. **README trigger check** — before committing, actively verify whether any of the **update-readme** skill triggers have been reached by comparing the staged changes against the trigger conditions in that skill. If any trigger is met, run the **update-readme** skill and stage the updated `README.md` before committing. This check is mandatory on every commit, not optional.

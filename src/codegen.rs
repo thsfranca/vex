@@ -1366,6 +1366,7 @@ pub fn go_type(ty: &VexType) -> String {
             format!("vexrt.Result[{}, {}]", go_type(ok), go_type(err))
         }
         VexType::TypeVar(id) => format!("T{}", id),
+        VexType::Syntax => "interface{}".to_string(),
     }
 }
 

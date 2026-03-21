@@ -1,3 +1,5 @@
+use crate::ast;
+use crate::source::{FileId, Span};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -44,6 +46,7 @@ pub enum VexType {
         err: Box<VexType>,
     },
     TypeVar(u32),
+    Syntax,
 }
 
 impl VexType {
@@ -139,6 +142,314 @@ impl VexType {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum SyntaxValue {
+    Int(i64),
+    Float(f64),
+    Str(std::string::String),
+    Bool(bool),
+    Nil,
+    Sym(std::string::String),
+    Kw(std::string::String),
+    List(Vec<SyntaxValue>),
+}
+
+pub fn expr_to_syntax(expr: &ast::Expr) -> SyntaxValue {
+    match expr {
+        ast::Expr::Int(n, _) => SyntaxValue::Int(*n),
+        ast::Expr::Float(n, _) => SyntaxValue::Float(*n),
+        ast::Expr::String(s, _) => SyntaxValue::Str(s.clone()),
+        ast::Expr::Bool(b, _) => SyntaxValue::Bool(*b),
+        ast::Expr::Nil(_) => SyntaxValue::Nil,
+        ast::Expr::Symbol(s, _) => SyntaxValue::Sym(s.clone()),
+        ast::Expr::Keyword(s, _) => SyntaxValue::Kw(s.clone()),
+        ast::Expr::Call { func, args, .. } => {
+            let mut items = vec![expr_to_syntax(func)];
+            for arg in args {
+                items.push(expr_to_syntax(arg));
+            }
+            SyntaxValue::List(items)
+        }
+        ast::Expr::If {
+            test,
+            then_branch,
+            else_branch,
+            ..
+        } => SyntaxValue::List(vec![
+            SyntaxValue::Sym("if".into()),
+            expr_to_syntax(test),
+            expr_to_syntax(then_branch),
+            expr_to_syntax(else_branch),
+        ]),
+        ast::Expr::Let { bindings, body, .. } => {
+            let mut binding_items = Vec::new();
+            for b in bindings {
+                binding_items.push(SyntaxValue::Sym(b.name.clone()));
+                binding_items.push(expr_to_syntax(&b.value));
+            }
+            let mut items = vec![
+                SyntaxValue::Sym("let".into()),
+                SyntaxValue::List(binding_items),
+            ];
+            for expr in body {
+                items.push(expr_to_syntax(expr));
+            }
+            SyntaxValue::List(items)
+        }
+        ast::Expr::Lambda { params, body, .. } => {
+            let param_items: Vec<SyntaxValue> = params
+                .iter()
+                .map(|p| SyntaxValue::Sym(p.name.clone()))
+                .collect();
+            let mut items = vec![
+                SyntaxValue::Sym("fn".into()),
+                SyntaxValue::List(param_items),
+            ];
+            for expr in body {
+                items.push(expr_to_syntax(expr));
+            }
+            SyntaxValue::List(items)
+        }
+        ast::Expr::Quote { expr: inner, .. } => SyntaxValue::List(vec![
+            SyntaxValue::Sym("quote".into()),
+            expr_to_syntax(inner),
+        ]),
+        ast::Expr::Unquote { expr: inner, .. } => SyntaxValue::List(vec![
+            SyntaxValue::Sym("unquote".into()),
+            expr_to_syntax(inner),
+        ]),
+        ast::Expr::Splice { expr: inner, .. } => SyntaxValue::List(vec![
+            SyntaxValue::Sym("splice".into()),
+            expr_to_syntax(inner),
+        ]),
+        ast::Expr::Cond {
+            clauses, else_body, ..
+        } => {
+            let mut items = vec![SyntaxValue::Sym("cond".into())];
+            for clause in clauses {
+                items.push(expr_to_syntax(&clause.test));
+                items.push(expr_to_syntax(&clause.value));
+            }
+            if let Some(body) = else_body {
+                items.push(SyntaxValue::Kw("else".into()));
+                items.push(expr_to_syntax(body));
+            }
+            SyntaxValue::List(items)
+        }
+        ast::Expr::Match {
+            scrutinee, clauses, ..
+        } => {
+            let mut items = vec![SyntaxValue::Sym("match".into()), expr_to_syntax(scrutinee)];
+            for clause in clauses {
+                items.push(pattern_to_syntax(&clause.pattern));
+                items.push(expr_to_syntax(&clause.body));
+            }
+            SyntaxValue::List(items)
+        }
+        ast::Expr::FieldAccess { object, field, .. } => SyntaxValue::List(vec![
+            SyntaxValue::Sym(".".into()),
+            expr_to_syntax(object),
+            SyntaxValue::Sym(field.clone()),
+        ]),
+        ast::Expr::Spawn { body, .. } => {
+            SyntaxValue::List(vec![SyntaxValue::Sym("spawn".into()), expr_to_syntax(body)])
+        }
+        ast::Expr::Channel { .. } => SyntaxValue::List(vec![SyntaxValue::Sym("channel".into())]),
+        ast::Expr::Send { channel, value, .. } => SyntaxValue::List(vec![
+            SyntaxValue::Sym("send".into()),
+            expr_to_syntax(channel),
+            expr_to_syntax(value),
+        ]),
+        ast::Expr::Recv { channel, .. } => SyntaxValue::List(vec![
+            SyntaxValue::Sym("recv".into()),
+            expr_to_syntax(channel),
+        ]),
+    }
+}
+
+fn pattern_to_syntax(pattern: &ast::Pattern) -> SyntaxValue {
+    match pattern {
+        ast::Pattern::Wildcard(_) => SyntaxValue::Sym("_".into()),
+        ast::Pattern::Binding(name, _) => SyntaxValue::Sym(name.clone()),
+        ast::Pattern::Literal(expr) => expr_to_syntax(expr),
+        ast::Pattern::Constructor { name, args, .. } => {
+            let mut items = vec![SyntaxValue::Sym(name.clone())];
+            for arg in args {
+                items.push(pattern_to_syntax(arg));
+            }
+            SyntaxValue::List(items)
+        }
+    }
+}
+
+pub fn syntax_to_expr(syntax: &SyntaxValue, span: Span) -> ast::Expr {
+    match syntax {
+        SyntaxValue::Int(n) => ast::Expr::Int(*n, span),
+        SyntaxValue::Float(n) => ast::Expr::Float(*n, span),
+        SyntaxValue::Str(s) => ast::Expr::String(s.clone(), span),
+        SyntaxValue::Bool(b) => ast::Expr::Bool(*b, span),
+        SyntaxValue::Nil => ast::Expr::Nil(span),
+        SyntaxValue::Sym(s) => ast::Expr::Symbol(s.clone(), span),
+        SyntaxValue::Kw(s) => ast::Expr::Keyword(s.clone(), span),
+        SyntaxValue::List(items) if items.is_empty() => ast::Expr::Nil(span),
+        SyntaxValue::List(items) => {
+            if let SyntaxValue::Sym(head) = &items[0] {
+                match head.as_str() {
+                    "if" if items.len() == 4 => {
+                        return ast::Expr::If {
+                            test: Box::new(syntax_to_expr(&items[1], span)),
+                            then_branch: Box::new(syntax_to_expr(&items[2], span)),
+                            else_branch: Box::new(syntax_to_expr(&items[3], span)),
+                            span,
+                        };
+                    }
+                    "let" if items.len() >= 3 => {
+                        if let SyntaxValue::List(binding_items) = &items[1] {
+                            let mut bindings = Vec::new();
+                            let mut i = 0;
+                            while i + 1 < binding_items.len() {
+                                if let SyntaxValue::Sym(name) = &binding_items[i] {
+                                    bindings.push(ast::Binding {
+                                        name: name.clone(),
+                                        value: syntax_to_expr(&binding_items[i + 1], span),
+                                        span,
+                                    });
+                                }
+                                i += 2;
+                            }
+                            let body: Vec<ast::Expr> =
+                                items[2..].iter().map(|s| syntax_to_expr(s, span)).collect();
+                            return ast::Expr::Let {
+                                bindings,
+                                body,
+                                span,
+                            };
+                        }
+                    }
+                    "fn" if items.len() >= 3 => {
+                        if let SyntaxValue::List(param_items) = &items[1] {
+                            let params: Vec<ast::Param> = param_items
+                                .iter()
+                                .filter_map(|p| {
+                                    if let SyntaxValue::Sym(name) = p {
+                                        Some(ast::Param {
+                                            name: name.clone(),
+                                            type_ann: None,
+                                            span,
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            let body: Vec<ast::Expr> =
+                                items[2..].iter().map(|s| syntax_to_expr(s, span)).collect();
+                            return ast::Expr::Lambda {
+                                params,
+                                return_type: None,
+                                body,
+                                span,
+                            };
+                        }
+                    }
+                    "quote" if items.len() == 2 => {
+                        return ast::Expr::Quote {
+                            expr: Box::new(syntax_to_expr(&items[1], span)),
+                            span,
+                        };
+                    }
+                    _ => {}
+                }
+            }
+            let func = syntax_to_expr(&items[0], span);
+            let args: Vec<ast::Expr> = items[1..].iter().map(|s| syntax_to_expr(s, span)).collect();
+            ast::Expr::Call {
+                func: Box::new(func),
+                args,
+                span,
+            }
+        }
+    }
+}
+
+pub fn syntax_to_top_form(syntax: &SyntaxValue, span: Span) -> ast::TopForm {
+    if let SyntaxValue::List(items) = syntax
+        && let Some(SyntaxValue::Sym(head)) = items.first()
+    {
+        match head.as_str() {
+            "defn" if items.len() >= 4 => {
+                if let (SyntaxValue::Sym(name), SyntaxValue::List(param_items)) =
+                    (&items[1], &items[2])
+                {
+                    let params: Vec<ast::Param> = param_items
+                        .iter()
+                        .filter_map(|p| {
+                            if let SyntaxValue::Sym(name) = p {
+                                Some(ast::Param {
+                                    name: name.clone(),
+                                    type_ann: None,
+                                    span,
+                                })
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    let body: Vec<ast::Expr> =
+                        items[3..].iter().map(|s| syntax_to_expr(s, span)).collect();
+                    return ast::TopForm::Defn {
+                        name: name.clone(),
+                        params,
+                        return_type: None,
+                        body,
+                        span,
+                    };
+                }
+            }
+            "def" if items.len() == 3 => {
+                if let SyntaxValue::Sym(name) = &items[1] {
+                    return ast::TopForm::Def {
+                        name: name.clone(),
+                        type_ann: None,
+                        value: syntax_to_expr(&items[2], span),
+                        span,
+                    };
+                }
+            }
+            _ => {}
+        }
+    }
+    ast::TopForm::Expr(syntax_to_expr(syntax, span))
+}
+
+pub fn dummy_span() -> Span {
+    Span::new(FileId::new(0), 0, 0)
+}
+
+impl fmt::Display for SyntaxValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SyntaxValue::Int(n) => write!(f, "{}", n),
+            SyntaxValue::Float(n) => write!(f, "{}", n),
+            SyntaxValue::Str(s) => write!(f, "\"{}\"", s),
+            SyntaxValue::Bool(b) => write!(f, "{}", b),
+            SyntaxValue::Nil => write!(f, "nil"),
+            SyntaxValue::Sym(s) => write!(f, "{}", s),
+            SyntaxValue::Kw(s) => write!(f, ":{}", s),
+            SyntaxValue::List(items) => {
+                write!(f, "(")?;
+                for (i, item) in items.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, " ")?;
+                    }
+                    write!(f, "{}", item)?;
+                }
+                write!(f, ")")
+            }
+        }
+    }
+}
+
 impl fmt::Display for VexType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -165,6 +476,7 @@ impl fmt::Display for VexType {
             VexType::Option(inner) => write!(f, "(Option {})", inner),
             VexType::Result { ok, err } => write!(f, "(Result {} {})", ok, err),
             VexType::TypeVar(id) => write!(f, "?T{}", id),
+            VexType::Syntax => write!(f, "Syntax"),
         }
     }
 }
@@ -654,5 +966,119 @@ mod tests {
             VexType::types_compatible(&a, &b),
             Some(VexType::Channel(Box::new(VexType::Int)))
         );
+    }
+
+    #[test]
+    fn syntax_type_display() {
+        assert_eq!(format!("{}", VexType::Syntax), "Syntax");
+    }
+
+    #[test]
+    fn syntax_value_display_primitives() {
+        assert_eq!(format!("{}", SyntaxValue::Int(42)), "42");
+        assert_eq!(format!("{}", SyntaxValue::Str("hi".into())), "\"hi\"");
+        assert_eq!(format!("{}", SyntaxValue::Sym("x".into())), "x");
+        assert_eq!(format!("{}", SyntaxValue::Kw("else".into())), ":else");
+        assert_eq!(format!("{}", SyntaxValue::Bool(true)), "true");
+        assert_eq!(format!("{}", SyntaxValue::Nil), "nil");
+    }
+
+    #[test]
+    fn syntax_value_display_list() {
+        let list = SyntaxValue::List(vec![
+            SyntaxValue::Sym("+".into()),
+            SyntaxValue::Int(1),
+            SyntaxValue::Int(2),
+        ]);
+        assert_eq!(format!("{}", list), "(+ 1 2)");
+    }
+
+    #[test]
+    fn expr_to_syntax_literals() {
+        let s = dummy_span();
+        assert_eq!(expr_to_syntax(&ast::Expr::Int(42, s)), SyntaxValue::Int(42));
+        assert_eq!(
+            expr_to_syntax(&ast::Expr::Symbol("x".into(), s)),
+            SyntaxValue::Sym("x".into())
+        );
+        assert_eq!(
+            expr_to_syntax(&ast::Expr::Bool(true, s)),
+            SyntaxValue::Bool(true)
+        );
+    }
+
+    #[test]
+    fn expr_to_syntax_call() {
+        let s = dummy_span();
+        let call = ast::Expr::Call {
+            func: Box::new(ast::Expr::Symbol("+".into(), s)),
+            args: vec![ast::Expr::Int(1, s), ast::Expr::Int(2, s)],
+            span: s,
+        };
+        assert_eq!(
+            expr_to_syntax(&call),
+            SyntaxValue::List(vec![
+                SyntaxValue::Sym("+".into()),
+                SyntaxValue::Int(1),
+                SyntaxValue::Int(2),
+            ])
+        );
+    }
+
+    #[test]
+    fn syntax_to_expr_literals() {
+        let s = dummy_span();
+        assert!(matches!(
+            syntax_to_expr(&SyntaxValue::Int(42), s),
+            ast::Expr::Int(42, _)
+        ));
+        let expr = syntax_to_expr(&SyntaxValue::Sym("x".into()), s);
+        assert!(matches!(expr, ast::Expr::Symbol(ref name, _) if name == "x"));
+    }
+
+    #[test]
+    fn syntax_to_expr_call() {
+        let s = dummy_span();
+        let syntax = SyntaxValue::List(vec![
+            SyntaxValue::Sym("+".into()),
+            SyntaxValue::Int(1),
+            SyntaxValue::Int(2),
+        ]);
+        let expr = syntax_to_expr(&syntax, s);
+        assert!(matches!(expr, ast::Expr::Call { .. }));
+        if let ast::Expr::Call { func, args, .. } = expr {
+            assert!(matches!(func.as_ref(), ast::Expr::Symbol(n, _) if n == "+"));
+            assert_eq!(args.len(), 2);
+        }
+    }
+
+    #[test]
+    fn syntax_to_expr_if() {
+        let s = dummy_span();
+        let syntax = SyntaxValue::List(vec![
+            SyntaxValue::Sym("if".into()),
+            SyntaxValue::Bool(true),
+            SyntaxValue::Int(1),
+            SyntaxValue::Int(0),
+        ]);
+        let expr = syntax_to_expr(&syntax, s);
+        assert!(matches!(expr, ast::Expr::If { .. }));
+    }
+
+    #[test]
+    fn roundtrip_call() {
+        let s = dummy_span();
+        let original = ast::Expr::Call {
+            func: Box::new(ast::Expr::Symbol("println".into(), s)),
+            args: vec![ast::Expr::String("hello".into(), s)],
+            span: s,
+        };
+        let syntax = expr_to_syntax(&original);
+        let reconstructed = syntax_to_expr(&syntax, s);
+        assert!(matches!(reconstructed, ast::Expr::Call { .. }));
+        if let ast::Expr::Call { func, args, .. } = reconstructed {
+            assert!(matches!(func.as_ref(), ast::Expr::Symbol(n, _) if n == "println"));
+            assert!(matches!(&args[0], ast::Expr::String(v, _) if v == "hello"));
+        }
     }
 }

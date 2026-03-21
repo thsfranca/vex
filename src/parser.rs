@@ -1,4 +1,6 @@
-use crate::ast::{Binding, CondClause, Expr, Field, Param, TopForm, TypeExpr, Variant};
+use crate::ast::{
+    Binding, CondClause, Expr, Field, MatchClause, Param, Pattern, TopForm, TypeExpr, Variant,
+};
 use crate::diagnostics::{Diagnostic, Label};
 use crate::lexer::{Token, TokenKind};
 use crate::source::{FileId, Span};
@@ -240,6 +242,7 @@ impl<'a> Parser<'a> {
                 "if" => return self.parse_if(open_span),
                 "let" => return self.parse_let(open_span),
                 "cond" => return self.parse_cond(open_span),
+                "match" => return self.parse_match(open_span),
                 "fn" => return self.parse_lambda(open_span),
                 _ => {}
             }
@@ -368,6 +371,113 @@ impl<'a> Parser<'a> {
             else_body,
             span: Span::new(open_span.file, open_span.start, close_span.end),
         })
+    }
+
+    fn parse_match(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+
+        let scrutinee = Box::new(self.parse_expr()?);
+
+        let mut clauses = Vec::new();
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightParen)) {
+            clauses.push(self.parse_match_clause()?);
+        }
+
+        if clauses.is_empty() {
+            self.diagnostics.push(Diagnostic::error(
+                "match requires at least one clause",
+                open_span,
+            ));
+            return None;
+        }
+
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(Expr::Match {
+            scrutinee,
+            clauses,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_match_clause(&mut self) -> Option<MatchClause> {
+        let pattern = self.parse_pattern()?;
+        let body = self.parse_expr()?;
+        let span = Span::new(pattern.span().file, pattern.span().start, body.span().end);
+        Some(MatchClause {
+            pattern,
+            body,
+            span,
+        })
+    }
+
+    fn parse_pattern(&mut self) -> Option<Pattern> {
+        if self.at_end() {
+            self.diagnostics.push(Diagnostic::error(
+                "expected pattern but reached end of input",
+                self.eof_span(),
+            ));
+            return None;
+        }
+
+        let span = self.tokens[self.pos].span;
+        match &self.tokens[self.pos].kind {
+            TokenKind::Integer(n) => {
+                let n = *n;
+                self.pos += 1;
+                Some(Pattern::Literal(Box::new(Expr::Int(n, span))))
+            }
+            TokenKind::Float(f) => {
+                let f = *f;
+                self.pos += 1;
+                Some(Pattern::Literal(Box::new(Expr::Float(f, span))))
+            }
+            TokenKind::String(s) => {
+                let s = s.clone();
+                self.pos += 1;
+                Some(Pattern::Literal(Box::new(Expr::String(s, span))))
+            }
+            TokenKind::Boolean(b) => {
+                let b = *b;
+                self.pos += 1;
+                Some(Pattern::Literal(Box::new(Expr::Bool(b, span))))
+            }
+            TokenKind::Nil => {
+                self.pos += 1;
+                Some(Pattern::Literal(Box::new(Expr::Nil(span))))
+            }
+            TokenKind::Symbol(s) if s == "_" => {
+                self.pos += 1;
+                Some(Pattern::Wildcard(span))
+            }
+            TokenKind::Symbol(s) => {
+                let s = s.clone();
+                self.pos += 1;
+                Some(Pattern::Binding(s, span))
+            }
+            TokenKind::LeftParen => {
+                self.pos += 1;
+                let (name, _) = self.expect_symbol()?;
+                let mut args = Vec::new();
+                while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightParen)) {
+                    args.push(self.parse_pattern()?);
+                }
+                let close_span = self.expect_right_paren(span)?;
+                Some(Pattern::Constructor {
+                    name,
+                    args,
+                    span: Span::new(span.file, span.start, close_span.end),
+                })
+            }
+            _ => {
+                let desc = token_kind_name(&self.tokens[self.pos].kind);
+                self.diagnostics.push(Diagnostic::error(
+                    format!("expected pattern, found {}", desc),
+                    span,
+                ));
+                None
+            }
+        }
     }
 
     fn parse_lambda(&mut self, open_span: Span) -> Option<Expr> {
@@ -1606,6 +1716,63 @@ mod tests {
     #[test]
     fn error_defunion_bad_variant() {
         let source = "(defunion Foo bar)";
+        let (_, diags) = parse_source(source);
+        assert!(!diags.is_empty());
+    }
+
+    #[test]
+    fn match_constructor_patterns() {
+        let source = "(match x (Some v) v _ nil)";
+        let (forms, diags) = parse_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let TopForm::Expr(Expr::Match {
+            scrutinee, clauses, ..
+        }) = &forms[0]
+        {
+            assert!(matches!(scrutinee.as_ref(), Expr::Symbol(s, _) if s == "x"));
+            assert_eq!(clauses.len(), 2);
+            assert!(
+                matches!(&clauses[0].pattern, Pattern::Constructor { name, args, .. }
+                if name == "Some" && args.len() == 1)
+            );
+            assert!(matches!(&clauses[1].pattern, Pattern::Wildcard(_)));
+        } else {
+            panic!("expected match");
+        }
+    }
+
+    #[test]
+    fn match_literal_patterns() {
+        let source = r#"(match x 1 "one" 2 "two" _ "other")"#;
+        let (forms, diags) = parse_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let TopForm::Expr(Expr::Match { clauses, .. }) = &forms[0] {
+            assert_eq!(clauses.len(), 3);
+            assert!(
+                matches!(&clauses[0].pattern, Pattern::Literal(e) if matches!(e.as_ref(), Expr::Int(1, _)))
+            );
+            assert!(
+                matches!(&clauses[1].pattern, Pattern::Literal(e) if matches!(e.as_ref(), Expr::Int(2, _)))
+            );
+            assert!(matches!(&clauses[2].pattern, Pattern::Wildcard(_)));
+        } else {
+            panic!("expected match");
+        }
+    }
+
+    #[test]
+    fn match_spans() {
+        let source = "(match x _ nil)";
+        let (forms, diags) = parse_source(source);
+        assert!(diags.is_empty());
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, source.len() as u32);
+    }
+
+    #[test]
+    fn error_match_no_clauses() {
+        let source = "(match x)";
         let (_, diags) = parse_source(source);
         assert!(!diags.is_empty());
     }

@@ -647,7 +647,6 @@ body           = expression { expression } ;
 
 expression     = literal
                | qualified-id
-               | KEYWORD
                | "(" "let" binding-list body ")"
                | "(" "if" expression expression expression ")"
                | "(" "match" expression match-clause { match-clause } ")"

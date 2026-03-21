@@ -154,6 +154,11 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     return self.parse_import(open_span);
                 }
+                "import-go" => {
+                    let open_span = self.tokens[self.pos].span;
+                    self.pos += 1;
+                    return self.parse_import_go(open_span);
+                }
                 "defn" => {
                     let open_span = self.tokens[self.pos].span;
                     self.pos += 1;
@@ -277,6 +282,60 @@ impl<'a> Parser<'a> {
 
         Some(TopForm::Import {
             module_path,
+            symbols,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_import_go(&mut self, open_span: Span) -> Option<TopForm> {
+        self.pos += 1;
+
+        if self.at_end() {
+            self.diagnostics.push(Diagnostic::error(
+                "expected Go package path string",
+                self.eof_span(),
+            ));
+            return None;
+        }
+        let go_package = if let TokenKind::String(ref s) = self.tokens[self.pos].kind {
+            let s = s.clone();
+            self.pos += 1;
+            s
+        } else {
+            let desc = token_kind_name(&self.tokens[self.pos].kind);
+            self.diagnostics.push(Diagnostic::error(
+                format!("expected Go package path string, found {}", desc),
+                self.tokens[self.pos].span,
+            ));
+            return None;
+        };
+
+        if self.at_end() || !self.check(|k| matches!(k, TokenKind::LeftBracket)) {
+            let span = if self.at_end() {
+                self.eof_span()
+            } else {
+                self.tokens[self.pos].span
+            };
+            self.diagnostics.push(Diagnostic::error(
+                "expected '[' for import-go symbol list",
+                span,
+            ));
+            return None;
+        }
+        let bracket_span = self.tokens[self.pos].span;
+        self.pos += 1;
+
+        let mut symbols = Vec::new();
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightBracket)) {
+            let (sym, _) = self.expect_symbol()?;
+            symbols.push(sym);
+        }
+
+        self.expect_right_bracket(bracket_span)?;
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(TopForm::ImportGo {
+            go_package,
             symbols,
             span: Span::new(open_span.file, open_span.start, close_span.end),
         })
@@ -1996,6 +2055,53 @@ mod tests {
     #[test]
     fn error_import_no_bracket() {
         let (_, diags) = parse_source("(import math foo)");
+        assert!(!diags.is_empty());
+    }
+
+    #[test]
+    fn import_go_simple() {
+        let (forms, diags) = parse_source(r#"(import-go "net/http" [Get Post])"#);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(forms.len(), 1);
+        if let TopForm::ImportGo {
+            go_package,
+            symbols,
+            ..
+        } = &forms[0]
+        {
+            assert_eq!(go_package, "net/http");
+            assert_eq!(symbols, &["Get", "Post"]);
+        } else {
+            panic!("expected ImportGo");
+        }
+    }
+
+    #[test]
+    fn import_go_single_symbol() {
+        let (forms, diags) = parse_source(r#"(import-go "os" [Exit])"#);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let TopForm::ImportGo {
+            go_package,
+            symbols,
+            ..
+        } = &forms[0]
+        {
+            assert_eq!(go_package, "os");
+            assert_eq!(symbols, &["Exit"]);
+        } else {
+            panic!("expected ImportGo");
+        }
+    }
+
+    #[test]
+    fn error_import_go_no_string() {
+        let (_, diags) = parse_source("(import-go foo [bar])");
+        assert!(!diags.is_empty());
+    }
+
+    #[test]
+    fn error_import_go_no_bracket() {
+        let (_, diags) = parse_source(r#"(import-go "net/http" Get)"#);
         assert!(!diags.is_empty());
     }
 }

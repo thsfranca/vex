@@ -180,6 +180,12 @@ pub enum TopForm {
         span: Span,
     },
 
+    ImportGo {
+        go_package: String,
+        symbols: Vec<String>,
+        span: Span,
+    },
+
     Defn {
         name: String,
         params: Vec<Param>,
@@ -216,6 +222,7 @@ impl TopForm {
             TopForm::Module { span, .. }
             | TopForm::Export { span, .. }
             | TopForm::Import { span, .. }
+            | TopForm::ImportGo { span, .. }
             | TopForm::Defn { span, .. }
             | TopForm::Def { span, .. }
             | TopForm::Deftype { span, .. }
@@ -740,6 +747,25 @@ mod tests {
         {
             assert_eq!(module_path, "math.core");
             assert_eq!(symbols, &["add", "sub"]);
+        }
+    }
+
+    #[test]
+    fn import_go_top_form() {
+        let form = TopForm::ImportGo {
+            go_package: "net/http".into(),
+            symbols: vec!["Get".into(), "Post".into()],
+            span: span(0, 30),
+        };
+        assert_eq!(form.span(), span(0, 30));
+        if let TopForm::ImportGo {
+            go_package,
+            symbols,
+            ..
+        } = &form
+        {
+            assert_eq!(go_package, "net/http");
+            assert_eq!(symbols, &["Get", "Post"]);
         }
     }
 }

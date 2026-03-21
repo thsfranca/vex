@@ -4,7 +4,7 @@ use std::fmt::Write;
 use crate::builtins;
 use crate::builtins::GoTranslation;
 use crate::hir;
-use crate::types::{RecordField, VexType};
+use crate::types::{RecordField, UnionVariant, VexType};
 
 pub fn generate(module: &hir::Module) -> String {
     let mut cg = Generator::new();
@@ -85,7 +85,7 @@ impl Generator {
                 name, ty, value, ..
             } => self.emit_def(name, ty, value),
             hir::TopForm::Deftype { name, fields, .. } => self.emit_deftype(name, fields),
-            hir::TopForm::Defunion { .. } => {}
+            hir::TopForm::Defunion { name, variants, .. } => self.emit_defunion(name, variants),
             hir::TopForm::Expr(expr) => {
                 self.write_indent();
                 self.emit_expr(expr);
@@ -159,6 +159,49 @@ impl Generator {
         }
         self.indent -= 1;
         self.writeln("}");
+    }
+
+    fn emit_defunion(&mut self, name: &str, variants: &[UnionVariant]) {
+        let go_name = vex_to_go_public_name(name);
+        let marker = format!("is{}", go_name);
+
+        self.write("type ");
+        self.write(&go_name);
+        self.write(" interface { ");
+        self.write(&marker);
+        self.write("() }");
+        self.newline();
+        self.newline();
+
+        for variant in variants {
+            let variant_go = format!("{}_{}", go_name, vex_to_go_public_name(&variant.name));
+
+            self.write("type ");
+            self.write(&variant_go);
+            self.write(" struct {");
+            if variant.types.is_empty() {
+                self.write("}");
+            } else {
+                self.newline();
+                self.indent += 1;
+                for (i, ty) in variant.types.iter().enumerate() {
+                    self.write_indent();
+                    write!(self.output, "V{} {}", i, go_type(ty)).unwrap();
+                    self.newline();
+                }
+                self.indent -= 1;
+                self.write("}");
+            }
+            self.newline();
+
+            self.write("func (");
+            self.write(&variant_go);
+            self.write(") ");
+            self.write(&marker);
+            self.write("() {}");
+            self.newline();
+            self.newline();
+        }
     }
 
     fn emit_expr(&mut self, expr: &hir::Expr) {
@@ -1061,6 +1104,73 @@ mod tests {
         let output = generate(&module);
         assert!(output.contains("type ToolInput struct {"));
         assert!(output.contains("\tFullName string"));
+    }
+
+    #[test]
+    fn top_form_defunion() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Defunion {
+                name: "Msg".into(),
+                variants: vec![
+                    UnionVariant {
+                        name: "Req".into(),
+                        types: vec![VexType::Int],
+                    },
+                    UnionVariant {
+                        name: "Resp".into(),
+                        types: vec![VexType::String],
+                    },
+                ],
+                span: span(0, 40),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("type Msg interface { isMsg() }"));
+        assert!(output.contains("type Msg_Req struct {\n\tV0 int64\n}"));
+        assert!(output.contains("func (Msg_Req) isMsg() {}"));
+        assert!(output.contains("type Msg_Resp struct {\n\tV0 string\n}"));
+        assert!(output.contains("func (Msg_Resp) isMsg() {}"));
+    }
+
+    #[test]
+    fn top_form_defunion_no_data() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Defunion {
+                name: "Option".into(),
+                variants: vec![
+                    UnionVariant {
+                        name: "Some".into(),
+                        types: vec![VexType::Int],
+                    },
+                    UnionVariant {
+                        name: "None".into(),
+                        types: vec![],
+                    },
+                ],
+                span: span(0, 30),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("type Option interface { isOption() }"));
+        assert!(output.contains("type Option_Some struct {\n\tV0 int64\n}"));
+        assert!(output.contains("type Option_None struct {}"));
+        assert!(output.contains("func (Option_None) isOption() {}"));
+    }
+
+    #[test]
+    fn top_form_defunion_multi_field() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Defunion {
+                name: "Shape".into(),
+                variants: vec![UnionVariant {
+                    name: "Rect".into(),
+                    types: vec![VexType::Float, VexType::Float],
+                }],
+                span: span(0, 30),
+            }],
+        };
+        let output = generate(&module);
+        assert!(output.contains("type Shape_Rect struct {\n\tV0 float64\n\tV1 float64\n}"));
     }
 
     #[test]

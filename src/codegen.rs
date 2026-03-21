@@ -487,9 +487,6 @@ impl Generator {
                     self.write(")");
                     return;
                 }
-                GoTranslation::MacroOnly => {
-                    return;
-                }
             }
         }
 

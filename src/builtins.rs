@@ -8,7 +8,6 @@ pub enum GoTranslation {
         go_name: &'static str,
         go_import: &'static str,
     },
-    MacroOnly,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,69 +88,6 @@ pub fn all_builtins() -> Vec<Builtin> {
             },
             variadic: false,
         },
-        Builtin {
-            name: "syntax-list",
-            ty: VexType::Fn {
-                params: vec![],
-                ret: Box::new(VexType::Syntax),
-            },
-            go: GoTranslation::MacroOnly,
-            variadic: true,
-        },
-        Builtin {
-            name: "syntax-cons",
-            ty: VexType::Fn {
-                params: vec![VexType::Syntax, VexType::Syntax],
-                ret: Box::new(VexType::Syntax),
-            },
-            go: GoTranslation::MacroOnly,
-            variadic: false,
-        },
-        Builtin {
-            name: "syntax-first",
-            ty: VexType::Fn {
-                params: vec![VexType::Syntax],
-                ret: Box::new(VexType::Syntax),
-            },
-            go: GoTranslation::MacroOnly,
-            variadic: false,
-        },
-        Builtin {
-            name: "syntax-rest",
-            ty: VexType::Fn {
-                params: vec![VexType::Syntax],
-                ret: Box::new(VexType::Syntax),
-            },
-            go: GoTranslation::MacroOnly,
-            variadic: false,
-        },
-        Builtin {
-            name: "syntax-symbol?",
-            ty: VexType::Fn {
-                params: vec![VexType::Syntax],
-                ret: Box::new(VexType::Bool),
-            },
-            go: GoTranslation::MacroOnly,
-            variadic: false,
-        },
-        Builtin {
-            name: "syntax-list?",
-            ty: VexType::Fn {
-                params: vec![VexType::Syntax],
-                ret: Box::new(VexType::Bool),
-            },
-            go: GoTranslation::MacroOnly,
-            variadic: false,
-        },
-        Builtin {
-            name: "syntax-concat",
-            ty: VexType::Fn {
-                params: vec![VexType::Syntax, VexType::Syntax],
-                ret: Box::new(VexType::Syntax),
-            },
-            go: GoTranslation::MacroOnly,
-            variadic: false,
-        },
     ]
 }
 
@@ -188,7 +124,7 @@ mod tests {
     #[test]
     fn all_builtins_count() {
         let builtins = all_builtins();
-        assert_eq!(builtins.len(), 22);
+        assert_eq!(builtins.len(), 15);
     }
 
     #[test]

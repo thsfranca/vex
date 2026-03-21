@@ -1,0 +1,29 @@
+---
+description: Core project context — Vex compiler overview, philosophy, and design references
+alwaysApply: true
+---
+
+# Vex Compiler Project
+
+Vex is a statically typed Lisp for building MCP servers. The compiler is written in Rust and transpiles to Go source code, which `go build` compiles to a native binary.
+
+## Design Documents (read before any non-trivial change)
+
+- `docs/language-design.md` — language syntax, type system, grammar (EBNF), backend strategy, design decisions
+- `docs/compiler-architecture.md` — pipeline, file structure, dependency graph, phase contracts, type mapping, testing strategy
+
+## Core Philosophy
+
+- **Pure transformations** — each compiler phase is a function: data in, data out, plus diagnostics. No global state, no singletons, no mutable statics.
+- **Flat file structure** — one file per concept in `src/`. No subdirectories until a file exceeds ~500 lines.
+- **Separate AST and HIR** — parser produces untyped `ast::*` types; type checker produces typed `hir::*` types. Never mix them. Codegen only sees HIR.
+- **Strict layering** — modules form a DAG. `source.rs` at the bottom, `main.rs` at the top. No dependency cycles.
+- **Explicit over clever** — prefer straightforward code over abstractions. No trait-based frameworks, no indirection unless it solves a concrete problem.
+
+## Implementation Order
+
+Build bottom-up: `source` → `diagnostics` → `lexer` → `ast` → `parser` → `types`/`hir`/`builtins` → `typechecker` → `codegen` → `interpreter` → `lib` → `main`. Each step must be testable before moving to the next.
+
+## File Ownership
+
+Each source file owns exactly one concept. When adding functionality, find the file that owns that concept — don't scatter related logic across files. If unsure where something belongs, consult the dependency table in `docs/compiler-architecture.md` §3.

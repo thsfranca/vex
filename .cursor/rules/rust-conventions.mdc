@@ -1,0 +1,56 @@
+---
+description: Rust coding conventions for the Vex compiler
+globs: "**/*.rs"
+alwaysApply: false
+---
+
+# Rust Conventions
+
+## Naming
+
+Follow [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/naming.html):
+- Types, enums, traits: `UpperCamelCase` — acronyms count as one word (`FileId`, not `FileID`)
+- Functions, methods, variables, modules: `snake_case`
+- Constants/statics: `SCREAMING_SNAKE_CASE`
+- Conversions: `as_` (free, borrowed→borrowed), `to_` (expensive, produces owned), `into_` (consumes self)
+
+## Enums Over Trait Objects
+
+Represent AST nodes, HIR nodes, types, and token kinds as enums — not trait objects. The set of variants is known at compile time and must be exhaustively matched.
+
+## Exhaustive Matching
+
+Never use wildcard `_` catches on compiler-internal enums (`TokenKind`, `ast::Expr`, `hir::Expr`, `VexType`). Adding a variant must trigger compile errors everywhere it needs handling. Wildcards are acceptable only for truly open sets (e.g., string matching).
+
+## Error Handling
+
+- Use `Result<T, E>` for all fallible operations.
+- Use `thiserror` for custom error types that callers need to match on.
+- Never `unwrap()` or `expect()` in non-test code — propagate errors with `?` or handle them explicitly.
+- Compiler diagnostics use the `Diagnostic` type pushed to `&mut Vec<Diagnostic>`, not `Result`. Phases continue after errors when possible.
+
+## Span Everywhere
+
+Every token, AST node, and HIR node must carry a `Span`. Never create a node without attaching its source location. This is the foundation of good error messages.
+
+## Function Signatures
+
+- Public API functions have explicit types on all parameters and return values.
+- Let type inference handle locals — don't annotate what the compiler already knows.
+- Prefer free functions over methods when the operation doesn't need `self`. Phase entry points (`lex`, `parse`, `check`, `generate`, `eval`) are free functions, not methods on builder structs.
+
+## Derive Traits
+
+Derive `Debug` on all compiler data types. Derive `Clone`, `PartialEq` on types used in tests or comparisons. Don't derive traits you don't need.
+
+## Imports
+
+- Group imports: `std` first, external crates second, `crate::` imports third.
+- Use explicit imports (`use crate::source::Span`) not glob imports (`use crate::source::*`).
+
+## Readability Over Brevity
+
+- Prefer iterators and combinators (`.map()`, `.filter()`, `.collect()`) over manual `for` loops with `push`.
+- Use type aliases for complex types: `type ParseResult = (Vec<ast::TopForm>, Vec<Diagnostic>)`.
+- Extract well-named helper functions instead of writing deeply nested match arms.
+- If a function exceeds ~40 lines, look for opportunities to extract meaningful sub-functions.

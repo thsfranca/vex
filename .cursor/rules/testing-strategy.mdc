@@ -1,0 +1,62 @@
+---
+description: Testing conventions and per-phase testing strategy
+globs: "**/*.rs"
+alwaysApply: false
+---
+
+# Testing Strategy
+
+## Test Organization
+
+- **Unit tests**: `#[cfg(test)] mod tests` at the bottom of each module file.
+- **Integration tests**: `tests/` directory at crate root. These run the full pipeline from `.vx` source string to generated Go output.
+
+## Per-Phase Testing
+
+| Phase | Input | Assert on |
+|-------|-------|-----------|
+| Lexer | Source string | Token kinds, values, spans |
+| Parser | Token vec | AST structure (pattern match on node variants) |
+| Type checker | Hand-built AST | HIR node types, or expected diagnostics for invalid programs |
+| Codegen | Hand-built HIR | Generated Go source contains expected patterns |
+| Integration | `.vx` source string | Full pipeline output matches expected Go |
+
+Each phase is tested by constructing its input directly — don't run the full pipeline to test the parser. Isolate failures to the phase that caused them.
+
+## Test Naming
+
+Use descriptive names that explain what behavior is being tested:
+```rust
+#[test]
+fn lex_negative_number_as_single_token() { ... }
+
+#[test]
+fn parse_defn_with_typed_params() { ... }
+
+#[test]
+fn typecheck_rejects_string_plus_int() { ... }
+```
+
+Never use only issue numbers or generic names like `test_1` or `it_works`.
+
+## Test Structure
+
+Follow Arrange-Act-Assert:
+```rust
+#[test]
+fn lex_string_with_escape_sequences() {
+    let source = r#""hello\nworld""#;
+    let (tokens, diagnostics) = lex(source, FileId(0));
+    assert!(diagnostics.is_empty());
+    assert_eq!(tokens.len(), 1);
+    assert_eq!(tokens[0].kind, TokenKind::String);
+}
+```
+
+## Error Path Tests
+
+Every phase must test its error paths. If the type checker rejects `(+ "a" 1)`, write a test that asserts the specific diagnostic message and span. Valid programs and invalid programs get equal test coverage.
+
+## Read Before Writing Tests
+
+Always read the implementation of the module under test before writing or fixing tests. Understand the actual behavior, don't guess at expected outputs.

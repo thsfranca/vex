@@ -1,0 +1,64 @@
+---
+description: Compiler module boundaries, dependency rules, and phase contracts
+globs: "src/**/*.rs"
+alwaysApply: false
+---
+
+# Compiler Architecture Rules
+
+## Module Dependency Graph (strict — no violations)
+
+```
+source.rs          → (nothing)
+diagnostics.rs     → source
+lexer.rs           → source, diagnostics
+ast.rs             → source
+parser.rs          → source, diagnostics, lexer, ast
+types.rs           → source
+hir.rs             → source, types
+builtins.rs        → types
+typechecker.rs     → source, diagnostics, ast, hir, types, builtins
+codegen.rs         → hir, types, builtins
+interpreter.rs     → hir, types, builtins
+lib.rs             → all modules
+main.rs            → lib
+```
+
+A module must NEVER import from a module above it in this graph. If you feel the need, the design is wrong — restructure.
+
+## Phase Contracts
+
+Each phase is a standalone function with a clear signature:
+
+```rust
+fn lex(source: &str, file: FileId) -> (Vec<Token>, Vec<Diagnostic>)
+fn parse(tokens: &[Token]) -> (Vec<ast::TopForm>, Vec<Diagnostic>)
+fn check(program: &[ast::TopForm]) -> (hir::Module, Vec<Diagnostic>)
+fn generate(module: &hir::Module) -> String
+fn eval(module: &hir::Module) -> Result<Value, RuntimeError>
+```
+
+Don't change these signatures without updating the architecture doc. Don't add hidden parameters (globals, thread-locals, environment reads).
+
+## AST vs HIR Boundary
+
+- `ast.rs` types are **untyped** — they represent what the programmer wrote. Type annotations are stored as `Option<TypeExpr>` (syntactic, not semantic).
+- `hir.rs` types are **typed** — every node has a resolved `VexType`. All names are resolved, all types are concrete.
+- The parser produces `ast::*`. The type checker consumes `ast::*` and produces `hir::*`. Codegen and interpreter only see `hir::*`.
+- Never pass `ast::*` types into codegen or interpreter. Never pass `hir::*` types into the parser.
+
+## Built-in Functions
+
+`builtins.rs` is the single source of truth for built-in functions. It defines name, Vex type signature, and Go translation in one place. Both `typechecker.rs` and `codegen.rs` depend on it. Adding a built-in is a single-file change — if you're editing two files, something is wrong.
+
+## Adding a New Language Feature
+
+Follow this order:
+1. Update lexer if new tokens are needed
+2. Add AST node variants in `ast.rs`
+3. Update parser to produce the new AST nodes
+4. Add HIR node variants in `hir.rs` (mirroring the AST additions with types resolved)
+5. Update type checker to transform AST → HIR for the new feature
+6. Update codegen to emit Go for the new HIR nodes
+7. Update interpreter if applicable
+8. Add tests at each level

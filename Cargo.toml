@@ -1,0 +1,10 @@
+[package]
+name = "vex"
+version = "0.1.0"
+edition = "2024"
+description = "The Vex programming language compiler — a statically typed Lisp for building MCP servers"
+license = "MIT"
+
+[dependencies]
+
+[dev-dependencies]

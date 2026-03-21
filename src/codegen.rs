@@ -85,6 +85,7 @@ impl Generator {
                 name, ty, value, ..
             } => self.emit_def(name, ty, value),
             hir::TopForm::Deftype { name, fields, .. } => self.emit_deftype(name, fields),
+            hir::TopForm::Defunion { .. } => {}
             hir::TopForm::Expr(expr) => {
                 self.write_indent();
                 self.emit_expr(expr);
@@ -454,6 +455,7 @@ fn collect_builtin_calls_top_form(form: &hir::TopForm, names: &mut Vec<String>) 
             collect_builtin_calls_expr(value, names);
         }
         hir::TopForm::Deftype { .. } => {}
+        hir::TopForm::Defunion { .. } => {}
         hir::TopForm::Expr(expr) => {
             collect_builtin_calls_expr(expr, names);
         }

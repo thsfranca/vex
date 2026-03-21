@@ -292,13 +292,41 @@ impl Checker {
                     ret: Box::new(ret_type),
                 })
             }
-            ast::TypeExpr::Applied { name, span, .. } => {
-                self.diagnostics.push(Diagnostic::error(
-                    format!("applied type '{}' not supported in MVP", name),
-                    *span,
-                ));
-                None
-            }
+            ast::TypeExpr::Applied { name, args, span } => match name.as_str() {
+                "Option" => {
+                    if args.len() != 1 {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!("Option requires 1 type argument, found {}", args.len()),
+                            *span,
+                        ));
+                        return None;
+                    }
+                    let inner = self.resolve_type(&args[0])?;
+                    Some(VexType::Option(Box::new(inner)))
+                }
+                "Result" => {
+                    if args.len() != 2 {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!("Result requires 2 type arguments, found {}", args.len()),
+                            *span,
+                        ));
+                        return None;
+                    }
+                    let ok = self.resolve_type(&args[0])?;
+                    let err = self.resolve_type(&args[1])?;
+                    Some(VexType::Result {
+                        ok: Box::new(ok),
+                        err: Box::new(err),
+                    })
+                }
+                _ => {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!("unknown parametric type '{}'", name),
+                        *span,
+                    ));
+                    None
+                }
+            },
         }
     }
 
@@ -1936,5 +1964,102 @@ mod tests {
                 variant_name, args, ..
             } if variant_name == "None" && args.is_empty()));
         }
+    }
+
+    #[test]
+    fn resolve_option_type() {
+        let source = r#"
+            (defn f [x : (Option Int)] : (Option Int)
+              x)
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn {
+            params,
+            return_type,
+            ..
+        } = &module.top_forms[0]
+        {
+            assert_eq!(params[0].ty, VexType::Option(Box::new(VexType::Int)));
+            assert_eq!(*return_type, VexType::Option(Box::new(VexType::Int)));
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn resolve_result_type() {
+        let source = r#"
+            (defn f [x : (Result Int String)] : (Result Int String)
+              x)
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn {
+            params,
+            return_type,
+            ..
+        } = &module.top_forms[0]
+        {
+            assert_eq!(
+                params[0].ty,
+                VexType::Result {
+                    ok: Box::new(VexType::Int),
+                    err: Box::new(VexType::String),
+                }
+            );
+            assert_eq!(
+                *return_type,
+                VexType::Result {
+                    ok: Box::new(VexType::Int),
+                    err: Box::new(VexType::String),
+                }
+            );
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn resolve_nested_option() {
+        let source = r#"
+            (defn f [x : (Option (Option Int))] : (Option (Option Int))
+              x)
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { params, .. } = &module.top_forms[0] {
+            assert_eq!(
+                params[0].ty,
+                VexType::Option(Box::new(VexType::Option(Box::new(VexType::Int))))
+            );
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn error_option_wrong_arity() {
+        let (_, diags) = check_source("(defn f [x : (Option Int String)] x)");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("Option requires 1 type argument"));
+    }
+
+    #[test]
+    fn error_result_wrong_arity() {
+        let (_, diags) = check_source("(defn f [x : (Result Int)] x)");
+        assert_eq!(diags.len(), 1);
+        assert!(
+            diags[0]
+                .message
+                .contains("Result requires 2 type arguments")
+        );
+    }
+
+    #[test]
+    fn error_unknown_parametric_type() {
+        let (_, diags) = check_source("(defn f [x : (List Int)] x)");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("unknown parametric type"));
     }
 }

@@ -3,7 +3,7 @@ use crate::builtins;
 use crate::diagnostics::Diagnostic;
 use crate::hir;
 use crate::source::Span;
-use crate::types::{RecordField, TypeEnv, VexType};
+use crate::types::{RecordField, TypeEnv, UnionVariant, VexType};
 
 struct Checker {
     env: TypeEnv,
@@ -692,6 +692,38 @@ impl Checker {
         })
     }
 
+    fn check_defunion(
+        &mut self,
+        name: &str,
+        variants: &[ast::Variant],
+        span: Span,
+    ) -> Option<hir::TopForm> {
+        let mut checked_variants = Vec::new();
+        for variant in variants {
+            let mut resolved_types = Vec::new();
+            for type_expr in &variant.types {
+                resolved_types.push(self.resolve_type(type_expr)?);
+            }
+            checked_variants.push(UnionVariant {
+                name: variant.name.clone(),
+                types: resolved_types,
+            });
+        }
+
+        let union_type = VexType::Union {
+            name: name.to_string(),
+            variants: checked_variants.clone(),
+        };
+
+        self.type_defs.insert(name.to_string(), union_type);
+
+        Some(hir::TopForm::Defunion {
+            name: name.to_string(),
+            variants: checked_variants,
+            span,
+        })
+    }
+
     fn check_top_form(&mut self, form: &ast::TopForm) -> Option<hir::TopForm> {
         match form {
             ast::TopForm::Expr(expr) => {
@@ -712,7 +744,11 @@ impl Checker {
                 span,
             } => self.check_def(name, type_ann.as_ref(), value, *span),
             ast::TopForm::Deftype { name, fields, span } => self.check_deftype(name, fields, *span),
-            ast::TopForm::Defunion { .. } => None,
+            ast::TopForm::Defunion {
+                name,
+                variants,
+                span,
+            } => self.check_defunion(name, variants, *span),
         }
     }
 }
@@ -1470,5 +1506,61 @@ mod tests {
         } else {
             panic!("expected defn");
         }
+    }
+
+    #[test]
+    fn defunion_simple() {
+        let source = "(defunion Shape (Circle Float) (Rect Float Float))";
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 1);
+        if let hir::TopForm::Defunion { name, variants, .. } = &module.top_forms[0] {
+            assert_eq!(name, "Shape");
+            assert_eq!(variants.len(), 2);
+            assert_eq!(variants[0].name, "Circle");
+            assert_eq!(variants[0].types, vec![VexType::Float]);
+            assert_eq!(variants[1].name, "Rect");
+            assert_eq!(variants[1].types, vec![VexType::Float, VexType::Float]);
+        } else {
+            panic!("expected defunion");
+        }
+    }
+
+    #[test]
+    fn defunion_no_data_variant() {
+        let source = "(defunion Option (Some Int) (None))";
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        if let hir::TopForm::Defunion { variants, .. } = &module.top_forms[0] {
+            assert_eq!(variants[0].types, vec![VexType::Int]);
+            assert!(variants[1].types.is_empty());
+        } else {
+            panic!("expected defunion");
+        }
+    }
+
+    #[test]
+    fn defunion_registered_as_type() {
+        let source = r#"
+            (defunion Shape (Circle Float) (Rect Float Float))
+            (defn area [s : Shape] : Float
+              0.0)
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 2);
+        if let hir::TopForm::Defn { params, .. } = &module.top_forms[1] {
+            assert!(matches!(&params[0].ty, VexType::Union { name, .. } if name == "Shape"));
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn defunion_unknown_type() {
+        let source = "(defunion Bad (Foo Unknown))";
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("unknown type"));
     }
 }

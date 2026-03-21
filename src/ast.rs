@@ -132,6 +132,28 @@ pub enum Expr {
         clauses: Vec<MatchClause>,
         span: Span,
     },
+
+    Spawn {
+        body: Box<Expr>,
+        span: Span,
+    },
+
+    Channel {
+        element_type: TypeExpr,
+        size: Option<Box<Expr>>,
+        span: Span,
+    },
+
+    Send {
+        channel: Box<Expr>,
+        value: Box<Expr>,
+        span: Span,
+    },
+
+    Recv {
+        channel: Box<Expr>,
+        span: Span,
+    },
 }
 
 impl Expr {
@@ -150,7 +172,11 @@ impl Expr {
             | Expr::Lambda { span, .. }
             | Expr::Call { span, .. }
             | Expr::FieldAccess { span, .. }
-            | Expr::Match { span, .. } => *span,
+            | Expr::Match { span, .. }
+            | Expr::Spawn { span, .. }
+            | Expr::Channel { span, .. }
+            | Expr::Send { span, .. }
+            | Expr::Recv { span, .. } => *span,
         }
     }
 }
@@ -766,6 +792,82 @@ mod tests {
         {
             assert_eq!(go_package, "net/http");
             assert_eq!(symbols, &["Get", "Post"]);
+        }
+    }
+
+    #[test]
+    fn spawn_expr() {
+        let expr = Expr::Spawn {
+            body: Box::new(Expr::Call {
+                func: Box::new(Expr::Symbol("println".into(), span(7, 14))),
+                args: vec![Expr::String("hi".into(), span(15, 19))],
+                span: span(6, 20),
+            }),
+            span: span(0, 21),
+        };
+        assert_eq!(expr.span(), span(0, 21));
+        assert!(matches!(expr, Expr::Spawn { .. }));
+    }
+
+    #[test]
+    fn channel_expr() {
+        let expr = Expr::Channel {
+            element_type: TypeExpr::Named {
+                name: "Int".into(),
+                span: span(9, 12),
+            },
+            size: Some(Box::new(Expr::Int(10, span(13, 15)))),
+            span: span(0, 16),
+        };
+        assert_eq!(expr.span(), span(0, 16));
+        if let Expr::Channel {
+            element_type, size, ..
+        } = &expr
+        {
+            assert!(matches!(element_type, TypeExpr::Named { name, .. } if name == "Int"));
+            assert!(matches!(size.as_deref(), Some(Expr::Int(10, _))));
+        }
+    }
+
+    #[test]
+    fn channel_expr_unbuffered() {
+        let expr = Expr::Channel {
+            element_type: TypeExpr::Named {
+                name: "String".into(),
+                span: span(9, 15),
+            },
+            size: None,
+            span: span(0, 16),
+        };
+        assert_eq!(expr.span(), span(0, 16));
+        if let Expr::Channel { size, .. } = &expr {
+            assert!(size.is_none());
+        }
+    }
+
+    #[test]
+    fn send_expr() {
+        let expr = Expr::Send {
+            channel: Box::new(Expr::Symbol("ch".into(), span(6, 8))),
+            value: Box::new(Expr::Int(42, span(9, 11))),
+            span: span(0, 12),
+        };
+        assert_eq!(expr.span(), span(0, 12));
+        if let Expr::Send { channel, value, .. } = &expr {
+            assert!(matches!(channel.as_ref(), Expr::Symbol(s, _) if s == "ch"));
+            assert!(matches!(value.as_ref(), Expr::Int(42, _)));
+        }
+    }
+
+    #[test]
+    fn recv_expr() {
+        let expr = Expr::Recv {
+            channel: Box::new(Expr::Symbol("ch".into(), span(6, 8))),
+            span: span(0, 9),
+        };
+        assert_eq!(expr.span(), span(0, 9));
+        if let Expr::Recv { channel, .. } = &expr {
+            assert!(matches!(channel.as_ref(), Expr::Symbol(s, _) if s == "ch"));
         }
     }
 }

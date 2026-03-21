@@ -418,11 +418,63 @@ impl<'a> Parser<'a> {
                 "cond" => return self.parse_cond(open_span),
                 "match" => return self.parse_match(open_span),
                 "fn" => return self.parse_lambda(open_span),
+                "spawn" => return self.parse_spawn(open_span),
+                "channel" => return self.parse_channel(open_span),
+                "send" => return self.parse_send(open_span),
+                "recv" => return self.parse_recv(open_span),
                 _ => {}
             }
         }
 
         self.parse_call(open_span)
+    }
+
+    fn parse_spawn(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+        let body = self.parse_expr()?;
+        let close_span = self.expect_right_paren(open_span)?;
+        Some(Expr::Spawn {
+            body: Box::new(body),
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_channel(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+        let element_type = self.parse_type()?;
+        let size = if !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightParen)) {
+            Some(Box::new(self.parse_expr()?))
+        } else {
+            None
+        };
+        let close_span = self.expect_right_paren(open_span)?;
+        Some(Expr::Channel {
+            element_type,
+            size,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_send(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+        let channel = self.parse_expr()?;
+        let value = self.parse_expr()?;
+        let close_span = self.expect_right_paren(open_span)?;
+        Some(Expr::Send {
+            channel: Box::new(channel),
+            value: Box::new(value),
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_recv(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+        let channel = self.parse_expr()?;
+        let close_span = self.expect_right_paren(open_span)?;
+        Some(Expr::Recv {
+            channel: Box::new(channel),
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
     }
 
     fn parse_call(&mut self, open_span: Span) -> Option<Expr> {
@@ -2103,5 +2155,129 @@ mod tests {
     fn error_import_go_no_bracket() {
         let (_, diags) = parse_source(r#"(import-go "net/http" Get)"#);
         assert!(!diags.is_empty());
+    }
+
+    #[test]
+    fn spawn_simple() {
+        let (forms, diags) = parse_source("(spawn (println \"hi\"))");
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Expr(Expr::Spawn { body, .. }) = &forms[0] {
+            assert!(matches!(body.as_ref(), Expr::Call { .. }));
+        } else {
+            panic!("expected Spawn");
+        }
+    }
+
+    #[test]
+    fn spawn_spans() {
+        let src = "(spawn (foo))";
+        let (forms, diags) = parse_source(src);
+        assert!(diags.is_empty(), "{:?}", diags);
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, src.len() as u32);
+    }
+
+    #[test]
+    fn channel_buffered() {
+        let (forms, diags) = parse_source("(channel Int 10)");
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Expr(Expr::Channel {
+            element_type, size, ..
+        }) = &forms[0]
+        {
+            assert!(matches!(element_type, TypeExpr::Named { name, .. } if name == "Int"));
+            assert!(matches!(size.as_deref(), Some(Expr::Int(10, _))));
+        } else {
+            panic!("expected Channel");
+        }
+    }
+
+    #[test]
+    fn channel_unbuffered() {
+        let (forms, diags) = parse_source("(channel String)");
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Expr(Expr::Channel {
+            element_type, size, ..
+        }) = &forms[0]
+        {
+            assert!(matches!(element_type, TypeExpr::Named { name, .. } if name == "String"));
+            assert!(size.is_none());
+        } else {
+            panic!("expected Channel");
+        }
+    }
+
+    #[test]
+    fn channel_spans() {
+        let src = "(channel Int 10)";
+        let (forms, diags) = parse_source(src);
+        assert!(diags.is_empty(), "{:?}", diags);
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, src.len() as u32);
+    }
+
+    #[test]
+    fn send_simple() {
+        let (forms, diags) = parse_source("(send ch 42)");
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Expr(Expr::Send { channel, value, .. }) = &forms[0] {
+            assert!(matches!(channel.as_ref(), Expr::Symbol(s, _) if s == "ch"));
+            assert!(matches!(value.as_ref(), Expr::Int(42, _)));
+        } else {
+            panic!("expected Send");
+        }
+    }
+
+    #[test]
+    fn send_spans() {
+        let src = "(send ch 42)";
+        let (forms, diags) = parse_source(src);
+        assert!(diags.is_empty(), "{:?}", diags);
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, src.len() as u32);
+    }
+
+    #[test]
+    fn recv_simple() {
+        let (forms, diags) = parse_source("(recv ch)");
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Expr(Expr::Recv { channel, .. }) = &forms[0] {
+            assert!(matches!(channel.as_ref(), Expr::Symbol(s, _) if s == "ch"));
+        } else {
+            panic!("expected Recv");
+        }
+    }
+
+    #[test]
+    fn recv_spans() {
+        let src = "(recv ch)";
+        let (forms, diags) = parse_source(src);
+        assert!(diags.is_empty(), "{:?}", diags);
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, src.len() as u32);
+    }
+
+    #[test]
+    fn concurrency_integration() {
+        let source = r#"
+(defn main []
+  (let [ch (channel Int 10)]
+    (spawn
+      (send ch 42))
+    (println (str (recv ch)))))
+"#;
+        let (forms, diags) = parse_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        assert_eq!(forms.len(), 1);
+        assert!(matches!(&forms[0], TopForm::Defn { name, .. } if name == "main"));
     }
 }

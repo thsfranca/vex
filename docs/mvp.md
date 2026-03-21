@@ -74,7 +74,7 @@ Expected output: `1`, `2`, `Fizz`, `4`, `Buzz`, ..., `FizzBuzz`, ..., `Buzz` (10
 | `defn` | `(defn name [params] body)` | Named function definition |
 | `def` | `(def name expr)` | Top-level constant binding |
 | `let` | `(let [bindings] body)` | Local bindings with body |
-| `if` | `(if test then else)` | Conditional (three branches) |
+| `if` | `(if test then else)` | Conditional (two branches) |
 | `fn` | `(fn [params] body)` | Anonymous function (lambda) |
 | Call | `(f arg1 arg2 ...)` | Function application |
 

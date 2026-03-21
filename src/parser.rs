@@ -1,4 +1,4 @@
-use crate::ast::{Binding, CondClause, Expr, Param, TopForm, TypeExpr};
+use crate::ast::{Binding, CondClause, Expr, Field, Param, TopForm, TypeExpr};
 use crate::diagnostics::{Diagnostic, Label};
 use crate::lexer::{Token, TokenKind};
 use crate::source::{FileId, Span};
@@ -146,6 +146,11 @@ impl<'a> Parser<'a> {
                     let open_span = self.tokens[self.pos].span;
                     self.pos += 1;
                     return self.parse_def(open_span);
+                }
+                "deftype" => {
+                    let open_span = self.tokens[self.pos].span;
+                    self.pos += 1;
+                    return self.parse_deftype(open_span);
                 }
                 _ => {}
             }
@@ -423,6 +428,56 @@ impl<'a> Parser<'a> {
             name,
             type_ann,
             value,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_deftype(&mut self, open_span: Span) -> Option<TopForm> {
+        self.pos += 1;
+
+        let (name, _) = self.expect_symbol()?;
+
+        let mut fields = Vec::new();
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightParen)) {
+            fields.push(self.parse_field()?);
+        }
+
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(TopForm::Deftype {
+            name,
+            fields,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_field(&mut self) -> Option<Field> {
+        if self.at_end() {
+            self.diagnostics.push(Diagnostic::error(
+                "expected '(' for field declaration but reached end of input",
+                self.eof_span(),
+            ));
+            return None;
+        }
+
+        let open_span = self.tokens[self.pos].span;
+        if !matches!(self.tokens[self.pos].kind, TokenKind::LeftParen) {
+            let desc = token_kind_name(&self.tokens[self.pos].kind);
+            self.diagnostics.push(Diagnostic::error(
+                format!("expected '(' for field declaration, found {}", desc),
+                open_span,
+            ));
+            return None;
+        }
+        self.pos += 1;
+
+        let (name, _) = self.expect_symbol()?;
+        let type_expr = self.parse_type()?;
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(Field {
+            name,
+            type_expr,
             span: Span::new(open_span.file, open_span.start, close_span.end),
         })
     }
@@ -1297,5 +1352,92 @@ mod tests {
         assert!(matches!(&forms[0], TopForm::Def { name, .. } if name == "pi"));
         assert!(matches!(&forms[1], TopForm::Defn { name, .. } if name == "circle-area"));
         assert!(matches!(&forms[2], TopForm::Defn { name, .. } if name == "main"));
+    }
+
+    #[test]
+    fn deftype_simple() {
+        let (forms, diags) = parse_source("(deftype Point (x Float) (y Float))");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Deftype { name, fields, .. } = &forms[0] {
+            assert_eq!(name, "Point");
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name, "x");
+            assert!(
+                matches!(&fields[0].type_expr, TypeExpr::Named { name, .. } if name == "Float")
+            );
+            assert_eq!(fields[1].name, "y");
+            assert!(
+                matches!(&fields[1].type_expr, TypeExpr::Named { name, .. } if name == "Float")
+            );
+        } else {
+            panic!("expected deftype");
+        }
+    }
+
+    #[test]
+    fn deftype_no_fields() {
+        let (forms, diags) = parse_source("(deftype Empty)");
+        assert!(diags.is_empty());
+        if let TopForm::Deftype { name, fields, .. } = &forms[0] {
+            assert_eq!(name, "Empty");
+            assert!(fields.is_empty());
+        } else {
+            panic!("expected deftype");
+        }
+    }
+
+    #[test]
+    fn deftype_complex_field_types() {
+        let (forms, diags) =
+            parse_source("(deftype Config (name String) (handler (Fn [Int] Bool)))");
+        assert!(diags.is_empty());
+        if let TopForm::Deftype { name, fields, .. } = &forms[0] {
+            assert_eq!(name, "Config");
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name, "name");
+            assert!(
+                matches!(&fields[0].type_expr, TypeExpr::Named { name, .. } if name == "String")
+            );
+            assert!(matches!(&fields[1].type_expr, TypeExpr::Function { .. }));
+        } else {
+            panic!("expected deftype");
+        }
+    }
+
+    #[test]
+    fn deftype_spans() {
+        let src = "(deftype Point (x Int) (y Int))";
+        let (forms, _) = parse_source(src);
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, src.len() as u32);
+    }
+
+    #[test]
+    fn deftype_with_program() {
+        let src = r#"(deftype Point (x Float) (y Float))
+
+(defn main []
+  (println "hello"))"#;
+        let (forms, diags) = parse_source(src);
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 2);
+        assert!(matches!(&forms[0], TopForm::Deftype { name, .. } if name == "Point"));
+        assert!(matches!(&forms[1], TopForm::Defn { name, .. } if name == "main"));
+    }
+
+    #[test]
+    fn error_deftype_missing_name() {
+        let (_, diags) = parse_source("(deftype)");
+        assert!(!diags.is_empty());
+        assert!(diags[0].message.contains("expected symbol"));
+    }
+
+    #[test]
+    fn error_deftype_bad_field() {
+        let (_, diags) = parse_source("(deftype Foo x)");
+        assert!(!diags.is_empty());
+        assert!(diags[0].message.contains("'('"));
     }
 }

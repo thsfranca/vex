@@ -1,23 +1,44 @@
 use std::env;
 use std::fs;
+use std::io::{self, Write};
 use std::path::Path;
 use std::process::{self, Command};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() < 3 {
-        eprintln!("Usage: vex build <file.vx> [-o <output>] [--emit-go <dir>]");
+    if args.len() < 2 {
+        print_usage();
         process::exit(3);
     }
 
     let subcommand = &args[1];
-    if subcommand != "build" && subcommand != "run" {
-        eprintln!("Unknown command: {}", subcommand);
-        eprintln!("Usage: vex build <file.vx> [-o <output>] [--emit-go <dir>]");
-        process::exit(3);
+    match subcommand.as_str() {
+        "build" | "run" => {
+            if args.len() < 3 {
+                print_usage();
+                process::exit(3);
+            }
+            run_compile(&args);
+        }
+        "repl" => run_repl(),
+        _ => {
+            eprintln!("Unknown command: {}", subcommand);
+            print_usage();
+            process::exit(3);
+        }
     }
+}
 
+fn print_usage() {
+    eprintln!("Usage:");
+    eprintln!("  vex build <file.vx> [-o <output>] [--emit-go <dir>]");
+    eprintln!("  vex run <file.vx>");
+    eprintln!("  vex repl");
+}
+
+fn run_compile(args: &[String]) {
+    let subcommand = &args[1];
     let source_path = Path::new(&args[2]);
     if !source_path.exists() {
         eprintln!("File not found: {}", source_path.display());
@@ -163,6 +184,102 @@ fn main() {
                 eprintln!("Failed to run binary: {}", e);
                 process::exit(1);
             }
+        }
+    }
+}
+
+fn run_repl() {
+    println!("Vex REPL — type :quit to exit");
+
+    let mut interpreter = vex::interpreter::Interpreter::new();
+    let mut accumulated = String::new();
+    let mut prev_count: usize = 0;
+
+    while let Some(input) = read_input() {
+        let trimmed = input.trim();
+        if trimmed == ":quit" || trimmed == ":exit" || trimmed == ":q" {
+            break;
+        }
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let test_source = if accumulated.is_empty() {
+            input.clone()
+        } else {
+            format!("{}\n{}", accumulated, input)
+        };
+
+        let mut source_map = vex::source::SourceMap::new();
+        let file_id = source_map.add_file("repl".into(), test_source.clone());
+        let (tokens, lex_diags) = vex::lexer::lex(&test_source, file_id);
+        if !lex_diags.is_empty() {
+            for d in &lex_diags {
+                eprintln!("{}", d.render(&source_map));
+            }
+            continue;
+        }
+
+        let (ast, parse_diags) = vex::parser::parse(&tokens);
+        if !parse_diags.is_empty() {
+            for d in &parse_diags {
+                eprintln!("{}", d.render(&source_map));
+            }
+            continue;
+        }
+
+        let (hir_module, check_diags) = vex::typechecker::check(&ast);
+        if !check_diags.is_empty() {
+            for d in &check_diags {
+                eprintln!("{}", d.render(&source_map));
+            }
+            continue;
+        }
+
+        accumulated = test_source;
+
+        for form in &hir_module.top_forms[prev_count..] {
+            match interpreter.eval_top_form(form) {
+                Ok(vex::interpreter::Value::Unit) => {}
+                Ok(value) => println!("=> {}", value),
+                Err(err) => eprintln!("{}", err),
+            }
+        }
+        prev_count = hir_module.top_forms.len();
+    }
+}
+
+fn read_input() -> Option<String> {
+    let mut input = String::new();
+    let mut depth: i32 = 0;
+
+    loop {
+        if input.is_empty() {
+            print!("vex> ");
+        } else {
+            print!("...  ");
+        }
+        io::stdout().flush().ok();
+
+        let mut line = String::new();
+        match io::stdin().read_line(&mut line) {
+            Ok(0) => return None,
+            Err(_) => return None,
+            _ => {}
+        }
+
+        for ch in line.chars() {
+            match ch {
+                '(' | '[' | '{' => depth += 1,
+                ')' | ']' | '}' => depth -= 1,
+                _ => {}
+            }
+        }
+
+        input.push_str(&line);
+
+        if depth <= 0 {
+            return Some(input);
         }
     }
 }

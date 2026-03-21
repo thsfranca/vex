@@ -1,8 +1,8 @@
 (defmacro unless [test body]
-  (syntax-list (quote if) test (quote nil) body))
+  (list (quote if) test (quote nil) body))
 
 (defmacro when [test body]
-  (syntax-list (quote if) test body (quote nil)))
+  (list (quote if) test body (quote nil)))
 
 (defn main []
   (unless (> 1 10)

@@ -428,7 +428,7 @@ mod tests {
     fn defmacro_unless_compiles() {
         let result = compile_source(
             r#"(defmacro unless [test body]
-  (syntax-list (quote if) test (quote nil) body))
+  (list (quote if) test (quote nil) body))
 
 (defn main []
   (unless (> 1 10)
@@ -447,7 +447,7 @@ mod tests {
     fn defmacro_when_compiles() {
         let result = compile_source(
             r#"(defmacro when [test body]
-  (syntax-list (quote if) test body (quote nil)))
+  (list (quote if) test body (quote nil)))
 
 (defn main []
   (when (< 1 10)
@@ -483,8 +483,8 @@ mod tests {
     fn defmacro_with_hygiene_compiles() {
         let result = compile_source(
             r#"(defmacro with-temp [body]
-  (syntax-list (quote let)
-    (syntax-list (quote tmp) (quote 0))
+  (list (quote let)
+    (list (quote tmp) (quote 0))
     body))
 
 (defn main []
@@ -503,10 +503,10 @@ mod tests {
     fn defmacro_multiple_macros_compile() {
         let result = compile_source(
             r#"(defmacro unless [test body]
-  (syntax-list (quote if) test (quote nil) body))
+  (list (quote if) test (quote nil) body))
 
 (defmacro when [test body]
-  (syntax-list (quote if) test body (quote nil)))
+  (list (quote if) test body (quote nil)))
 
 (defn main []
   (unless (> 1 10)

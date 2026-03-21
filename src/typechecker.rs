@@ -47,13 +47,22 @@ impl Checker {
                 span,
             } => self.check_if(test, then_branch, else_branch, *span),
 
-            ast::Expr::Let { .. } | ast::Expr::Cond { .. } | ast::Expr::Lambda { .. } => {
-                self.diagnostics.push(Diagnostic::error(
-                    "not yet implemented in type checker",
-                    expr.span(),
-                ));
-                None
-            }
+            ast::Expr::Let {
+                bindings,
+                body,
+                span,
+            } => self.check_let(bindings, body, *span),
+            ast::Expr::Cond {
+                clauses,
+                else_body,
+                span,
+            } => self.check_cond(clauses, else_body.as_deref(), *span),
+            ast::Expr::Lambda {
+                params,
+                return_type,
+                body,
+                span,
+            } => self.check_lambda(params, return_type.as_ref(), body, *span),
         }
     }
 
@@ -227,6 +236,211 @@ impl Checker {
             else_branch: Box::new(checked_else),
             span,
             ty,
+        })
+    }
+
+    fn resolve_type(&mut self, type_expr: &ast::TypeExpr) -> Option<VexType> {
+        match type_expr {
+            ast::TypeExpr::Named { name, span } => match name.as_str() {
+                "Int" => Some(VexType::Int),
+                "Float" => Some(VexType::Float),
+                "Bool" => Some(VexType::Bool),
+                "String" => Some(VexType::String),
+                "Unit" => Some(VexType::Unit),
+                _ => {
+                    self.diagnostics
+                        .push(Diagnostic::error(format!("unknown type '{}'", name), *span));
+                    None
+                }
+            },
+            ast::TypeExpr::Function { params, ret, .. } => {
+                let mut param_types = Vec::new();
+                for p in params {
+                    param_types.push(self.resolve_type(p)?);
+                }
+                let ret_type = self.resolve_type(ret)?;
+                Some(VexType::Fn {
+                    params: param_types,
+                    ret: Box::new(ret_type),
+                })
+            }
+            ast::TypeExpr::Applied { name, span, .. } => {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("applied type '{}' not supported in MVP", name),
+                    *span,
+                ));
+                None
+            }
+        }
+    }
+
+    fn check_body(&mut self, body: &[ast::Expr]) -> Option<Vec<hir::Expr>> {
+        let mut checked = Vec::new();
+        for expr in body {
+            checked.push(self.check_expr(expr)?);
+        }
+        Some(checked)
+    }
+
+    fn check_let(
+        &mut self,
+        bindings: &[ast::Binding],
+        body: &[ast::Expr],
+        span: Span,
+    ) -> Option<hir::Expr> {
+        self.env.push_scope();
+
+        let mut checked_bindings = Vec::new();
+        for binding in bindings {
+            let checked_value = self.check_expr(&binding.value)?;
+            let ty = checked_value.ty().clone();
+            self.env.define(binding.name.clone(), ty.clone());
+            checked_bindings.push(hir::Binding {
+                name: binding.name.clone(),
+                ty,
+                value: checked_value,
+                span: binding.span,
+            });
+        }
+
+        let checked_body = self.check_body(body)?;
+        let ty = checked_body
+            .last()
+            .map(|e| e.ty().clone())
+            .unwrap_or(VexType::Unit);
+
+        self.env.pop_scope();
+
+        Some(hir::Expr::Let {
+            bindings: checked_bindings,
+            body: checked_body,
+            span,
+            ty,
+        })
+    }
+
+    fn check_cond(
+        &mut self,
+        clauses: &[ast::CondClause],
+        else_body: Option<&ast::Expr>,
+        span: Span,
+    ) -> Option<hir::Expr> {
+        let else_expr = if let Some(e) = else_body {
+            self.check_expr(e)?
+        } else {
+            hir::Expr::Nil(span)
+        };
+
+        let mut result = else_expr;
+
+        for clause in clauses.iter().rev() {
+            let checked_test = self.check_expr(&clause.test)?;
+
+            if checked_test.ty() != &VexType::Bool {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("cond test must be Bool, found {}", checked_test.ty()),
+                    checked_test.span(),
+                ));
+                return None;
+            }
+
+            let checked_value = self.check_expr(&clause.value)?;
+
+            if checked_value.ty() != result.ty() {
+                self.diagnostics.push(Diagnostic::error(
+                    format!(
+                        "cond branches have different types: {} and {}",
+                        checked_value.ty(),
+                        result.ty()
+                    ),
+                    clause.span,
+                ));
+                return None;
+            }
+
+            let ty = checked_value.ty().clone();
+
+            result = hir::Expr::If {
+                test: Box::new(checked_test),
+                then_branch: Box::new(checked_value),
+                else_branch: Box::new(result),
+                span: clause.span,
+                ty,
+            };
+        }
+
+        Some(result)
+    }
+
+    fn check_lambda(
+        &mut self,
+        params: &[ast::Param],
+        return_type: Option<&ast::TypeExpr>,
+        body: &[ast::Expr],
+        span: Span,
+    ) -> Option<hir::Expr> {
+        let mut checked_params = Vec::new();
+        let mut param_types = Vec::new();
+
+        for param in params {
+            let ty = if let Some(type_ann) = &param.type_ann {
+                self.resolve_type(type_ann)?
+            } else {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("parameter '{}' requires a type annotation", param.name),
+                    param.span,
+                ));
+                return None;
+            };
+            param_types.push(ty.clone());
+            checked_params.push(hir::Param {
+                name: param.name.clone(),
+                ty,
+                span: param.span,
+            });
+        }
+
+        self.env.push_scope();
+        for param in &checked_params {
+            self.env.define(param.name.clone(), param.ty.clone());
+        }
+
+        let checked_body = self.check_body(body)?;
+        let body_ty = checked_body
+            .last()
+            .map(|e| e.ty().clone())
+            .unwrap_or(VexType::Unit);
+
+        self.env.pop_scope();
+
+        let ret_ty = if let Some(ret_ann) = return_type {
+            let declared = self.resolve_type(ret_ann)?;
+            if declared != body_ty {
+                self.diagnostics.push(Diagnostic::error(
+                    format!(
+                        "declared return type {} doesn't match body type {}",
+                        declared, body_ty
+                    ),
+                    span,
+                ));
+                return None;
+            }
+            declared
+        } else {
+            body_ty
+        };
+
+        let fn_ty = VexType::Fn {
+            params: param_types,
+            ret: Box::new(ret_ty.clone()),
+        };
+
+        Some(hir::Expr::Lambda {
+            params: checked_params,
+            return_type: ret_ty,
+            body: checked_body,
+            span,
+            ty: fn_ty,
         })
     }
 
@@ -480,5 +694,162 @@ mod tests {
         let (_, diags) = check_source(r#"(if true 1 "hello")"#);
         assert_eq!(diags.len(), 1);
         assert!(diags[0].message.contains("different types"));
+    }
+
+    #[test]
+    fn let_simple() {
+        let (module, diags) = check_source("(let [x 42] x)");
+        assert!(diags.is_empty());
+        if let hir::TopForm::Expr(expr) = &module.top_forms[0] {
+            assert_eq!(expr.ty(), &VexType::Int);
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn let_multiple_bindings() {
+        let (module, diags) = check_source("(let [x 1 y 2] (+ x y))");
+        assert!(diags.is_empty());
+        if let hir::TopForm::Expr(expr) = &module.top_forms[0] {
+            assert_eq!(expr.ty(), &VexType::Int);
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn let_scoping() {
+        let (_, diags) = check_source("(let [x 1] x) x");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("undefined symbol"));
+    }
+
+    #[test]
+    fn let_body_type_is_last() {
+        let (module, diags) = check_source(r#"(let [x 1] (println "hi") x)"#);
+        assert!(diags.is_empty());
+        if let hir::TopForm::Expr(expr) = &module.top_forms[0] {
+            assert_eq!(expr.ty(), &VexType::Int);
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn cond_basic() {
+        let (module, diags) = check_source("(cond (<= 1 2) 10 :else 20)");
+        assert!(diags.is_empty());
+        if let hir::TopForm::Expr(expr) = &module.top_forms[0] {
+            assert_eq!(expr.ty(), &VexType::Int);
+            assert!(matches!(expr, hir::Expr::If { .. }));
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn cond_multiple_clauses() {
+        let (module, diags) = check_source("(cond (< 1 0) 1 (= 1 1) 2 :else 3)");
+        assert!(diags.is_empty());
+        if let hir::TopForm::Expr(expr) = &module.top_forms[0] {
+            assert_eq!(expr.ty(), &VexType::Int);
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn cond_no_else() {
+        let (module, diags) = check_source("(cond)");
+        assert!(diags.is_empty());
+        if let hir::TopForm::Expr(expr) = &module.top_forms[0] {
+            assert_eq!(expr.ty(), &VexType::Unit);
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn error_cond_non_bool_test() {
+        let (_, diags) = check_source("(cond 42 1 :else 2)");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("must be Bool"));
+    }
+
+    #[test]
+    fn lambda_simple() {
+        let (module, diags) = check_source("(fn [x : Int] (+ x 1))");
+        assert!(diags.is_empty());
+        if let hir::TopForm::Expr(expr) = &module.top_forms[0] {
+            assert_eq!(
+                expr.ty(),
+                &VexType::Fn {
+                    params: vec![VexType::Int],
+                    ret: Box::new(VexType::Int),
+                }
+            );
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn lambda_with_return_type() {
+        let (module, diags) = check_source("(fn [x : Int] : Int (+ x 1))");
+        assert!(diags.is_empty());
+        if let hir::TopForm::Expr(expr) = &module.top_forms[0] {
+            assert_eq!(
+                expr.ty(),
+                &VexType::Fn {
+                    params: vec![VexType::Int],
+                    ret: Box::new(VexType::Int),
+                }
+            );
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn lambda_no_params() {
+        let (module, diags) = check_source("(fn [] 42)");
+        assert!(diags.is_empty());
+        if let hir::TopForm::Expr(expr) = &module.top_forms[0] {
+            assert_eq!(
+                expr.ty(),
+                &VexType::Fn {
+                    params: vec![],
+                    ret: Box::new(VexType::Int),
+                }
+            );
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn lambda_call() {
+        let (module, diags) = check_source("((fn [x : Int] (+ x 1)) 5)");
+        assert!(diags.is_empty());
+        if let hir::TopForm::Expr(expr) = &module.top_forms[0] {
+            assert_eq!(expr.ty(), &VexType::Int);
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn error_lambda_missing_type_ann() {
+        let (_, diags) = check_source("(fn [x] x)");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("requires a type annotation"));
+    }
+
+    #[test]
+    fn error_lambda_return_type_mismatch() {
+        let (_, diags) = check_source(r#"(fn [x : Int] : String (+ x 1))"#);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("doesn't match"));
     }
 }

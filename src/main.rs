@@ -228,7 +228,13 @@ fn run_repl() {
             continue;
         }
 
-        let ast = vex::macro_expand::expand(ast);
+        let (ast, expand_diags) = vex::macro_expand::expand(ast);
+        if !expand_diags.is_empty() {
+            for d in &expand_diags {
+                eprintln!("{}", d.render(&source_map));
+            }
+            continue;
+        }
 
         let (hir_module, check_diags) = vex::typechecker::check(&ast);
         if !check_diags.is_empty() {

@@ -120,7 +120,10 @@ fn compile_single(
         return Err(parse_diags);
     }
 
-    let ast = macro_expand::expand(ast);
+    let (ast, expand_diags) = macro_expand::expand(ast);
+    if !expand_diags.is_empty() {
+        return Err(expand_diags);
+    }
 
     let (hir_module, check_diags) = typechecker::check_with_imports(&ast, imported_symbols);
     if !check_diags.is_empty() {
@@ -164,7 +167,17 @@ pub fn compile(source: &str, file_name: &str) -> CompileResult {
         };
     }
 
-    let main_ast = macro_expand::expand(main_ast);
+    let (main_ast, expand_diags) = macro_expand::expand(main_ast);
+    if !expand_diags.is_empty() {
+        return CompileResult {
+            go_source: String::new(),
+            go_mod: String::new(),
+            vexrt: None,
+            extra_packages: Vec::new(),
+            diagnostics: expand_diags,
+            source_map,
+        };
+    }
 
     let imports = collect_imports(&main_ast);
     for (module_path, symbols) in &imports {

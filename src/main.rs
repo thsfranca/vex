@@ -95,6 +95,14 @@ fn main() {
             .expect("failed to write collections.go");
     }
 
+    for pkg in &result.extra_packages {
+        let pkg_dir = tmp_dir.join(&pkg.name);
+        fs::create_dir_all(&pkg_dir).expect("failed to create package directory");
+        let file_name = pkg.name.rsplit('/').next().unwrap_or(&pkg.name);
+        fs::write(pkg_dir.join(format!("{}.go", file_name)), &pkg.source)
+            .expect("failed to write package file");
+    }
+
     if let Some(ref dir) = emit_go_dir {
         let dest = Path::new(dir);
         fs::create_dir_all(dest).expect("failed to create emit-go directory");
@@ -109,6 +117,13 @@ fn main() {
                 .expect("failed to write result.go");
             fs::write(vexrt_dest.join("collections.go"), &vexrt.collections_go)
                 .expect("failed to write collections.go");
+        }
+        for pkg in &result.extra_packages {
+            let pkg_dest = dest.join(&pkg.name);
+            fs::create_dir_all(&pkg_dest).expect("failed to create package directory");
+            let file_name = pkg.name.rsplit('/').next().unwrap_or(&pkg.name);
+            fs::write(pkg_dest.join(format!("{}.go", file_name)), &pkg.source)
+                .expect("failed to write package file");
         }
     }
 

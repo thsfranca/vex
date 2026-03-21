@@ -1646,7 +1646,19 @@ fn validate_exports(program: &[ast::TopForm], diagnostics: &mut Vec<Diagnostic>)
 }
 
 pub fn check(program: &[ast::TopForm]) -> (hir::Module, Vec<Diagnostic>) {
+    check_with_imports(program, &[])
+}
+
+pub fn check_with_imports(
+    program: &[ast::TopForm],
+    imported_symbols: &[(String, VexType)],
+) -> (hir::Module, Vec<Diagnostic>) {
     let mut checker = Checker::new();
+
+    for (name, ty) in imported_symbols {
+        checker.env.define(name.clone(), ty.clone());
+    }
+
     let mut top_forms = Vec::new();
 
     validate_module_structure(program, &mut checker.diagnostics);

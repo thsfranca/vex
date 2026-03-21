@@ -12,9 +12,28 @@ pub fn generate(module: &hir::Module) -> String {
     cg.output
 }
 
+pub fn generate_with_imports(
+    module: &hir::Module,
+    import_map: &std::collections::HashMap<String, String>,
+) -> String {
+    let mut cg = Generator::new();
+    cg.import_map = import_map.clone();
+    cg.emit_module(module);
+    cg.output
+}
+
+pub fn generate_package(module: &hir::Module, package_name: &str) -> String {
+    let mut cg = Generator::new();
+    cg.package_name = Some(package_name.to_string());
+    cg.emit_module(module);
+    cg.output
+}
+
 struct Generator {
     output: String,
     indent: usize,
+    import_map: std::collections::HashMap<String, String>,
+    package_name: Option<String>,
 }
 
 impl Generator {
@@ -22,6 +41,20 @@ impl Generator {
         Self {
             output: String::new(),
             indent: 0,
+            import_map: std::collections::HashMap::new(),
+            package_name: None,
+        }
+    }
+
+    fn is_package(&self) -> bool {
+        self.package_name.is_some()
+    }
+
+    fn go_defn_name(&self, name: &str) -> String {
+        if self.is_package() {
+            vex_to_go_public_name(name)
+        } else {
+            vex_to_go_name(name)
         }
     }
 
@@ -46,10 +79,27 @@ impl Generator {
     }
 
     fn emit_module(&mut self, module: &hir::Module) {
-        self.writeln("package main");
+        if let Some(pkg) = self.package_name.clone() {
+            let short_name = pkg.rsplit('/').next().unwrap_or(&pkg).to_string();
+            self.write("package ");
+            self.write(&short_name);
+            self.newline();
+        } else {
+            self.writeln("package main");
+        }
         self.newline();
 
-        let imports = collect_imports(module);
+        let mut imports = collect_go_imports(module);
+
+        let module_packages: BTreeSet<String> = self
+            .import_map
+            .values()
+            .map(|pkg| format!("vex_out/{}", pkg))
+            .collect();
+        for pkg in &module_packages {
+            imports.insert(pkg.clone());
+        }
+
         if !imports.is_empty() {
             if imports.len() == 1 {
                 writeln!(self.output, "import \"{}\"", imports.iter().next().unwrap()).unwrap();
@@ -105,7 +155,7 @@ impl Generator {
         body: &[hir::Expr],
     ) {
         self.write("func ");
-        self.write(&vex_to_go_name(name));
+        self.write(&self.go_defn_name(name));
         self.write("(");
         for (i, param) in params.iter().enumerate() {
             if i > 0 {
@@ -139,7 +189,7 @@ impl Generator {
 
     fn emit_def(&mut self, name: &str, ty: &VexType, value: &hir::Expr) {
         self.write("var ");
-        self.write(&vex_to_go_name(name));
+        self.write(&self.go_defn_name(name));
         self.write(" ");
         self.write(&go_type(ty));
         self.write(" = ");
@@ -410,7 +460,17 @@ impl Generator {
             }
         }
 
-        self.emit_expr(func);
+        if let Some(name) = func_name
+            && let Some(pkg) = self.import_map.get(name).cloned()
+        {
+            let short_pkg = pkg.rsplit('/').next().unwrap_or(&pkg).to_string();
+            let public_name = vex_to_go_public_name(name);
+            self.write(&short_pkg);
+            self.write(".");
+            self.write(&public_name);
+        } else {
+            self.emit_expr(func);
+        }
         self.write("(");
         for (i, arg) in args.iter().enumerate() {
             if i > 0 {
@@ -966,7 +1026,7 @@ impl Generator {
     }
 }
 
-fn collect_imports(module: &hir::Module) -> BTreeSet<String> {
+fn collect_go_imports(module: &hir::Module) -> BTreeSet<String> {
     let mut names = Vec::new();
     for form in &module.top_forms {
         collect_builtin_calls_top_form(form, &mut names);
@@ -2713,5 +2773,80 @@ mod tests {
         };
         let output = generate(&module);
         assert!(output.contains("\"vex_out/vexrt\""), "{}", output);
+    }
+
+    #[test]
+    fn generate_package_uses_package_name() {
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Defn {
+                name: "add".into(),
+                params: vec![
+                    hir::Param {
+                        name: "a".into(),
+                        ty: VexType::Int,
+                        span: span(0, 1),
+                    },
+                    hir::Param {
+                        name: "b".into(),
+                        ty: VexType::Int,
+                        span: span(0, 1),
+                    },
+                ],
+                return_type: VexType::Int,
+                body: vec![hir::Expr::Call {
+                    func: Box::new(hir::Expr::Var {
+                        name: "+".into(),
+                        span: span(0, 1),
+                        ty: VexType::Fn {
+                            params: vec![VexType::Int, VexType::Int],
+                            ret: Box::new(VexType::Int),
+                        },
+                    }),
+                    args: vec![
+                        hir::Expr::Var {
+                            name: "a".into(),
+                            span: span(0, 1),
+                            ty: VexType::Int,
+                        },
+                        hir::Expr::Var {
+                            name: "b".into(),
+                            span: span(0, 1),
+                            ty: VexType::Int,
+                        },
+                    ],
+                    span: span(0, 1),
+                    ty: VexType::Int,
+                }],
+                span: span(0, 10),
+            }],
+        };
+        let output = generate_package(&module, "math");
+        assert!(output.contains("package math"), "{}", output);
+        assert!(output.contains("func Add("), "{}", output);
+    }
+
+    #[test]
+    fn generate_with_imports_qualifies_calls() {
+        let mut import_map = std::collections::HashMap::new();
+        import_map.insert("add".to_string(), "math".to_string());
+
+        let module = hir::Module {
+            top_forms: vec![hir::TopForm::Expr(hir::Expr::Call {
+                func: Box::new(hir::Expr::Var {
+                    name: "add".into(),
+                    span: span(1, 4),
+                    ty: VexType::Fn {
+                        params: vec![VexType::Int, VexType::Int],
+                        ret: Box::new(VexType::Int),
+                    },
+                }),
+                args: vec![hir::Expr::Int(1, span(5, 6)), hir::Expr::Int(2, span(7, 8))],
+                span: span(0, 9),
+                ty: VexType::Int,
+            })],
+        };
+        let output = generate_with_imports(&module, &import_map);
+        assert!(output.contains("math.Add(1, 2)"), "{}", output);
+        assert!(output.contains("\"vex_out/math\""), "{}", output);
     }
 }

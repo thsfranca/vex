@@ -1,5 +1,7 @@
 # Vex
 
+[![CI](https://github.com/thsfranca/vex/actions/workflows/ci.yml/badge.svg)](https://github.com/thsfranca/vex/actions/workflows/ci.yml)
+
 A statically typed Lisp for building MCP servers. The compiler is written in Rust and transpiles to Go source code.
 
 **This is a study project.**

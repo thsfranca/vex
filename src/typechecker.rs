@@ -444,19 +444,147 @@ impl Checker {
         })
     }
 
+    fn check_defn(
+        &mut self,
+        name: &str,
+        params: &[ast::Param],
+        return_type: Option<&ast::TypeExpr>,
+        body: &[ast::Expr],
+        span: Span,
+    ) -> Option<hir::TopForm> {
+        let mut checked_params = Vec::new();
+        let mut param_types = Vec::new();
+
+        for param in params {
+            let ty = if let Some(type_ann) = &param.type_ann {
+                self.resolve_type(type_ann)?
+            } else {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("parameter '{}' requires a type annotation", param.name),
+                    param.span,
+                ));
+                return None;
+            };
+            param_types.push(ty.clone());
+            checked_params.push(hir::Param {
+                name: param.name.clone(),
+                ty,
+                span: param.span,
+            });
+        }
+
+        let ret_ty_from_ann = if let Some(ret_ann) = return_type {
+            Some(self.resolve_type(ret_ann)?)
+        } else {
+            None
+        };
+
+        let fn_ty = VexType::Fn {
+            params: param_types,
+            ret: Box::new(ret_ty_from_ann.clone().unwrap_or(VexType::Unit)),
+        };
+        self.env.define(name.to_string(), fn_ty);
+
+        self.env.push_scope();
+        for param in &checked_params {
+            self.env.define(param.name.clone(), param.ty.clone());
+        }
+
+        let checked_body = self.check_body(body)?;
+        let body_ty = checked_body
+            .last()
+            .map(|e| e.ty().clone())
+            .unwrap_or(VexType::Unit);
+
+        self.env.pop_scope();
+
+        let ret_ty = if let Some(declared) = ret_ty_from_ann {
+            if declared != body_ty {
+                self.diagnostics.push(Diagnostic::error(
+                    format!(
+                        "declared return type {} doesn't match body type {}",
+                        declared, body_ty
+                    ),
+                    span,
+                ));
+                return None;
+            }
+            declared
+        } else {
+            body_ty.clone()
+        };
+
+        let final_fn_ty = VexType::Fn {
+            params: checked_params.iter().map(|p| p.ty.clone()).collect(),
+            ret: Box::new(ret_ty.clone()),
+        };
+        self.env.define(name.to_string(), final_fn_ty);
+
+        Some(hir::TopForm::Defn {
+            name: name.to_string(),
+            params: checked_params,
+            return_type: ret_ty,
+            body: checked_body,
+            span,
+        })
+    }
+
+    fn check_def(
+        &mut self,
+        name: &str,
+        type_ann: Option<&ast::TypeExpr>,
+        value: &ast::Expr,
+        span: Span,
+    ) -> Option<hir::TopForm> {
+        let checked_value = self.check_expr(value)?;
+        let value_ty = checked_value.ty().clone();
+
+        let ty = if let Some(ann) = type_ann {
+            let declared = self.resolve_type(ann)?;
+            if declared != value_ty {
+                self.diagnostics.push(Diagnostic::error(
+                    format!(
+                        "declared type {} doesn't match value type {}",
+                        declared, value_ty
+                    ),
+                    span,
+                ));
+                return None;
+            }
+            declared
+        } else {
+            value_ty
+        };
+
+        self.env.define(name.to_string(), ty.clone());
+
+        Some(hir::TopForm::Def {
+            name: name.to_string(),
+            ty,
+            value: checked_value,
+            span,
+        })
+    }
+
     fn check_top_form(&mut self, form: &ast::TopForm) -> Option<hir::TopForm> {
         match form {
             ast::TopForm::Expr(expr) => {
                 let checked = self.check_expr(expr)?;
                 Some(hir::TopForm::Expr(checked))
             }
-            ast::TopForm::Defn { span, .. } | ast::TopForm::Def { span, .. } => {
-                self.diagnostics.push(Diagnostic::error(
-                    "not yet implemented in type checker",
-                    *span,
-                ));
-                None
-            }
+            ast::TopForm::Defn {
+                name,
+                params,
+                return_type,
+                body,
+                span,
+            } => self.check_defn(name, params, return_type.as_ref(), body, *span),
+            ast::TopForm::Def {
+                name,
+                type_ann,
+                value,
+                span,
+            } => self.check_def(name, type_ann.as_ref(), value, *span),
         }
     }
 }
@@ -851,5 +979,179 @@ mod tests {
         let (_, diags) = check_source(r#"(fn [x : Int] : String (+ x 1))"#);
         assert_eq!(diags.len(), 1);
         assert!(diags[0].message.contains("doesn't match"));
+    }
+
+    #[test]
+    fn defn_simple() {
+        let (module, diags) = check_source("(defn add [x : Int y : Int] : Int (+ x y))");
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 1);
+        assert!(matches!(&module.top_forms[0], hir::TopForm::Defn { name, .. } if name == "add"));
+    }
+
+    #[test]
+    fn defn_no_return_type() {
+        let (module, diags) = check_source(r#"(defn greet [name : String] (println name))"#);
+        assert!(diags.is_empty());
+        if let hir::TopForm::Defn { return_type, .. } = &module.top_forms[0] {
+            assert_eq!(return_type, &VexType::Unit);
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn defn_recursive() {
+        let source = "(defn fib [n : Int] : Int (if (<= n 1) n (+ (fib (- n 1)) (fib (- n 2)))))";
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        if let hir::TopForm::Defn {
+            name, return_type, ..
+        } = &module.top_forms[0]
+        {
+            assert_eq!(name, "fib");
+            assert_eq!(return_type, &VexType::Int);
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn defn_available_after_definition() {
+        let source = r#"(defn double [x : Int] : Int (* x 2))
+                        (double 5)"#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 2);
+        if let hir::TopForm::Expr(expr) = &module.top_forms[1] {
+            assert_eq!(expr.ty(), &VexType::Int);
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn error_defn_return_type_mismatch() {
+        let (_, diags) = check_source(r#"(defn f [] : Int "hello")"#);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("doesn't match"));
+    }
+
+    #[test]
+    fn error_defn_missing_param_type() {
+        let (_, diags) = check_source("(defn f [x] x)");
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("requires a type annotation"));
+    }
+
+    #[test]
+    fn def_simple() {
+        let (module, diags) = check_source("(def x 42)");
+        assert!(diags.is_empty());
+        if let hir::TopForm::Def { name, ty, .. } = &module.top_forms[0] {
+            assert_eq!(name, "x");
+            assert_eq!(ty, &VexType::Int);
+        } else {
+            panic!("expected def");
+        }
+    }
+
+    #[test]
+    fn def_with_type_annotation() {
+        let (module, diags) = check_source("(def pi : Float 3.14)");
+        assert!(diags.is_empty());
+        if let hir::TopForm::Def { name, ty, .. } = &module.top_forms[0] {
+            assert_eq!(name, "pi");
+            assert_eq!(ty, &VexType::Float);
+        } else {
+            panic!("expected def");
+        }
+    }
+
+    #[test]
+    fn def_available_after_definition() {
+        let source = "(def x 10) (+ x 1)";
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 2);
+        if let hir::TopForm::Expr(expr) = &module.top_forms[1] {
+            assert_eq!(expr.ty(), &VexType::Int);
+        } else {
+            panic!("expected expression");
+        }
+    }
+
+    #[test]
+    fn error_def_type_mismatch() {
+        let (_, diags) = check_source(r#"(def x : Int "hello")"#);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("doesn't match"));
+    }
+
+    #[test]
+    fn integration_hello_world() {
+        let source = r#"(defn main [] (println "Hello, World!"))"#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 1);
+        if let hir::TopForm::Defn {
+            name, return_type, ..
+        } = &module.top_forms[0]
+        {
+            assert_eq!(name, "main");
+            assert_eq!(return_type, &VexType::Unit);
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn integration_fibonacci() {
+        let source = r#"
+            (defn fib [n : Int] : Int
+              (if (<= n 1)
+                n
+                (+ (fib (- n 1)) (fib (- n 2)))))
+
+            (defn main []
+              (println (str (fib 10))))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 2);
+    }
+
+    #[test]
+    fn integration_def_and_defn() {
+        let source = r#"
+            (def greeting : String "Hello")
+            (defn greet [name : String] : String
+              (str greeting ", " name "!"))
+            (defn main []
+              (println (greet "World")))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 3);
+    }
+
+    #[test]
+    fn integration_cond_and_let() {
+        let source = r#"
+            (defn classify [n : Int] : String
+              (let [abs_n (if (< n 0) (* n -1) n)]
+                (cond
+                  (= abs_n 0) "zero"
+                  (<= abs_n 10) "small"
+                  :else "large")))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 1);
+        if let hir::TopForm::Defn { return_type, .. } = &module.top_forms[0] {
+            assert_eq!(return_type, &VexType::String);
+        } else {
+            panic!("expected defn");
+        }
     }
 }

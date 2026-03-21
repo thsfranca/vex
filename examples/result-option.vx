@@ -1,0 +1,25 @@
+(defn safe-div [a : Int, b : Int] : (Result Int String)
+  (if (= b 0)
+    (Err "division by zero")
+    (Ok (/ a b))))
+
+(defn show-result [r : (Result Int String)] : String
+  (match r
+    (Ok v) (str "ok: " v)
+    (Err e) (str "error: " e)))
+
+(defn find-positive [x : Int] : (Option Int)
+  (if (> x 0)
+    (Some x)
+    None))
+
+(defn show-option [o : (Option Int)] : String
+  (match o
+    (Some v) (str "found: " v)
+    None "nothing"))
+
+(defn main []
+  (println (show-result (safe-div 10 3)))
+  (println (show-result (safe-div 10 0)))
+  (println (show-option (find-positive 42)))
+  (println (show-option (find-positive -5))))

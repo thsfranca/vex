@@ -104,6 +104,14 @@ pub enum Expr {
         span: Span,
         ty: VexType,
     },
+
+    VariantConstructor {
+        union_name: String,
+        variant_name: String,
+        args: Vec<Expr>,
+        span: Span,
+        ty: VexType,
+    },
 }
 
 impl Expr {
@@ -121,7 +129,8 @@ impl Expr {
             | Expr::Call { span, .. }
             | Expr::FieldAccess { span, .. }
             | Expr::RecordConstructor { span, .. }
-            | Expr::Match { span, .. } => *span,
+            | Expr::Match { span, .. }
+            | Expr::VariantConstructor { span, .. } => *span,
         }
     }
 
@@ -139,7 +148,8 @@ impl Expr {
             | Expr::Call { ty, .. }
             | Expr::FieldAccess { ty, .. }
             | Expr::RecordConstructor { ty, .. }
-            | Expr::Match { ty, .. } => ty,
+            | Expr::Match { ty, .. }
+            | Expr::VariantConstructor { ty, .. } => ty,
         }
     }
 }

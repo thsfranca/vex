@@ -250,6 +250,28 @@ impl Generator {
             hir::Expr::Match {
                 scrutinee, clauses, ..
             } => self.emit_match(scrutinee, clauses),
+            hir::Expr::VariantConstructor {
+                union_name,
+                variant_name,
+                args,
+                ..
+            } => {
+                let go_variant = format!(
+                    "{}_{}",
+                    vex_to_go_public_name(union_name),
+                    vex_to_go_public_name(variant_name)
+                );
+                self.write(&go_variant);
+                self.write("{");
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        self.write(", ");
+                    }
+                    write!(self.output, "V{}: ", i).unwrap();
+                    self.emit_expr(arg);
+                }
+                self.write("}");
+            }
         }
     }
 
@@ -631,6 +653,11 @@ fn collect_builtin_calls_expr(expr: &hir::Expr, names: &mut Vec<String>) {
             collect_builtin_calls_expr(scrutinee, names);
             for clause in clauses {
                 collect_builtin_calls_expr(&clause.body, names);
+            }
+        }
+        hir::Expr::VariantConstructor { args, .. } => {
+            for arg in args {
+                collect_builtin_calls_expr(arg, names);
             }
         }
     }

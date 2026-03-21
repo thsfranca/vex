@@ -1,0 +1,11 @@
+(module math)
+(export [add sub double])
+
+(defn add [a : Int b : Int] : Int
+  (+ a b))
+
+(defn sub [a : Int b : Int] : Int
+  (- a b))
+
+(defn double [n : Int] : Int
+  (* n 2))

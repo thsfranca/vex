@@ -154,11 +154,11 @@ The eventual MCP framework should allow declarations like:
 
 ### 4.5 Self-Hosted Macro Architecture
 
-User-defined macros (`defmacro`) are Vex functions that transform syntax at compile time. The compiler executes macro bodies using the existing tree-walking interpreter during the macro expansion phase.
+User-defined macros (`defmacro`) are Vex functions that transform syntax at compile time. A dedicated AST evaluator in the macro expansion phase executes macro bodies directly on the untyped AST — no type checking, no HIR, no interpreter involvement.
 
 #### Execution Model
 
-The macro expansion phase sits between the parser and type checker. When it encounters a `defmacro` form, it type-checks the macro body and stores the resulting HIR. When it encounters a call to a defined macro, it evaluates the HIR via the interpreter and converts the result back to AST.
+The macro expansion phase sits between the parser and type checker. When it encounters a `defmacro` form, it stores the macro body AST and parameter names in a registry. When it encounters a call to a defined macro, it evaluates the body using a compile-time AST evaluator and converts the result back to AST.
 
 ```
 Source (.vx)
@@ -178,16 +178,17 @@ Source (.vx)
 │         Macro Expansion              │
 │                                       │
 │  Pass 1: Collect defmacro forms       │
-│    → type-check body as              │
-│      (Fn [Syntax ...] Syntax)        │
-│    → store HIR in macro registry     │
+│    → store body AST + param names    │
+│      in a macro registry             │
 │                                       │
 │  Pass 2: Walk AST                    │
 │    → on macro call:                  │
 │      a. Convert args → Syntax values │
-│      b. Evaluate via interpreter     │
-│      c. Convert Syntax → AST        │
-│      d. Re-expand the result         │
+│      b. Evaluate body via AST eval   │
+│      c. Apply hygiene (rename        │
+│         macro-introduced bindings)   │
+│      d. Convert Syntax → AST        │
+│      e. Re-expand the result         │
 │    → apply compiler-internal macros  │
 │      (cond, and, or)                 │
 │                                       │
@@ -197,6 +198,8 @@ Source (.vx)
             ┌──────────────┐
             │ Type Checker │
 ```
+
+The AST evaluator supports a deliberate subset of the language: literals, symbols, `quote`, `if`, `let`, and calls to macro helper functions. This mirrors the approach taken by Zig's comptime (a separate tree-walking evaluator for compile-time code) and matches how every typed Lisp (Typed Racket, Carp) handles macros — macro bodies run in a dynamic context, and the type checker validates the expanded output.
 
 #### The `Syntax` Type
 
@@ -237,17 +240,17 @@ Example:
 
 #### Macro Helpers
 
-Built-in functions available to macro bodies for constructing and inspecting `Syntax` values:
+Functions available only inside macro bodies for constructing and inspecting `Syntax` values. These exist exclusively in the compile-time AST evaluator — they are not global builtins, not available at runtime, and cannot conflict with user-defined functions:
 
-| Name | Type | Description |
-|------|------|-------------|
-| `list` | `(Fn [Syntax ...] Syntax)` | Construct an `SList` from arguments |
-| `cons` | `(Fn [Syntax Syntax] Syntax)` | Prepend an element to an `SList` |
-| `first` | `(Fn [Syntax] Syntax)` | First element of an `SList` |
-| `rest` | `(Fn [Syntax] Syntax)` | All but the first element of an `SList` |
-| `symbol?` | `(Fn [Syntax] Bool)` | Check if a value is an `SSym` |
-| `list?` | `(Fn [Syntax] Bool)` | Check if a value is an `SList` |
-| `concat` | `(Fn [Syntax Syntax] Syntax)` | Concatenate two `SList` values |
+| Name | Signature | Description |
+|------|-----------|-------------|
+| `list` | `[Syntax ...] → Syntax` | Construct an `SList` from arguments |
+| `cons` | `[Syntax Syntax] → Syntax` | Prepend an element to an `SList` |
+| `first` | `[Syntax] → Syntax` | First element of an `SList` |
+| `rest` | `[Syntax] → Syntax` | All but the first element of an `SList` |
+| `symbol?` | `[Syntax] → Bool` | Check if a value is an `SSym` |
+| `list?` | `[Syntax] → Bool` | Check if a value is an `SList` |
+| `concat` | `[Syntax Syntax] → Syntax` | Concatenate two `SList` values |
 
 #### Hygiene
 
@@ -1034,18 +1037,21 @@ Distributed as a native Rust binary per platform:
 - Testing is covered by Result types and dependency injection
 - If purity annotations are ever wanted, an opt-in `:pure` marker can be added later without breaking existing code
 
-### 11. User-defined macros — interpreter-based, hygienic
+### 11. User-defined macros — AST-evaluated, hygienic
 
 - `defmacro` bodies are Vex code that transforms `Syntax` values at compile time
-- The existing tree-walking interpreter (`interpreter.rs`) executes macro bodies during the macro expansion phase — no Go compilation needed for macros
+- A dedicated AST evaluator in `macro_expand.rs` executes macro bodies — no type checking, no HIR, no interpreter involvement
+- The AST evaluator supports a deliberate subset: literals, symbols, `quote`, `if`, `let`, and calls to macro helper functions (`list`, `cons`, `first`, `rest`, `symbol?`, `list?`, `concat`)
+- Macro helpers exist only in the compile-time evaluator — they are not global builtins and cannot conflict with user code
 - Alternatives rejected:
+  - **Type-check-to-HIR, evaluate via interpreter** — Quote/Unquote/Splice are AST-level concepts with no natural HIR representation; routing them through the type checker and interpreter adds cross-phase coupling for marginal benefit. Every typed Lisp (Typed Racket, Carp) runs macros in a dynamic context and type-checks the expanded output, not the macro body. The useful type errors are in the expanded code.
   - **Compile-to-Go-and-exec** — compiling each macro to Go and running it as a subprocess adds seconds of latency and IPC complexity for every macro invocation
   - **Two-phase compilation** — building a "macro plugin" binary first, then using it for expansion, adds toolchain complexity without proportional benefit
 - Hygiene is automatic — the expander renames macro-introduced bindings to unique names without macro author intervention
   - Manual `gensym` was rejected: it shifts hygiene responsibility to the macro author, making accidental variable capture a common bug
   - Automatic hygiene matches the design principle "Macros are hygienic" (§2.6) and follows Scheme's proven approach
   - An escape hatch for intentional capture (anaphoric macros) can be added later without changing the default
-- `Syntax` is a built-in union type (like `Option` and `Result`) representing Vex syntax as data — macros are typed as `(Fn [Syntax ...] Syntax)`
+- `Syntax` is a built-in union type (like `Option` and `Result`) representing Vex syntax as data
 - Macros are erased after expansion — `defmacro` forms do not appear in the HIR or generated Go output
 
 ---

@@ -1,4 +1,4 @@
-use crate::ast::{Binding, CondClause, Expr, TopForm};
+use crate::ast::{Binding, CondClause, Expr, Param, TopForm, TypeExpr};
 use crate::diagnostics::{Diagnostic, Label};
 use crate::lexer::{Token, TokenKind};
 use crate::source::{FileId, Span};
@@ -208,6 +208,7 @@ impl<'a> Parser<'a> {
                 "if" => return self.parse_if(open_span),
                 "let" => return self.parse_let(open_span),
                 "cond" => return self.parse_cond(open_span),
+                "fn" => return self.parse_lambda(open_span),
                 _ => {}
             }
         }
@@ -333,6 +334,177 @@ impl<'a> Parser<'a> {
         Some(Expr::Cond {
             clauses,
             else_body,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_lambda(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+
+        let params = self.parse_param_list()?;
+
+        let return_type = if self.check(|k| matches!(k, TokenKind::Colon)) {
+            self.pos += 1;
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+
+        let body = self.parse_body()?;
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(Expr::Lambda {
+            params,
+            return_type,
+            body,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_param_list(&mut self) -> Option<Vec<Param>> {
+        if self.at_end() {
+            self.diagnostics.push(Diagnostic::error(
+                "expected '[' for parameter list but reached end of input",
+                self.eof_span(),
+            ));
+            return None;
+        }
+
+        let open_span = self.tokens[self.pos].span;
+        if !matches!(self.tokens[self.pos].kind, TokenKind::LeftBracket) {
+            let desc = token_kind_name(&self.tokens[self.pos].kind);
+            self.diagnostics.push(Diagnostic::error(
+                format!("expected '[' for parameter list, found {}", desc),
+                open_span,
+            ));
+            return None;
+        }
+        self.pos += 1;
+
+        let mut params = Vec::new();
+
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightBracket)) {
+            let (name, name_span) = self.expect_symbol()?;
+
+            let type_ann = if self.check(|k| matches!(k, TokenKind::Colon)) {
+                self.pos += 1;
+                let t = self.parse_type()?;
+                Some(t)
+            } else {
+                None
+            };
+
+            let end = type_ann
+                .as_ref()
+                .map(|t| t.span().end)
+                .unwrap_or(name_span.end);
+            let span = Span::new(name_span.file, name_span.start, end);
+            params.push(Param {
+                name,
+                type_ann,
+                span,
+            });
+        }
+
+        self.expect_right_bracket(open_span)?;
+
+        Some(params)
+    }
+
+    fn parse_type(&mut self) -> Option<TypeExpr> {
+        if self.at_end() {
+            self.diagnostics.push(Diagnostic::error(
+                "expected type but reached end of input",
+                self.eof_span(),
+            ));
+            return None;
+        }
+
+        let span = self.tokens[self.pos].span;
+
+        match &self.tokens[self.pos].kind {
+            TokenKind::Symbol(name) => {
+                let name = name.clone();
+                self.pos += 1;
+                Some(TypeExpr::Named { name, span })
+            }
+            TokenKind::LeftParen => {
+                self.pos += 1;
+                self.parse_compound_type(span)
+            }
+            _ => {
+                let desc = token_kind_name(&self.tokens[self.pos].kind);
+                self.diagnostics.push(Diagnostic::error(
+                    format!("expected type, found {}", desc),
+                    span,
+                ));
+                None
+            }
+        }
+    }
+
+    fn parse_compound_type(&mut self, open_span: Span) -> Option<TypeExpr> {
+        if self.at_end() {
+            self.diagnostics.push(Diagnostic::error(
+                "expected type name but reached end of input",
+                self.eof_span(),
+            ));
+            return None;
+        }
+
+        let (name, _) = self.expect_symbol()?;
+
+        if name == "Fn" {
+            return self.parse_fn_type(open_span);
+        }
+
+        let mut args = Vec::new();
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightParen)) {
+            args.push(self.parse_type()?);
+        }
+
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(TypeExpr::Applied {
+            name,
+            args,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_fn_type(&mut self, open_span: Span) -> Option<TypeExpr> {
+        if self.at_end() {
+            self.diagnostics.push(Diagnostic::error(
+                "expected '[' for function type parameters but reached end of input",
+                self.eof_span(),
+            ));
+            return None;
+        }
+
+        let bracket_span = self.tokens[self.pos].span;
+        if !matches!(self.tokens[self.pos].kind, TokenKind::LeftBracket) {
+            let desc = token_kind_name(&self.tokens[self.pos].kind);
+            self.diagnostics.push(Diagnostic::error(
+                format!("expected '[' for function type parameters, found {}", desc),
+                bracket_span,
+            ));
+            return None;
+        }
+        self.pos += 1;
+
+        let mut params = Vec::new();
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightBracket)) {
+            params.push(self.parse_type()?);
+        }
+
+        self.expect_right_bracket(bracket_span)?;
+
+        let ret = self.parse_type()?;
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(TypeExpr::Function {
+            params,
+            ret: Box::new(ret),
             span: Span::new(open_span.file, open_span.start, close_span.end),
         })
     }
@@ -684,5 +856,164 @@ mod tests {
     fn error_if_missing_else() {
         let (_, diags) = parse_source("(if true 1)");
         assert!(!diags.is_empty());
+    }
+
+    #[test]
+    fn lambda_no_params() {
+        let (forms, diags) = parse_source("(fn [] 42)");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Lambda {
+            params,
+            return_type,
+            body,
+            ..
+        }) = &forms[0]
+        {
+            assert!(params.is_empty());
+            assert!(return_type.is_none());
+            assert_eq!(body.len(), 1);
+            assert!(matches!(&body[0], Expr::Int(42, _)));
+        } else {
+            panic!("expected lambda expression");
+        }
+    }
+
+    #[test]
+    fn lambda_with_params() {
+        let (forms, diags) = parse_source("(fn [x y] (+ x y))");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Lambda { params, body, .. }) = &forms[0] {
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0].name, "x");
+            assert!(params[0].type_ann.is_none());
+            assert_eq!(params[1].name, "y");
+            assert!(params[1].type_ann.is_none());
+            assert_eq!(body.len(), 1);
+        } else {
+            panic!("expected lambda expression");
+        }
+    }
+
+    #[test]
+    fn lambda_with_typed_params() {
+        let (forms, diags) = parse_source("(fn [x : Int y : Int] (+ x y))");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Lambda { params, .. }) = &forms[0] {
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0].name, "x");
+            assert!(
+                matches!(&params[0].type_ann, Some(TypeExpr::Named { name, .. }) if name == "Int")
+            );
+            assert_eq!(params[1].name, "y");
+            assert!(
+                matches!(&params[1].type_ann, Some(TypeExpr::Named { name, .. }) if name == "Int")
+            );
+        } else {
+            panic!("expected lambda expression");
+        }
+    }
+
+    #[test]
+    fn lambda_with_return_type() {
+        let (forms, diags) = parse_source("(fn [n : Int] : Int n)");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Lambda {
+            params,
+            return_type,
+            body,
+            ..
+        }) = &forms[0]
+        {
+            assert_eq!(params.len(), 1);
+            assert_eq!(params[0].name, "n");
+            assert!(matches!(return_type, Some(TypeExpr::Named { name, .. }) if name == "Int"));
+            assert_eq!(body.len(), 1);
+        } else {
+            panic!("expected lambda expression");
+        }
+    }
+
+    #[test]
+    fn lambda_multi_body() {
+        let (forms, diags) = parse_source("(fn [] (println 1) 42)");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Lambda { body, .. }) = &forms[0] {
+            assert_eq!(body.len(), 2);
+        } else {
+            panic!("expected lambda expression");
+        }
+    }
+
+    #[test]
+    fn lambda_spans() {
+        let (forms, _) = parse_source("(fn [] 42)");
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, 10);
+    }
+
+    #[test]
+    fn type_named() {
+        let (forms, diags) = parse_source("(fn [x : String] x)");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Lambda { params, .. }) = &forms[0] {
+            assert!(
+                matches!(&params[0].type_ann, Some(TypeExpr::Named { name, .. }) if name == "String")
+            );
+        } else {
+            panic!("expected lambda expression");
+        }
+    }
+
+    #[test]
+    fn type_applied() {
+        let (forms, diags) = parse_source("(fn [xs : (List Int)] xs)");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Lambda { params, .. }) = &forms[0] {
+            if let Some(TypeExpr::Applied { name, args, .. }) = &params[0].type_ann {
+                assert_eq!(name, "List");
+                assert_eq!(args.len(), 1);
+                assert!(matches!(&args[0], TypeExpr::Named { name, .. } if name == "Int"));
+            } else {
+                panic!("expected applied type");
+            }
+        } else {
+            panic!("expected lambda expression");
+        }
+    }
+
+    #[test]
+    fn type_function() {
+        let (forms, diags) = parse_source("(fn [f : (Fn [Int Int] Bool)] f)");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::Lambda { params, .. }) = &forms[0] {
+            if let Some(TypeExpr::Function {
+                params: tp, ret, ..
+            }) = &params[0].type_ann
+            {
+                assert_eq!(tp.len(), 2);
+                assert!(matches!(&tp[0], TypeExpr::Named { name, .. } if name == "Int"));
+                assert!(matches!(&tp[1], TypeExpr::Named { name, .. } if name == "Int"));
+                assert!(matches!(ret.as_ref(), TypeExpr::Named { name, .. } if name == "Bool"));
+            } else {
+                panic!("expected function type");
+            }
+        } else {
+            panic!("expected lambda expression");
+        }
+    }
+
+    #[test]
+    fn error_lambda_missing_bracket() {
+        let (_, diags) = parse_source("(fn x 42)");
+        assert!(!diags.is_empty());
+        assert!(diags[0].message.contains("'['"));
+    }
+
+    #[test]
+    fn error_type_unexpected() {
+        let (_, diags) = parse_source("(fn [x : 42] x)");
+        assert!(!diags.is_empty());
+        assert!(diags[0].message.contains("expected type"));
     }
 }

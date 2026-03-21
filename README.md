@@ -8,7 +8,7 @@ A statically typed Lisp for building MCP servers. The compiler is written in Rus
 
 ## Overview
 
-Vex uses S-expression syntax with compile-time type checking, targeting networked services — especially [MCP](https://modelcontextprotocol.io/) servers. The compiler pipeline (lexer → parser → type checker → codegen) produces Go source that `go build` compiles to a native binary.
+Vex uses S-expression syntax with compile-time type checking, targeting networked services — especially [MCP](https://modelcontextprotocol.io/) servers. The compiler pipeline (lexer → parser → macro expand → type checker → codegen) produces Go source that `go build` compiles to a native binary.
 
 ## Example
 

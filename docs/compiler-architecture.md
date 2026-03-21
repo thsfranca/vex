@@ -94,7 +94,7 @@ src/
   lexer.rs          Lexer struct, TokenKind enum, Token struct, lex() function
   ast.rs            Untyped AST: Expr, TopForm, Pattern, TypeExpr, Param, Field, etc.
   parser.rs         Parser struct, parse() function (tokens → AST)
-  expand.rs         expand() function (AST → AST), compiler-internal macros (cond, and, or)
+  macro_expand.rs   expand() function (AST → AST), compiler-internal macros (cond, and, or)
 
   hir.rs            Typed AST: mirrors ast.rs but every node has a resolved type
   types.rs          VexType enum (semantic types: Int, Float, Function, etc.), TypeEnv
@@ -105,7 +105,7 @@ src/
   interpreter.rs    eval() function (HIR → Value), for REPL
 ```
 
-13 files, each with a single responsibility.
+14 files, each with a single responsibility.
 
 The key split is `ast.rs` vs `hir.rs`, mirroring the Lexer→Parser boundary:
 
@@ -140,12 +140,12 @@ Strict layering, no cycles. `source.rs` at the bottom, `main.rs` at the top.
        │        │  types.rs
        │        │         │
        └────────┼─────────┘
-           ╱    │
-   expand.rs parser.rs
-       │    ╱       ╲
-       │ lexer.rs  ast.rs
-       │    │        │
-       └────┴────────┘
+            ╱   │
+macro_expand.rs parser.rs
+            ╱       ╲
+       lexer.rs    ast.rs
+            │        │
+            ┴────────┘
             │
      diagnostics.rs
             │
@@ -161,7 +161,7 @@ Precise per-file dependencies:
 | `lexer.rs` | `source`, `diagnostics` |
 | `ast.rs` | `source` |
 | `parser.rs` | `source`, `diagnostics`, `lexer`, `ast` |
-| `expand.rs` | `source`, `diagnostics`, `ast` |
+| `macro_expand.rs` | `source`, `ast` |
 | `types.rs` | `source` |
 | `hir.rs` | `source`, `types` |
 | `builtins.rs` | `types` |
@@ -226,12 +226,11 @@ fn parse(tokens: &[Token]) -> (Vec<ast::TopForm>, Vec<Diagnostic>)
 ### Macro Expansion
 
 ```
-fn expand(program: Vec<ast::TopForm>) -> (Vec<ast::TopForm>, Vec<Diagnostic>)
+fn expand(program: Vec<ast::TopForm>) -> Vec<ast::TopForm>
 ```
 
 - Rewrites compiler-internal macros (`cond` → nested `if`, `and`/`or` → `if` expressions)
 - Produces an AST with only primitive forms — no macro forms survive this phase
-- Diagnostics: malformed macro invocations (wrong arity, invalid syntax)
 - When user-defined macros (`defmacro`) are added, this phase expands those too
 
 ### Type Checker
@@ -622,7 +621,7 @@ Build bottom-up, one phase at a time, each immediately testable.
 | 2 | `lexer.rs` | Lexer | `lex()` tokenizes `(defn main [] (println "Hello, World!"))` into the correct token sequence. Tests assert token kinds, values, and spans. |
 | 3 | `ast.rs` | AST | All untyped AST node types (`Expr`, `TopForm`, `Param`, `TypeExpr`, etc.) are defined and can represent the hello world program. |
 | 4 | `parser.rs` | Parser | `parse()` converts hello world tokens into the expected AST. Tests assert the resulting tree structure by pattern-matching on nodes. |
-| 5 | `expand.rs` | Macro expansion | `expand()` rewrites compiler-internal macros (`cond` → nested `if`, `and`/`or` → `if`). Tests assert expanded AST matches expected primitive forms. |
+| 5 | `macro_expand.rs` | Macro expansion | `expand()` rewrites compiler-internal macros (`cond` → nested `if`, `and`/`or` → `if`). Tests assert expanded AST matches expected primitive forms. |
 | 6 | `types.rs`, `hir.rs`, `builtins.rs` | Type system | `VexType` enum covers all primitive and compound types. `hir::Module` mirrors the AST with resolved types. `BuiltinRegistry` contains `println` with its type signature. Unit tests pass. |
 | 7 | `typechecker.rs` | Type checker | `check()` transforms the expanded AST into a valid `hir::Module` where every node carries a resolved type. Tests assert HIR types and diagnostic output for invalid programs. |
 | 8 | `codegen.rs` | Codegen | `generate()` produces valid Go source from the hello world HIR. Tests assert the output contains `package main`, `func main()`, and the `fmt.Println` call. |
@@ -642,7 +641,7 @@ Planned PR sequence:
 | 2 | `lexer` | `lexer.rs` — tokenizer for hello world |
 | 3 | `ast` | `ast.rs` — untyped AST types |
 | 4 | `parser` | `parser.rs` — recursive descent parser |
-| 5 | `expand` | `expand.rs` — compiler-internal macro expansion (cond, and, or) |
+| 5 | `macro-expand` | `macro_expand.rs` — compiler-internal macro expansion (cond, and, or) |
 | 6 | `types-hir-builtins` | `types.rs` + `hir.rs` + `builtins.rs` — type representations and built-in registry |
 | 7 | `typechecker` | `typechecker.rs` — AST → HIR |
 | 8 | `codegen` | `codegen.rs` — HIR → Go source |
@@ -699,4 +698,3 @@ The following serve MCP server authors specifically and will be part of the futu
 | **Multi-file compilation** | `SourceMap` supports `FileId` from day one, but the pipeline processes one file at a time. |
 | **Error recovery in parser** | Stop at first error initially. Accumulate multiple errors later. |
 | **LSP / incremental compilation** | Not a concern at this stage. |
-| **REPL** | `interpreter.rs` is in the file structure but will be implemented after the compile path works. |

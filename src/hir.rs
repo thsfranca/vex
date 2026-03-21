@@ -1,5 +1,5 @@
 use crate::source::Span;
-use crate::types::{RecordField, VexType};
+use crate::types::{RecordField, UnionVariant, VexType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Param {
@@ -134,6 +134,12 @@ pub enum TopForm {
         span: Span,
     },
 
+    Defunion {
+        name: String,
+        variants: Vec<UnionVariant>,
+        span: Span,
+    },
+
     Expr(Expr),
 }
 
@@ -142,7 +148,8 @@ impl TopForm {
         match self {
             TopForm::Defn { span, .. }
             | TopForm::Def { span, .. }
-            | TopForm::Deftype { span, .. } => *span,
+            | TopForm::Deftype { span, .. }
+            | TopForm::Defunion { span, .. } => *span,
             TopForm::Expr(expr) => expr.span(),
         }
     }
@@ -447,5 +454,26 @@ mod tests {
             ty: VexType::String,
         };
         assert_eq!(desugared.ty(), &VexType::String);
+    }
+
+    #[test]
+    fn defunion_top_form() {
+        let form = TopForm::Defunion {
+            name: "Shape".into(),
+            variants: vec![
+                UnionVariant {
+                    name: "Circle".into(),
+                    types: vec![VexType::Float],
+                },
+                UnionVariant {
+                    name: "Rect".into(),
+                    types: vec![VexType::Float, VexType::Float],
+                },
+            ],
+            span: span(0, 50),
+        };
+        assert!(matches!(&form, TopForm::Defunion { name, variants, .. }
+            if name == "Shape" && variants.len() == 2));
+        assert_eq!(form.span(), span(0, 50));
     }
 }

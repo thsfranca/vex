@@ -427,6 +427,7 @@ pub fn go_type(ty: &VexType) -> String {
                 format!("func({}) {}", param_strs.join(", "), ret_str)
             }
         }
+        VexType::Record { name, .. } => vex_to_go_name(name),
         VexType::TypeVar(id) => format!("T{}", id),
     }
 }

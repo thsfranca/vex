@@ -152,6 +152,116 @@ The eventual MCP framework should allow declarations like:
 
 `deftool` is a macro that expands into JSON schema registration, handler wiring, and error wrapping — eliminating the boilerplate that plagues current MCP SDKs.
 
+### 4.5 Self-Hosted Macro Architecture
+
+User-defined macros (`defmacro`) are Vex functions that transform syntax at compile time. The compiler executes macro bodies using the existing tree-walking interpreter during the macro expansion phase.
+
+#### Execution Model
+
+The macro expansion phase sits between the parser and type checker. When it encounters a `defmacro` form, it type-checks the macro body and stores the resulting HIR. When it encounters a call to a defined macro, it evaluates the HIR via the interpreter and converts the result back to AST.
+
+```
+Source (.vx)
+    │
+    ▼
+┌─────────┐
+│  Lexer  │
+└────┬────┘
+     │ tokens
+     ▼
+┌─────────┐
+│ Parser  │    parses defmacro, quote, unquote, splice
+└────┬────┘
+     │ AST (includes DefMacro top forms, Quote/Unquote/Splice exprs)
+     ▼
+┌───────────────────────────────────────┐
+│         Macro Expansion              │
+│                                       │
+│  Pass 1: Collect defmacro forms       │
+│    → type-check body as              │
+│      (Fn [Syntax ...] Syntax)        │
+│    → store HIR in macro registry     │
+│                                       │
+│  Pass 2: Walk AST                    │
+│    → on macro call:                  │
+│      a. Convert args → Syntax values │
+│      b. Evaluate via interpreter     │
+│      c. Convert Syntax → AST        │
+│      d. Re-expand the result         │
+│    → apply compiler-internal macros  │
+│      (cond, and, or)                 │
+│                                       │
+└───────────────────┬───────────────────┘
+                    │ expanded AST (no defmacro, no macro calls)
+                    ▼
+            ┌──────────────┐
+            │ Type Checker │
+```
+
+#### The `Syntax` Type
+
+Macros operate on a built-in union type that represents Vex syntax as data:
+
+```
+(defunion Syntax
+  (SInt Int)
+  (SFloat Float)
+  (SStr String)
+  (SBool Bool)
+  (SNil)
+  (SSym String)
+  (SKw String)
+  (SList (List Syntax)))
+```
+
+The compiler provides `Syntax` as a built-in type (like `Option` and `Result`). Macro parameters receive `Syntax` values, and macro bodies return `Syntax` values.
+
+#### Quote and Unquote
+
+Three forms convert between code and `Syntax` data:
+
+- `(quote expr)` — converts syntax to a `Syntax` value without evaluating it
+- `(unquote expr)` — inside a `quote`, evaluates `expr` (must produce `Syntax`) and splices the result
+- `(splice expr)` — inside a `quote`, evaluates `expr` (must produce `(List Syntax)`) and splices each element
+
+Example:
+
+```
+(defmacro unless [test body]
+  (list (quote if) test (quote nil) body))
+
+;; (unless (> x 10) (println "small"))
+;; expands to:
+;; (if (> x 10) nil (println "small"))
+```
+
+#### Macro Helpers
+
+Built-in functions available to macro bodies for constructing and inspecting `Syntax` values:
+
+| Name | Type | Description |
+|------|------|-------------|
+| `list` | `(Fn [Syntax ...] Syntax)` | Construct an `SList` from arguments |
+| `cons` | `(Fn [Syntax Syntax] Syntax)` | Prepend an element to an `SList` |
+| `first` | `(Fn [Syntax] Syntax)` | First element of an `SList` |
+| `rest` | `(Fn [Syntax] Syntax)` | All but the first element of an `SList` |
+| `symbol?` | `(Fn [Syntax] Bool)` | Check if a value is an `SSym` |
+| `list?` | `(Fn [Syntax] Bool)` | Check if a value is an `SList` |
+| `concat` | `(Fn [Syntax Syntax] Syntax)` | Concatenate two `SList` values |
+
+#### Hygiene
+
+Macros are hygienic by default. The expander automatically renames all bindings introduced by the macro to unique names, preventing variable capture at the call site. The macro author does not need to manage name uniqueness.
+
+For example, the compiler-internal `or` macro introduces a temporary binding. With automatic hygiene, this binding receives a unique compiler-generated name that cannot conflict with user code.
+
+#### Constraints
+
+- Macros cannot reference other macros defined later in the same file — definition order matters
+- `defmacro` forms do not appear in the HIR or generated Go code — they exist only at compile time
+- Macros cannot access runtime values — they operate on syntax only
+- Macro expansion is iterative: expanded output is re-expanded until no macro calls remain (with a depth limit to detect infinite expansion)
+
 ---
 
 ## 5. Type System
@@ -923,6 +1033,20 @@ Distributed as a native Rust binary per platform:
 - Compiler complexity is better spent on the MCP framework
 - Testing is covered by Result types and dependency injection
 - If purity annotations are ever wanted, an opt-in `:pure` marker can be added later without breaking existing code
+
+### 11. User-defined macros — interpreter-based, hygienic
+
+- `defmacro` bodies are Vex code that transforms `Syntax` values at compile time
+- The existing tree-walking interpreter (`interpreter.rs`) executes macro bodies during the macro expansion phase — no Go compilation needed for macros
+- Alternatives rejected:
+  - **Compile-to-Go-and-exec** — compiling each macro to Go and running it as a subprocess adds seconds of latency and IPC complexity for every macro invocation
+  - **Two-phase compilation** — building a "macro plugin" binary first, then using it for expansion, adds toolchain complexity without proportional benefit
+- Hygiene is automatic — the expander renames macro-introduced bindings to unique names without macro author intervention
+  - Manual `gensym` was rejected: it shifts hygiene responsibility to the macro author, making accidental variable capture a common bug
+  - Automatic hygiene matches the design principle "Macros are hygienic" (§2.6) and follows Scheme's proven approach
+  - An escape hatch for intentional capture (anaphoric macros) can be added later without changing the default
+- `Syntax` is a built-in union type (like `Option` and `Result`) representing Vex syntax as data — macros are typed as `(Fn [Syntax ...] Syntax)`
+- Macros are erased after expansion — `defmacro` forms do not appear in the HIR or generated Go output
 
 ---
 

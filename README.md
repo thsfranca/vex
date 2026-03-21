@@ -25,11 +25,12 @@ vex build hello.vx              # Compile to ./hello binary
 vex build hello.vx -o server    # Custom output name
 vex build hello.vx --emit-go .  # Also write generated Go source
 vex run hello.vx                # Build and run immediately
+vex repl                        # Interactive REPL
 ```
 
 ## Current Status
 
-Tree-walking interpreter is implemented — evaluates typed HIR directly for instant feedback without the Go compile cycle.
+REPL is implemented — `vex repl` provides an interactive read-eval-print loop with multi-line input, persistent definitions, and instant feedback via the tree-walking interpreter.
 
 ### Compiler Phases
 
@@ -56,6 +57,7 @@ Tree-walking interpreter is implemented — evaluates typed HIR directly for ins
 - **Collections:** `each`, `range`, `map`, `filter`
 - **Modules:** `module`, `export`, `import`, Go interop (`import-go`)
 - **Concurrency:** `spawn`, `channel`, `send`, `recv`
+- **REPL:** interactive `vex repl` with multi-line input and persistent state
 - **Interpreter:** tree-walking HIR evaluator with all expression forms
 - **Operators:** arithmetic, comparison, logical
 - **Built-in functions:** `println`, `str`, `mod`

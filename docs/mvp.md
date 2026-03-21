@@ -75,9 +75,18 @@ Expected output: `1`, `2`, `Fizz`, `4`, `Buzz`, ..., `FizzBuzz`, ..., `Buzz` (10
 | `def` | `(def name expr)` | Top-level constant binding |
 | `let` | `(let [bindings] body)` | Local bindings with body |
 | `if` | `(if test then else)` | Conditional (three branches) |
-| `cond` | `(cond test1 body1 ... :else bodyN)` | Multi-branch conditional |
 | `fn` | `(fn [params] body)` | Anonymous function (lambda) |
 | Call | `(f arg1 arg2 ...)` | Function application |
+
+### Compiler-Internal Macros
+
+These forms are available to the user but expand to primitive forms before type checking:
+
+| Macro | Expansion | Description |
+|-------|-----------|-------------|
+| `cond` | Nested `if` | `(cond t1 v1 t2 v2 :else d)` → `(if t1 v1 (if t2 v2 d))` |
+| `&&` | `if` | `(&& a b)` → `(if a b false)` |
+| `\|\|` | `let` + `if` | `(\|\| a b)` → `(let [tmp a] (if tmp tmp b))` |
 
 ### Types
 
@@ -112,8 +121,6 @@ Function types `(Fn [T1 T2] R)` are supported for passing functions as values.
 | `>=` | `(Fn [Int Int] Bool)` | `(a >= b)` |
 | `=` | `(Fn [Int Int] Bool)` | `(a == b)` |
 | `!=` | `(Fn [Int Int] Bool)` | `(a != b)` |
-| `&&` | `(Fn [Bool Bool] Bool)` | `(a && b)` |
-| `\|\|` | `(Fn [Bool Bool] Bool)` | `(a \|\| b)` |
 | `not` | `(Fn [Bool] Bool)` | `!a` |
 | `println` | `(Fn [String] Unit)` | `fmt.Println(a)` |
 | `str` | `(Fn [Any...] String)` | `fmt.Sprint(args...)` |
@@ -141,7 +148,7 @@ Exit codes: `0` success, `1` compilation error, `2` Go build error, `3` CLI usag
 | Traits | Requires `deftype` first |
 | `Result` / `Option` | Requires `defunion` and pattern matching on ADTs |
 | Pattern matching (`match`) | Only useful with ADTs; `if`/`cond` cover MVP needs |
-| Macros | Entire subsystem deferred to post-MVP |
+| User-defined macros (`defmacro`) | Entire subsystem deferred to post-MVP; compiler-internal macros (`cond`, `&&`, `||`) are included |
 | Modules / imports | Single-file compilation only |
 | Go interop (`import-go`) | Not needed until stdlib work begins |
 | Concurrency (`spawn`, `channel`) | Requires runtime support beyond basic codegen |

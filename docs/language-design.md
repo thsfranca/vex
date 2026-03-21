@@ -893,7 +893,24 @@ Distributed as a native Rust binary per platform:
 - Non-tail recursive functions get a compiler warning about stack usage proportional to input size
 - Mutual tail recursion is **not** optimized — trampolining adds allocation overhead for a rare case in MCP code
 
-### 8. Effect system — no effect tracking
+### 8. Short-circuit operators — `&&` and `||` are macros
+
+- `&&` and `||` expand to `if` expressions during macro expansion:
+  - `(&& a b)` → `(if a b false)`
+  - `(|| a b)` → `(let [tmp a] (if tmp tmp b))`
+- This preserves short-circuit semantics in both the interpreter and compiled paths
+- Treating them as regular functions would evaluate both arguments eagerly — the interpreter would produce different behavior than the compiled output
+- The compiled path would accidentally short-circuit (Go's `&&`/`||` are lazy), but the interpreter would not — a silent correctness bug
+- Macros make the semantics explicit and consistent across execution modes
+
+### 9. `cond` is a macro over `if`
+
+- `cond` expands to nested `if` expressions during macro expansion:
+  - `(cond test1 val1 test2 val2 :else default)` → `(if test1 val1 (if test2 val2 default))`
+- The parser, AST, and type checker do not need to know `cond` exists — it is gone before type checking
+- `defn` remains a special form (not a macro) because it is the most common form in Vex programs, and first-class parser support produces better error messages
+
+### 10. Effect system — no effect tracking
 
 - Side effects are not tracked in the type system
 - MCP servers are inherently effectful — nearly every function does I/O, so effect annotations would be noise

@@ -76,6 +76,27 @@ impl VexType {
         }
     }
 
+    pub fn resolve_vars(&self, target: &VexType) -> VexType {
+        match (self, target) {
+            (VexType::TypeVar(_), concrete) => concrete.clone(),
+            (VexType::Option(a), VexType::Option(b)) => {
+                VexType::Option(Box::new(a.resolve_vars(b)))
+            }
+            (
+                VexType::Result {
+                    ok: oa, err: ea, ..
+                },
+                VexType::Result {
+                    ok: ob, err: eb, ..
+                },
+            ) => VexType::Result {
+                ok: Box::new(oa.resolve_vars(ob)),
+                err: Box::new(ea.resolve_vars(eb)),
+            },
+            _ => self.clone(),
+        }
+    }
+
     pub fn field_type(&self, field_name: &str) -> Option<&VexType> {
         match self {
             VexType::Record { fields, .. } => {

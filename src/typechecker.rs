@@ -252,8 +252,8 @@ impl Checker {
             return None;
         }
 
-        let checked_then = self.check_expr(then_branch)?;
-        let checked_else = self.check_expr(else_branch)?;
+        let mut checked_then = self.check_expr(then_branch)?;
+        let mut checked_else = self.check_expr(else_branch)?;
 
         let ty = match VexType::types_compatible(checked_then.ty(), checked_else.ty()) {
             Some(merged) => merged,
@@ -269,6 +269,9 @@ impl Checker {
                 return None;
             }
         };
+
+        resolve_expr_type_vars(&mut checked_then, &ty);
+        resolve_expr_type_vars(&mut checked_else, &ty);
 
         Some(hir::Expr::If {
             test: Box::new(checked_test),
@@ -478,7 +481,7 @@ impl Checker {
             self.env.define(param.name.clone(), param.ty.clone());
         }
 
-        let checked_body = self.check_body(body)?;
+        let mut checked_body = self.check_body(body)?;
         let body_ty = checked_body
             .last()
             .map(|e| e.ty().clone())
@@ -489,7 +492,12 @@ impl Checker {
         let ret_ty = if let Some(ret_ann) = return_type {
             let declared = self.resolve_type(ret_ann)?;
             match VexType::types_compatible(&declared, &body_ty) {
-                Some(merged) => merged,
+                Some(merged) => {
+                    if let Some(last) = checked_body.last_mut() {
+                        resolve_expr_type_vars(last, &merged);
+                    }
+                    merged
+                }
                 None => {
                     self.diagnostics.push(Diagnostic::error(
                         format!(
@@ -563,13 +571,16 @@ impl Checker {
         for clause in clauses {
             self.env.push_scope();
             let checked_pattern = self.check_pattern(&clause.pattern, &scrutinee_ty)?;
-            let checked_body = self.check_expr(&clause.body)?;
+            let mut checked_body = self.check_expr(&clause.body)?;
             let body_ty = checked_body.ty().clone();
             self.env.pop_scope();
 
             if let Some(ref expected) = result_ty {
                 match VexType::types_compatible(&body_ty, expected) {
-                    Some(merged) => result_ty = Some(merged),
+                    Some(merged) => {
+                        resolve_expr_type_vars(&mut checked_body, &merged);
+                        result_ty = Some(merged);
+                    }
                     None => {
                         self.diagnostics.push(Diagnostic::error(
                             format!(
@@ -1087,7 +1098,7 @@ impl Checker {
             self.env.define(param.name.clone(), param.ty.clone());
         }
 
-        let checked_body = self.check_body(body)?;
+        let mut checked_body = self.check_body(body)?;
         let body_ty = checked_body
             .last()
             .map(|e| e.ty().clone())
@@ -1097,7 +1108,12 @@ impl Checker {
 
         let ret_ty = if let Some(declared) = ret_ty_from_ann {
             match VexType::types_compatible(&declared, &body_ty) {
-                Some(merged) => merged,
+                Some(merged) => {
+                    if let Some(last) = checked_body.last_mut() {
+                        resolve_expr_type_vars(last, &merged);
+                    }
+                    merged
+                }
                 None => {
                     self.diagnostics.push(Diagnostic::error(
                         format!(
@@ -1252,6 +1268,40 @@ impl Checker {
                 span,
             } => self.check_defunion(name, variants, *span),
         }
+    }
+}
+
+fn resolve_expr_type_vars(expr: &mut hir::Expr, target: &VexType) {
+    match expr {
+        hir::Expr::VariantConstructor { ty, args, .. } => {
+            *ty = ty.resolve_vars(target);
+            for arg in args {
+                resolve_expr_type_vars(arg, target);
+            }
+        }
+        hir::Expr::If {
+            then_branch,
+            else_branch,
+            ty,
+            ..
+        } => {
+            *ty = ty.resolve_vars(target);
+            resolve_expr_type_vars(then_branch, target);
+            resolve_expr_type_vars(else_branch, target);
+        }
+        hir::Expr::Let { body, ty, .. } => {
+            *ty = ty.resolve_vars(target);
+            if let Some(last) = body.last_mut() {
+                resolve_expr_type_vars(last, target);
+            }
+        }
+        hir::Expr::Match { clauses, ty, .. } => {
+            *ty = ty.resolve_vars(target);
+            for clause in clauses {
+                resolve_expr_type_vars(&mut clause.body, target);
+            }
+        }
+        _ => {}
     }
 }
 

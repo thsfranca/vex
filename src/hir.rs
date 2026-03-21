@@ -17,6 +17,30 @@ pub struct Binding {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Pattern {
+    Wildcard(Span),
+    Binding {
+        name: String,
+        ty: VexType,
+        span: Span,
+    },
+    Literal(Box<Expr>),
+    Constructor {
+        union_name: String,
+        variant_name: String,
+        bindings: Vec<Pattern>,
+        span: Span,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchClause {
+    pub pattern: Pattern,
+    pub body: Expr,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Int(i64, Span),
     Float(f64, Span),
@@ -73,6 +97,13 @@ pub enum Expr {
         span: Span,
         ty: VexType,
     },
+
+    Match {
+        scrutinee: Box<Expr>,
+        clauses: Vec<MatchClause>,
+        span: Span,
+        ty: VexType,
+    },
 }
 
 impl Expr {
@@ -89,7 +120,8 @@ impl Expr {
             | Expr::Lambda { span, .. }
             | Expr::Call { span, .. }
             | Expr::FieldAccess { span, .. }
-            | Expr::RecordConstructor { span, .. } => *span,
+            | Expr::RecordConstructor { span, .. }
+            | Expr::Match { span, .. } => *span,
         }
     }
 
@@ -106,7 +138,8 @@ impl Expr {
             | Expr::Lambda { ty, .. }
             | Expr::Call { ty, .. }
             | Expr::FieldAccess { ty, .. }
-            | Expr::RecordConstructor { ty, .. } => ty,
+            | Expr::RecordConstructor { ty, .. }
+            | Expr::Match { ty, .. } => ty,
         }
     }
 }
@@ -475,5 +508,42 @@ mod tests {
         assert!(matches!(&form, TopForm::Defunion { name, variants, .. }
             if name == "Shape" && variants.len() == 2));
         assert_eq!(form.span(), span(0, 50));
+    }
+
+    #[test]
+    fn match_type() {
+        let expr = Expr::Match {
+            scrutinee: Box::new(Expr::Var {
+                name: "x".into(),
+                span: span(7, 8),
+                ty: VexType::Int,
+            }),
+            clauses: vec![MatchClause {
+                pattern: Pattern::Wildcard(span(9, 10)),
+                body: Expr::Int(0, span(11, 12)),
+                span: span(9, 12),
+            }],
+            span: span(0, 13),
+            ty: VexType::Int,
+        };
+        assert_eq!(expr.ty(), &VexType::Int);
+        assert_eq!(expr.span(), span(0, 13));
+    }
+
+    #[test]
+    fn match_constructor_pattern() {
+        let pattern = Pattern::Constructor {
+            union_name: "Option".into(),
+            variant_name: "Some".into(),
+            bindings: vec![Pattern::Binding {
+                name: "x".into(),
+                ty: VexType::Int,
+                span: span(6, 7),
+            }],
+            span: span(0, 8),
+        };
+        assert!(
+            matches!(&pattern, Pattern::Constructor { variant_name, .. } if variant_name == "Some")
+        );
     }
 }

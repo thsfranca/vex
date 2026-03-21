@@ -1,0 +1,7 @@
+(module myapp)
+(import math [add sub double])
+
+(defn main []
+  (println (str "3 + 4 = " (add 3 4)))
+  (println (str "10 - 3 = " (sub 10 3)))
+  (println (str "double 5 = " (double 5))))

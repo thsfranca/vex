@@ -226,6 +226,10 @@ impl<'a> Parser<'a> {
             return None;
         }
 
+        if self.check(|k| matches!(k, TokenKind::Dot)) {
+            return self.parse_field_access(open_span);
+        }
+
         if let Some(TokenKind::Symbol(name)) = self.tokens.get(self.pos).map(|t| &t.kind) {
             match name.as_str() {
                 "if" => return self.parse_if(open_span),
@@ -380,6 +384,20 @@ impl<'a> Parser<'a> {
             params,
             return_type,
             body,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_field_access(&mut self, open_span: Span) -> Option<Expr> {
+        self.pos += 1;
+
+        let object = self.parse_expr()?;
+        let (field, _) = self.expect_symbol()?;
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(Expr::FieldAccess {
+            object: Box::new(object),
+            field,
             span: Span::new(open_span.file, open_span.start, close_span.end),
         })
     }
@@ -1439,5 +1457,39 @@ mod tests {
         let (_, diags) = parse_source("(deftype Foo x)");
         assert!(!diags.is_empty());
         assert!(diags[0].message.contains("'('"));
+    }
+
+    #[test]
+    fn field_access_simple() {
+        let (forms, diags) = parse_source("(. point x)");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Expr(Expr::FieldAccess { object, field, .. }) = &forms[0] {
+            assert!(matches!(object.as_ref(), Expr::Symbol(s, _) if s == "point"));
+            assert_eq!(field, "x");
+        } else {
+            panic!("expected field access expression");
+        }
+    }
+
+    #[test]
+    fn field_access_nested() {
+        let (forms, diags) = parse_source("(. (. line start) x)");
+        assert!(diags.is_empty());
+        if let TopForm::Expr(Expr::FieldAccess { object, field, .. }) = &forms[0] {
+            assert!(matches!(object.as_ref(), Expr::FieldAccess { .. }));
+            assert_eq!(field, "x");
+        } else {
+            panic!("expected field access expression");
+        }
+    }
+
+    #[test]
+    fn field_access_spans() {
+        let src = "(. point x)";
+        let (forms, _) = parse_source(src);
+        let span = forms[0].span();
+        assert_eq!(span.start, 0);
+        assert_eq!(span.end, src.len() as u32);
     }
 }

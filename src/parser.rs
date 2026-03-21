@@ -139,6 +139,21 @@ impl<'a> Parser<'a> {
             && let Some(TokenKind::Symbol(name)) = self.tokens.get(self.pos + 1).map(|t| &t.kind)
         {
             match name.as_str() {
+                "module" => {
+                    let open_span = self.tokens[self.pos].span;
+                    self.pos += 1;
+                    return self.parse_module(open_span);
+                }
+                "export" => {
+                    let open_span = self.tokens[self.pos].span;
+                    self.pos += 1;
+                    return self.parse_export(open_span);
+                }
+                "import" => {
+                    let open_span = self.tokens[self.pos].span;
+                    self.pos += 1;
+                    return self.parse_import(open_span);
+                }
                 "defn" => {
                     let open_span = self.tokens[self.pos].span;
                     self.pos += 1;
@@ -165,6 +180,106 @@ impl<'a> Parser<'a> {
 
         let expr = self.parse_expr()?;
         Some(TopForm::Expr(expr))
+    }
+
+    fn parse_qualified_id(&mut self) -> Option<(String, Span)> {
+        let (first, start_span) = self.expect_symbol()?;
+        let mut name = first;
+        let mut end_span = start_span;
+
+        while self.check(|k| matches!(k, TokenKind::Dot)) {
+            self.pos += 1;
+            let (part, part_span) = self.expect_symbol()?;
+            name.push('.');
+            name.push_str(&part);
+            end_span = part_span;
+        }
+
+        Some((
+            name,
+            Span::new(start_span.file, start_span.start, end_span.end),
+        ))
+    }
+
+    fn parse_module(&mut self, open_span: Span) -> Option<TopForm> {
+        self.pos += 1;
+
+        let (name, _) = self.parse_qualified_id()?;
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(TopForm::Module {
+            name,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_export(&mut self, open_span: Span) -> Option<TopForm> {
+        self.pos += 1;
+
+        if self.at_end() || !self.check(|k| matches!(k, TokenKind::LeftBracket)) {
+            let span = if self.at_end() {
+                self.eof_span()
+            } else {
+                self.tokens[self.pos].span
+            };
+            self.diagnostics.push(Diagnostic::error(
+                "expected '[' for export symbol list",
+                span,
+            ));
+            return None;
+        }
+        let bracket_span = self.tokens[self.pos].span;
+        self.pos += 1;
+
+        let mut symbols = Vec::new();
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightBracket)) {
+            let (sym, _) = self.expect_symbol()?;
+            symbols.push(sym);
+        }
+
+        self.expect_right_bracket(bracket_span)?;
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(TopForm::Export {
+            symbols,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
+    }
+
+    fn parse_import(&mut self, open_span: Span) -> Option<TopForm> {
+        self.pos += 1;
+
+        let (module_path, _) = self.parse_qualified_id()?;
+
+        if self.at_end() || !self.check(|k| matches!(k, TokenKind::LeftBracket)) {
+            let span = if self.at_end() {
+                self.eof_span()
+            } else {
+                self.tokens[self.pos].span
+            };
+            self.diagnostics.push(Diagnostic::error(
+                "expected '[' for import symbol list",
+                span,
+            ));
+            return None;
+        }
+        let bracket_span = self.tokens[self.pos].span;
+        self.pos += 1;
+
+        let mut symbols = Vec::new();
+        while !self.at_end() && !self.check(|k| matches!(k, TokenKind::RightBracket)) {
+            let (sym, _) = self.expect_symbol()?;
+            symbols.push(sym);
+        }
+
+        self.expect_right_bracket(bracket_span)?;
+        let close_span = self.expect_right_paren(open_span)?;
+
+        Some(TopForm::Import {
+            module_path,
+            symbols,
+            span: Span::new(open_span.file, open_span.start, close_span.end),
+        })
     }
 
     fn parse_expr(&mut self) -> Option<Expr> {
@@ -1774,6 +1889,113 @@ mod tests {
     fn error_match_no_clauses() {
         let source = "(match x)";
         let (_, diags) = parse_source(source);
+        assert!(!diags.is_empty());
+    }
+
+    #[test]
+    fn module_simple() {
+        let (forms, diags) = parse_source("(module myapp)");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        assert!(matches!(&forms[0], TopForm::Module { name, .. } if name == "myapp"));
+    }
+
+    #[test]
+    fn module_qualified() {
+        let (forms, diags) = parse_source("(module vex.http.server)");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        assert!(matches!(&forms[0], TopForm::Module { name, .. } if name == "vex.http.server"));
+    }
+
+    #[test]
+    fn export_symbols() {
+        let (forms, diags) = parse_source("(export [foo bar baz])");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Export { symbols, .. } = &forms[0] {
+            assert_eq!(symbols, &["foo", "bar", "baz"]);
+        } else {
+            panic!("expected Export");
+        }
+    }
+
+    #[test]
+    fn export_empty() {
+        let (forms, diags) = parse_source("(export [])");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Export { symbols, .. } = &forms[0] {
+            assert!(symbols.is_empty());
+        } else {
+            panic!("expected Export");
+        }
+    }
+
+    #[test]
+    fn import_simple() {
+        let (forms, diags) = parse_source("(import math [add sub])");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Import {
+            module_path,
+            symbols,
+            ..
+        } = &forms[0]
+        {
+            assert_eq!(module_path, "math");
+            assert_eq!(symbols, &["add", "sub"]);
+        } else {
+            panic!("expected Import");
+        }
+    }
+
+    #[test]
+    fn import_qualified() {
+        let (forms, diags) = parse_source("(import vex.http [get post])");
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 1);
+        if let TopForm::Import {
+            module_path,
+            symbols,
+            ..
+        } = &forms[0]
+        {
+            assert_eq!(module_path, "vex.http");
+            assert_eq!(symbols, &["get", "post"]);
+        } else {
+            panic!("expected Import");
+        }
+    }
+
+    #[test]
+    fn module_export_import_together() {
+        let source = r#"
+(module myapp)
+(export [main])
+(import math [add])
+(defn main [] (add 1 2))
+"#;
+        let (forms, diags) = parse_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(forms.len(), 4);
+        assert!(matches!(&forms[0], TopForm::Module { name, .. } if name == "myapp"));
+        assert!(matches!(&forms[1], TopForm::Export { symbols, .. } if symbols == &["main"]));
+        assert!(
+            matches!(&forms[2], TopForm::Import { module_path, symbols, .. } if module_path == "math" && symbols == &["add"])
+        );
+        assert!(matches!(&forms[3], TopForm::Defn { name, .. } if name == "main"));
+    }
+
+    #[test]
+    fn error_export_no_bracket() {
+        let (_, diags) = parse_source("(export foo)");
+        assert!(!diags.is_empty());
+    }
+
+    #[test]
+    fn error_import_no_bracket() {
+        let (_, diags) = parse_source("(import math foo)");
         assert!(!diags.is_empty());
     }
 }

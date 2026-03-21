@@ -74,6 +74,9 @@ impl Generator {
 
     fn emit_top_form(&mut self, form: &hir::TopForm) {
         match form {
+            hir::TopForm::Module { .. }
+            | hir::TopForm::Export { .. }
+            | hir::TopForm::Import { .. } => {}
             hir::TopForm::Defn {
                 name,
                 params,
@@ -1047,6 +1050,8 @@ fn collect_builtin_calls_expr(expr: &hir::Expr, names: &mut Vec<String>) {
 
 fn collect_builtin_calls_top_form(form: &hir::TopForm, names: &mut Vec<String>) {
     match form {
+        hir::TopForm::Module { .. } | hir::TopForm::Export { .. } | hir::TopForm::Import { .. } => {
+        }
         hir::TopForm::Defn { body, .. } => {
             for expr in body {
                 collect_builtin_calls_expr(expr, names);

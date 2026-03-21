@@ -1,0 +1,7 @@
+(defmacro and [a b]
+  (list (quote if) a b (quote false)))
+
+(defmacro or [a b]
+  (list (quote let)
+    (list (quote tmp) a)
+    (list (quote if) (quote tmp) (quote tmp) b)))

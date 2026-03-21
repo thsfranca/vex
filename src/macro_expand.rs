@@ -3,10 +3,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::ast::{self, Binding, Expr, TopForm};
 use crate::diagnostics::Diagnostic;
-use crate::source::Span;
+use crate::lexer;
+use crate::parser;
+use crate::source::{FileId, Span};
 use crate::types::{SyntaxValue, expr_to_syntax, syntax_to_expr};
 
 const MAX_EXPANSION_DEPTH: usize = 64;
+const PRELUDE_SOURCE: &str = include_str!("prelude.vx");
 
 static GENSYM_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -36,9 +39,31 @@ fn macro_val_to_syntax(val: &MacroVal) -> SyntaxValue {
     }
 }
 
+fn load_prelude(registry: &mut HashMap<String, MacroDef>) {
+    let prelude_file = FileId::new(u32::MAX);
+    let (tokens, _) = lexer::lex(PRELUDE_SOURCE, prelude_file);
+    let (forms, _) = parser::parse(&tokens);
+    for form in forms {
+        if let TopForm::DefMacro {
+            name, params, body, ..
+        } = form
+        {
+            registry.insert(
+                name,
+                MacroDef {
+                    params: params.into_iter().map(|p| p.name).collect(),
+                    body,
+                },
+            );
+        }
+    }
+}
+
 pub fn expand(program: Vec<TopForm>) -> (Vec<TopForm>, Vec<Diagnostic>) {
     let mut registry: HashMap<String, MacroDef> = HashMap::new();
     let mut diagnostics = Vec::new();
+
+    load_prelude(&mut registry);
 
     for form in &program {
         if let TopForm::DefMacro {
@@ -124,55 +149,45 @@ fn expand_expr(
         } => expand_cond(clauses, else_body, span, registry, diagnostics, depth),
 
         Expr::Call { func, args, span } => {
-            if let Expr::Symbol(ref name, _) = *func {
-                match name.as_str() {
-                    "and" if args.len() == 2 => {
-                        return expand_and(args, span, registry, diagnostics, depth);
-                    }
-                    "or" if args.len() == 2 => {
-                        return expand_or(args, span, registry, diagnostics, depth);
-                    }
-                    _ => {
-                        if let Some(macro_def) = registry.get(name.as_str()) {
-                            if args.len() != macro_def.params.len() {
-                                diagnostics.push(Diagnostic::error(
-                                    format!(
-                                        "macro '{}' expects {} arguments, got {}",
-                                        name,
-                                        macro_def.params.len(),
-                                        args.len()
-                                    ),
-                                    span,
-                                ));
-                                return Expr::Nil(span);
-                            }
+            if let Expr::Symbol(ref name, _) = *func
+                && let Some(macro_def) = registry.get(name.as_str())
+            {
+                if args.len() != macro_def.params.len() {
+                    diagnostics.push(Diagnostic::error(
+                        format!(
+                            "macro '{}' expects {} arguments, got {}",
+                            name,
+                            macro_def.params.len(),
+                            args.len()
+                        ),
+                        span,
+                    ));
+                    return Expr::Nil(span);
+                }
 
-                            let mut env: HashMap<String, MacroVal> = HashMap::new();
-                            for (param, arg) in macro_def.params.iter().zip(args.iter()) {
-                                env.insert(param.clone(), MacroVal::CallSite(expr_to_syntax(arg)));
-                            }
+                let mut env: HashMap<String, MacroVal> = HashMap::new();
+                for (param, arg) in macro_def.params.iter().zip(args.iter()) {
+                    env.insert(param.clone(), MacroVal::CallSite(expr_to_syntax(arg)));
+                }
 
-                            let mut result = MacroVal::Intro(SyntaxValue::Nil);
-                            for body_expr in &macro_def.body {
-                                match eval_macro_expr(body_expr, &env) {
-                                    Ok(val) => result = val,
-                                    Err(msg) => {
-                                        diagnostics.push(Diagnostic::error(
-                                            format!("macro expansion error: {}", msg),
-                                            span,
-                                        ));
-                                        return Expr::Nil(span);
-                                    }
-                                }
-                            }
-
-                            let renamed = rename_in_macro_val(result);
-                            let result_syntax = macro_val_to_syntax(&renamed);
-                            let expanded_ast = syntax_to_expr(&result_syntax, span);
-                            return expand_expr(expanded_ast, registry, diagnostics, depth + 1);
+                let mut result = MacroVal::Intro(SyntaxValue::Nil);
+                for body_expr in &macro_def.body {
+                    match eval_macro_expr(body_expr, &env) {
+                        Ok(val) => result = val,
+                        Err(msg) => {
+                            diagnostics.push(Diagnostic::error(
+                                format!("macro expansion error: {}", msg),
+                                span,
+                            ));
+                            return Expr::Nil(span);
                         }
                     }
                 }
+
+                let renamed = rename_in_macro_val(result);
+                let result_syntax = macro_val_to_syntax(&renamed);
+                let expanded_ast = syntax_to_expr(&result_syntax, span);
+                return expand_expr(expanded_ast, registry, diagnostics, depth + 1);
             }
             Expr::Call {
                 func: Box::new(expand_expr(*func, registry, diagnostics, depth)),
@@ -675,49 +690,6 @@ fn expand_cond(
     result
 }
 
-fn expand_and(
-    mut args: Vec<Expr>,
-    span: Span,
-    registry: &HashMap<String, MacroDef>,
-    diagnostics: &mut Vec<Diagnostic>,
-    depth: usize,
-) -> Expr {
-    let b = expand_expr(args.pop().unwrap(), registry, diagnostics, depth);
-    let a = expand_expr(args.pop().unwrap(), registry, diagnostics, depth);
-    Expr::If {
-        test: Box::new(a),
-        then_branch: Box::new(b),
-        else_branch: Box::new(Expr::Bool(false, span)),
-        span,
-    }
-}
-
-fn expand_or(
-    mut args: Vec<Expr>,
-    span: Span,
-    registry: &HashMap<String, MacroDef>,
-    diagnostics: &mut Vec<Diagnostic>,
-    depth: usize,
-) -> Expr {
-    let b = expand_expr(args.pop().unwrap(), registry, diagnostics, depth);
-    let a = expand_expr(args.pop().unwrap(), registry, diagnostics, depth);
-    let tmp_name = "__or_tmp".to_string();
-    Expr::Let {
-        bindings: vec![Binding {
-            name: tmp_name.clone(),
-            value: a,
-            span,
-        }],
-        body: vec![Expr::If {
-            test: Box::new(Expr::Symbol(tmp_name.clone(), span)),
-            then_branch: Box::new(Expr::Symbol(tmp_name, span)),
-            else_branch: Box::new(b),
-            span,
-        }],
-        span,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -841,7 +813,12 @@ mod tests {
         assert!(diags.is_empty());
         if let TopForm::Expr(Expr::Let { bindings, body, .. }) = &result[0] {
             assert_eq!(bindings.len(), 1);
-            assert_eq!(bindings[0].name, "__or_tmp");
+            assert!(
+                bindings[0].name.starts_with("__tmp_"),
+                "expected hygienic tmp name, got: {}",
+                bindings[0].name
+            );
+            let tmp_name = &bindings[0].name;
             assert!(matches!(&bindings[0].value, Expr::Symbol(s, _) if s == "a"));
 
             assert_eq!(body.len(), 1);
@@ -852,8 +829,8 @@ mod tests {
                 ..
             } = &body[0]
             {
-                assert!(matches!(test.as_ref(), Expr::Symbol(s, _) if s == "__or_tmp"));
-                assert!(matches!(then_branch.as_ref(), Expr::Symbol(s, _) if s == "__or_tmp"));
+                assert!(matches!(test.as_ref(), Expr::Symbol(s, _) if s == tmp_name));
+                assert!(matches!(then_branch.as_ref(), Expr::Symbol(s, _) if s == tmp_name));
                 assert!(matches!(else_branch.as_ref(), Expr::Symbol(s, _) if s == "b"));
             } else {
                 panic!("expected if in let body");

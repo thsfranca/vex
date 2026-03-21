@@ -91,6 +91,12 @@ pub enum Expr {
         args: Vec<Expr>,
         span: Span,
     },
+
+    FieldAccess {
+        object: Box<Expr>,
+        field: String,
+        span: Span,
+    },
 }
 
 impl Expr {
@@ -107,7 +113,8 @@ impl Expr {
             | Expr::Cond { span, .. }
             | Expr::Let { span, .. }
             | Expr::Lambda { span, .. }
-            | Expr::Call { span, .. } => *span,
+            | Expr::Call { span, .. }
+            | Expr::FieldAccess { span, .. } => *span,
         }
     }
 }
@@ -256,6 +263,20 @@ mod tests {
             assert_eq!(params[0].name, "n");
             assert!(params[0].type_ann.is_some());
             assert_eq!(body.len(), 1);
+        }
+    }
+
+    #[test]
+    fn field_access_expr() {
+        let expr = Expr::FieldAccess {
+            object: Box::new(Expr::Symbol("point".into(), span(3, 8))),
+            field: "x".into(),
+            span: span(0, 11),
+        };
+        assert_eq!(expr.span(), span(0, 11));
+        if let Expr::FieldAccess { object, field, .. } = &expr {
+            assert!(matches!(object.as_ref(), Expr::Symbol(s, _) if s == "point"));
+            assert_eq!(field, "x");
         }
     }
 

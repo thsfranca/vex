@@ -65,6 +65,7 @@ impl Checker {
                 body,
                 span,
             } => self.check_lambda(params, return_type.as_ref(), body, *span),
+            ast::Expr::FieldAccess { .. } => None,
         }
     }
 

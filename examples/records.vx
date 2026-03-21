@@ -1,0 +1,10 @@
+(deftype Point (x Float) (y Float))
+
+(defn distance [p : Point] : String
+  (str "(" (. p x) ", " (. p y) ")"))
+
+(defn main []
+  (let [origin (Point 0.0 0.0)
+        target (Point 3.0 4.0)]
+    (println (str "origin = " (distance origin)))
+    (println (str "target = " (distance target)))))

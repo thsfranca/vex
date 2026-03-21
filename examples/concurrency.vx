@@ -1,0 +1,5 @@
+(defn main []
+  (let [ch (channel Int)]
+    (spawn
+      (send ch 42))
+    (println (str "received: " (recv ch)))))

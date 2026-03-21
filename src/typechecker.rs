@@ -3,10 +3,11 @@ use crate::builtins;
 use crate::diagnostics::Diagnostic;
 use crate::hir;
 use crate::source::Span;
-use crate::types::{TypeEnv, VexType};
+use crate::types::{RecordField, TypeEnv, VexType};
 
 struct Checker {
     env: TypeEnv,
+    type_defs: std::collections::HashMap<String, VexType>,
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -18,6 +19,7 @@ impl Checker {
         }
         Self {
             env,
+            type_defs: std::collections::HashMap::new(),
             diagnostics: Vec::new(),
         }
     }
@@ -248,9 +250,13 @@ impl Checker {
                 "String" => Some(VexType::String),
                 "Unit" => Some(VexType::Unit),
                 _ => {
-                    self.diagnostics
-                        .push(Diagnostic::error(format!("unknown type '{}'", name), *span));
-                    None
+                    if let Some(ty) = self.type_defs.get(name) {
+                        Some(ty.clone())
+                    } else {
+                        self.diagnostics
+                            .push(Diagnostic::error(format!("unknown type '{}'", name), *span));
+                        None
+                    }
                 }
             },
             ast::TypeExpr::Function { params, ret, .. } => {
@@ -566,6 +572,35 @@ impl Checker {
         })
     }
 
+    fn check_deftype(
+        &mut self,
+        name: &str,
+        fields: &[ast::Field],
+        span: Span,
+    ) -> Option<hir::TopForm> {
+        let mut record_fields = Vec::new();
+        for field in fields {
+            let ty = self.resolve_type(&field.type_expr)?;
+            record_fields.push(RecordField {
+                name: field.name.clone(),
+                ty,
+            });
+        }
+
+        let record_type = VexType::Record {
+            name: name.to_string(),
+            fields: record_fields.clone(),
+        };
+
+        self.type_defs.insert(name.to_string(), record_type);
+
+        Some(hir::TopForm::Deftype {
+            name: name.to_string(),
+            fields: record_fields,
+            span,
+        })
+    }
+
     fn check_top_form(&mut self, form: &ast::TopForm) -> Option<hir::TopForm> {
         match form {
             ast::TopForm::Expr(expr) => {
@@ -585,7 +620,7 @@ impl Checker {
                 value,
                 span,
             } => self.check_def(name, type_ann.as_ref(), value, *span),
-            ast::TopForm::Deftype { .. } => None,
+            ast::TopForm::Deftype { name, fields, span } => self.check_deftype(name, fields, *span),
         }
     }
 }
@@ -1153,6 +1188,78 @@ mod tests {
             assert_eq!(return_type, &VexType::String);
         } else {
             panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn deftype_simple() {
+        let source = "(deftype Point (x Float) (y Float))";
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 1);
+        if let hir::TopForm::Deftype { name, fields, .. } = &module.top_forms[0] {
+            assert_eq!(name, "Point");
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name, "x");
+            assert_eq!(fields[0].ty, VexType::Float);
+            assert_eq!(fields[1].name, "y");
+            assert_eq!(fields[1].ty, VexType::Float);
+        } else {
+            panic!("expected deftype");
+        }
+    }
+
+    #[test]
+    fn deftype_multiple_field_types() {
+        let source = "(deftype Config (name String) (count Int) (active Bool))";
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        if let hir::TopForm::Deftype { fields, .. } = &module.top_forms[0] {
+            assert_eq!(fields.len(), 3);
+            assert_eq!(fields[0].ty, VexType::String);
+            assert_eq!(fields[1].ty, VexType::Int);
+            assert_eq!(fields[2].ty, VexType::Bool);
+        } else {
+            panic!("expected deftype");
+        }
+    }
+
+    #[test]
+    fn deftype_no_fields() {
+        let source = "(deftype Empty)";
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        if let hir::TopForm::Deftype { name, fields, .. } = &module.top_forms[0] {
+            assert_eq!(name, "Empty");
+            assert!(fields.is_empty());
+        } else {
+            panic!("expected deftype");
+        }
+    }
+
+    #[test]
+    fn deftype_unknown_field_type() {
+        let source = "(deftype Bad (x Unknown))";
+        let (_, diags) = check_source(source);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("unknown type"));
+    }
+
+    #[test]
+    fn deftype_registered_as_type() {
+        let source = r#"
+            (deftype Point (x Float) (y Float))
+            (deftype Line (start Point) (end Point))
+        "#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty());
+        assert_eq!(module.top_forms.len(), 2);
+        if let hir::TopForm::Deftype { fields, .. } = &module.top_forms[1] {
+            assert_eq!(fields.len(), 2);
+            assert!(matches!(&fields[0].ty, VexType::Record { name, .. } if name == "Point"));
+            assert!(matches!(&fields[1].ty, VexType::Record { name, .. } if name == "Point"));
+        } else {
+            panic!("expected deftype");
         }
     }
 }

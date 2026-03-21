@@ -5,4 +5,5 @@ pub mod hir;
 pub mod lexer;
 pub mod parser;
 pub mod source;
+pub mod typechecker;
 pub mod types;

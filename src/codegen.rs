@@ -360,6 +360,11 @@ impl Generator {
             None
         };
 
+        if func_name == Some("each") && args.len() == 2 {
+            self.emit_each(&args[0], &args[1]);
+            return;
+        }
+
         if let Some(name) = func_name
             && let Some(builtin) = builtins::lookup(name)
         {
@@ -401,6 +406,42 @@ impl Generator {
             self.emit_expr(arg);
         }
         self.write(")");
+    }
+
+    fn emit_each(&mut self, list: &hir::Expr, callback: &hir::Expr) {
+        if let hir::Expr::Lambda { params, body, .. } = callback {
+            let param_name = if let Some(p) = params.first() {
+                vex_to_go_name(&p.name)
+            } else {
+                "_v".to_string()
+            };
+            self.write("for _, ");
+            self.write(&param_name);
+            self.write(" := range ");
+            self.emit_expr(list);
+            self.write(" {\n");
+            self.indent += 1;
+            for expr in body {
+                self.write_indent();
+                self.emit_expr(expr);
+                self.newline();
+            }
+            self.indent -= 1;
+            self.write_indent();
+            self.write("}");
+        } else {
+            self.write("for _, _v := range ");
+            self.emit_expr(list);
+            self.write(" {\n");
+            self.indent += 1;
+            self.write_indent();
+            self.emit_expr(callback);
+            self.write("(_v)");
+            self.newline();
+            self.indent -= 1;
+            self.write_indent();
+            self.write("}");
+        }
     }
 
     fn emit_lambda(&mut self, params: &[hir::Param], return_type: &VexType, body: &[hir::Expr]) {
@@ -2186,6 +2227,105 @@ mod tests {
             }],
         };
         assert!(needs_vexrt(&module));
+    }
+
+    #[test]
+    fn expr_each_with_lambda() {
+        let mut cg = Generator::new();
+        let list_expr = hir::Expr::Call {
+            func: Box::new(hir::Expr::Var {
+                name: "range".into(),
+                span: span(6, 11),
+                ty: VexType::Fn {
+                    params: vec![VexType::Int, VexType::Int],
+                    ret: Box::new(VexType::List(Box::new(VexType::Int))),
+                },
+            }),
+            args: vec![
+                hir::Expr::Int(0, span(12, 13)),
+                hir::Expr::Int(10, span(14, 16)),
+            ],
+            span: span(5, 17),
+            ty: VexType::List(Box::new(VexType::Int)),
+        };
+        let callback = hir::Expr::Lambda {
+            params: vec![hir::Param {
+                name: "x".into(),
+                ty: VexType::Int,
+                span: span(23, 24),
+            }],
+            return_type: VexType::Unit,
+            body: vec![hir::Expr::Call {
+                func: Box::new(hir::Expr::Var {
+                    name: "println".into(),
+                    span: span(30, 37),
+                    ty: VexType::Fn {
+                        params: vec![VexType::String],
+                        ret: Box::new(VexType::Unit),
+                    },
+                }),
+                args: vec![hir::Expr::Call {
+                    func: Box::new(hir::Expr::Var {
+                        name: "str".into(),
+                        span: span(39, 42),
+                        ty: VexType::Fn {
+                            params: vec![],
+                            ret: Box::new(VexType::String),
+                        },
+                    }),
+                    args: vec![hir::Expr::Var {
+                        name: "x".into(),
+                        span: span(43, 44),
+                        ty: VexType::Int,
+                    }],
+                    span: span(38, 45),
+                    ty: VexType::String,
+                }],
+                span: span(29, 46),
+                ty: VexType::Unit,
+            }],
+            span: span(18, 47),
+            ty: VexType::Fn {
+                params: vec![VexType::Int],
+                ret: Box::new(VexType::Unit),
+            },
+        };
+        cg.emit_each(&list_expr, &callback);
+        assert!(
+            cg.output.contains("for _, x := range vexrt.Range(0, 10) {"),
+            "{}",
+            cg.output
+        );
+        assert!(
+            cg.output.contains("fmt.Println(fmt.Sprint(x))"),
+            "{}",
+            cg.output
+        );
+    }
+
+    #[test]
+    fn expr_each_with_var() {
+        let mut cg = Generator::new();
+        let list_expr = hir::Expr::Var {
+            name: "items".into(),
+            span: span(6, 11),
+            ty: VexType::List(Box::new(VexType::Int)),
+        };
+        let callback = hir::Expr::Var {
+            name: "process-item".into(),
+            span: span(12, 24),
+            ty: VexType::Fn {
+                params: vec![VexType::Int],
+                ret: Box::new(VexType::Unit),
+            },
+        };
+        cg.emit_each(&list_expr, &callback);
+        assert!(
+            cg.output.contains("for _, _v := range items {"),
+            "{}",
+            cg.output
+        );
+        assert!(cg.output.contains("processItem(_v)"), "{}", cg.output);
     }
 
     #[test]

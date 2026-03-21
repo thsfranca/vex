@@ -22,6 +22,7 @@ jobs:
           filters: |
             rust:
               - 'src/**'
+              - 'stdlib/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.github/workflows/**'

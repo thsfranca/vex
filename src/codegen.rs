@@ -370,6 +370,11 @@ impl Generator {
             return;
         }
 
+        if func_name == Some("filter") && args.len() == 2 {
+            self.emit_filter(&args[0], &args[1], _ty);
+            return;
+        }
+
         if let Some(name) = func_name
             && let Some(builtin) = builtins::lookup(name)
         {
@@ -498,6 +503,83 @@ impl Generator {
             self.write("_result = append(_result, ");
             self.emit_expr(callback);
             self.write("(_v))");
+            self.newline();
+            self.indent -= 1;
+            self.write_indent();
+            self.write("}");
+            self.newline();
+        }
+
+        self.write_indent();
+        self.write("return _result");
+        self.newline();
+        self.indent -= 1;
+        self.write_indent();
+        self.write("}()");
+    }
+
+    fn emit_filter(&mut self, list: &hir::Expr, predicate: &hir::Expr, result_ty: &VexType) {
+        let result_go_ty = go_type(result_ty);
+        self.write("func() ");
+        self.write(&result_go_ty);
+        self.write(" {\n");
+        self.indent += 1;
+
+        self.write_indent();
+        self.write("var _result ");
+        self.write(&result_go_ty);
+        self.newline();
+
+        if let hir::Expr::Lambda { params, body, .. } = predicate {
+            let param_name = if let Some(p) = params.first() {
+                vex_to_go_name(&p.name)
+            } else {
+                "_v".to_string()
+            };
+            self.write_indent();
+            self.write("for _, ");
+            self.write(&param_name);
+            self.write(" := range ");
+            self.emit_expr(list);
+            self.write(" {\n");
+            self.indent += 1;
+            self.write_indent();
+            self.write("if ");
+            if let Some(last) = body.last() {
+                self.emit_expr(last);
+            }
+            self.write(" {\n");
+            self.indent += 1;
+            self.write_indent();
+            self.write("_result = append(_result, ");
+            self.write(&param_name);
+            self.write(")");
+            self.newline();
+            self.indent -= 1;
+            self.write_indent();
+            self.write("}");
+            self.newline();
+            self.indent -= 1;
+            self.write_indent();
+            self.write("}");
+            self.newline();
+        } else {
+            self.write_indent();
+            self.write("for _, _v := range ");
+            self.emit_expr(list);
+            self.write(" {\n");
+            self.indent += 1;
+            self.write_indent();
+            self.write("if ");
+            self.emit_expr(predicate);
+            self.write("(_v) {\n");
+            self.indent += 1;
+            self.write_indent();
+            self.write("_result = append(_result, _v)");
+            self.newline();
+            self.indent -= 1;
+            self.write_indent();
+            self.write("}");
             self.newline();
             self.indent -= 1;
             self.write_indent();
@@ -2484,6 +2566,96 @@ mod tests {
         );
         assert!(
             cg.output.contains("_result = append(_result, double(_v))"),
+            "{}",
+            cg.output
+        );
+    }
+
+    #[test]
+    fn expr_filter_with_lambda() {
+        let mut cg = Generator::new();
+        let list_expr = hir::Expr::Var {
+            name: "xs".into(),
+            span: span(8, 10),
+            ty: VexType::List(Box::new(VexType::Int)),
+        };
+        let callback = hir::Expr::Lambda {
+            params: vec![hir::Param {
+                name: "x".into(),
+                ty: VexType::Int,
+                span: span(16, 17),
+            }],
+            return_type: VexType::Bool,
+            body: vec![hir::Expr::Call {
+                func: Box::new(hir::Expr::Var {
+                    name: ">".into(),
+                    span: span(25, 26),
+                    ty: VexType::Fn {
+                        params: vec![VexType::Int, VexType::Int],
+                        ret: Box::new(VexType::Bool),
+                    },
+                }),
+                args: vec![
+                    hir::Expr::Var {
+                        name: "x".into(),
+                        span: span(27, 28),
+                        ty: VexType::Int,
+                    },
+                    hir::Expr::Int(5, span(29, 30)),
+                ],
+                span: span(24, 31),
+                ty: VexType::Bool,
+            }],
+            span: span(11, 32),
+            ty: VexType::Fn {
+                params: vec![VexType::Int],
+                ret: Box::new(VexType::Bool),
+            },
+        };
+        let result_ty = VexType::List(Box::new(VexType::Int));
+        cg.emit_filter(&list_expr, &callback, &result_ty);
+        assert!(cg.output.contains("func() []int64 {"), "{}", cg.output);
+        assert!(cg.output.contains("var _result []int64"), "{}", cg.output);
+        assert!(
+            cg.output.contains("for _, x := range xs {"),
+            "{}",
+            cg.output
+        );
+        assert!(cg.output.contains("if (x > 5) {"), "{}", cg.output);
+        assert!(
+            cg.output.contains("_result = append(_result, x)"),
+            "{}",
+            cg.output
+        );
+        assert!(cg.output.contains("return _result"), "{}", cg.output);
+    }
+
+    #[test]
+    fn expr_filter_with_var() {
+        let mut cg = Generator::new();
+        let list_expr = hir::Expr::Var {
+            name: "xs".into(),
+            span: span(8, 10),
+            ty: VexType::List(Box::new(VexType::Int)),
+        };
+        let callback = hir::Expr::Var {
+            name: "is-even".into(),
+            span: span(11, 18),
+            ty: VexType::Fn {
+                params: vec![VexType::Int],
+                ret: Box::new(VexType::Bool),
+            },
+        };
+        let result_ty = VexType::List(Box::new(VexType::Int));
+        cg.emit_filter(&list_expr, &callback, &result_ty);
+        assert!(
+            cg.output.contains("for _, _v := range xs {"),
+            "{}",
+            cg.output
+        );
+        assert!(cg.output.contains("if isEven(_v) {"), "{}", cg.output);
+        assert!(
+            cg.output.contains("_result = append(_result, _v)"),
             "{}",
             cg.output
         );

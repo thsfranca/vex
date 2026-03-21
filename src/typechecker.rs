@@ -77,16 +77,18 @@ impl Checker {
                 clauses,
                 span,
             } => self.check_match(scrutinee, clauses, *span),
-            ast::Expr::Spawn { span, .. }
-            | ast::Expr::Channel { span, .. }
-            | ast::Expr::Send { span, .. }
-            | ast::Expr::Recv { span, .. } => {
-                self.diagnostics.push(Diagnostic::error(
-                    "concurrency primitives are not yet supported in the type checker",
-                    *span,
-                ));
-                None
-            }
+            ast::Expr::Spawn { body, span } => self.check_spawn(body, *span),
+            ast::Expr::Channel {
+                element_type,
+                size,
+                span,
+            } => self.check_channel(element_type, size.as_deref(), *span),
+            ast::Expr::Send {
+                channel,
+                value,
+                span,
+            } => self.check_send(channel, value, *span),
+            ast::Expr::Recv { channel, span } => self.check_recv(channel, *span),
         }
     }
 
@@ -395,6 +397,17 @@ impl Checker {
                     }
                     let inner = self.resolve_type(&args[0])?;
                     Some(VexType::Option(Box::new(inner)))
+                }
+                "Channel" => {
+                    if args.len() != 1 {
+                        self.diagnostics.push(Diagnostic::error(
+                            format!("Channel requires 1 type argument, found {}", args.len()),
+                            *span,
+                        ));
+                        return None;
+                    }
+                    let inner = self.resolve_type(&args[0])?;
+                    Some(VexType::Channel(Box::new(inner)))
                 }
                 "Result" => {
                     if args.len() != 2 {
@@ -902,6 +915,101 @@ impl Checker {
                 }))
             }
             _ => None,
+        }
+    }
+
+    fn check_spawn(&mut self, body: &ast::Expr, span: Span) -> Option<hir::Expr> {
+        let checked_body = self.check_expr(body)?;
+        Some(hir::Expr::Spawn {
+            body: Box::new(checked_body),
+            span,
+            ty: VexType::Unit,
+        })
+    }
+
+    fn check_channel(
+        &mut self,
+        element_type: &ast::TypeExpr,
+        size: Option<&ast::Expr>,
+        span: Span,
+    ) -> Option<hir::Expr> {
+        let elem_ty = self.resolve_type(element_type)?;
+        let checked_size = if let Some(size_expr) = size {
+            let s = self.check_expr(size_expr)?;
+            if s.ty() != &VexType::Int {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("channel buffer size must be Int, found {}", s.ty()),
+                    size_expr.span(),
+                ));
+                return None;
+            }
+            Some(Box::new(s))
+        } else {
+            None
+        };
+        let chan_ty = VexType::Channel(Box::new(elem_ty.clone()));
+        Some(hir::Expr::Channel {
+            element_type: elem_ty,
+            size: checked_size,
+            span,
+            ty: chan_ty,
+        })
+    }
+
+    fn check_send(
+        &mut self,
+        channel: &ast::Expr,
+        value: &ast::Expr,
+        span: Span,
+    ) -> Option<hir::Expr> {
+        let checked_chan = self.check_expr(channel)?;
+        let checked_val = self.check_expr(value)?;
+        match checked_chan.ty() {
+            VexType::Channel(elem_ty) => {
+                if checked_val.ty() != elem_ty.as_ref() {
+                    self.diagnostics.push(Diagnostic::error(
+                        format!(
+                            "cannot send {} on channel of {}, expected {}",
+                            checked_val.ty(),
+                            elem_ty,
+                            elem_ty
+                        ),
+                        value.span(),
+                    ));
+                    return None;
+                }
+            }
+            other => {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("send expects a channel, found {}", other),
+                    channel.span(),
+                ));
+                return None;
+            }
+        }
+        Some(hir::Expr::Send {
+            channel: Box::new(checked_chan),
+            value: Box::new(checked_val),
+            span,
+            ty: VexType::Unit,
+        })
+    }
+
+    fn check_recv(&mut self, channel: &ast::Expr, span: Span) -> Option<hir::Expr> {
+        let checked_chan = self.check_expr(channel)?;
+        match checked_chan.ty().clone() {
+            VexType::Channel(elem_ty) => Some(hir::Expr::Recv {
+                channel: Box::new(checked_chan),
+                span,
+                ty: *elem_ty,
+            }),
+            other => {
+                self.diagnostics.push(Diagnostic::error(
+                    format!("recv expects a channel, found {}", other),
+                    channel.span(),
+                ));
+                None
+            }
         }
     }
 
@@ -3331,5 +3439,161 @@ mod tests {
             matches!(&module.top_forms[1], hir::TopForm::Import { module_path, symbols, .. }
             if module_path == "math" && symbols == &["add"])
         );
+    }
+
+    #[test]
+    fn spawn_typechecks() {
+        let source = r#"
+(defn main []
+  (spawn (println "hi")))
+"#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            assert!(matches!(&body[0], hir::Expr::Spawn { ty, .. } if *ty == VexType::Unit));
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn channel_buffered() {
+        let source = r#"
+(defn main []
+  (let [ch (channel Int 10)]
+    ch))
+"#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            if let hir::Expr::Let { bindings, .. } = &body[0] {
+                assert_eq!(bindings[0].ty, VexType::Channel(Box::new(VexType::Int)));
+            } else {
+                panic!("expected let");
+            }
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn channel_unbuffered() {
+        let source = r#"
+(defn main []
+  (let [ch (channel String)]
+    ch))
+"#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            if let hir::Expr::Let { bindings, .. } = &body[0] {
+                assert_eq!(bindings[0].ty, VexType::Channel(Box::new(VexType::String)));
+            } else {
+                panic!("expected let");
+            }
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn channel_buffer_size_must_be_int() {
+        let source = r#"
+(defn main []
+  (channel Int "ten"))
+"#;
+        let (_, diags) = check_source(source);
+        assert!(!diags.is_empty());
+        assert!(diags[0].message.contains("channel buffer size must be Int"));
+    }
+
+    #[test]
+    fn send_recv_typechecks() {
+        let source = r#"
+(defn main []
+  (let [ch (channel Int)]
+    (send ch 42)
+    (println (str (recv ch)))))
+"#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            if let hir::Expr::Let { body: let_body, .. } = &body[0] {
+                assert!(matches!(&let_body[0], hir::Expr::Send { ty, .. } if *ty == VexType::Unit));
+            } else {
+                panic!("expected let");
+            }
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn recv_returns_element_type() {
+        let source = r#"
+(defn main []
+  (let [ch (channel Int)]
+    (recv ch)))
+"#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { body, .. } = &module.top_forms[0] {
+            if let hir::Expr::Let { body: let_body, .. } = &body[0] {
+                assert!(matches!(&let_body[0], hir::Expr::Recv { ty, .. } if *ty == VexType::Int));
+            } else {
+                panic!("expected let");
+            }
+        } else {
+            panic!("expected defn");
+        }
+    }
+
+    #[test]
+    fn send_wrong_type() {
+        let source = r#"
+(defn main []
+  (let [ch (channel Int)]
+    (send ch "hello")))
+"#;
+        let (_, diags) = check_source(source);
+        assert!(!diags.is_empty());
+        assert!(diags[0].message.contains("cannot send"));
+    }
+
+    #[test]
+    fn send_non_channel() {
+        let source = r#"
+(defn main []
+  (send 42 1))
+"#;
+        let (_, diags) = check_source(source);
+        assert!(!diags.is_empty());
+        assert!(diags[0].message.contains("send expects a channel"));
+    }
+
+    #[test]
+    fn recv_non_channel() {
+        let source = r#"
+(defn main []
+  (recv 42))
+"#;
+        let (_, diags) = check_source(source);
+        assert!(!diags.is_empty());
+        assert!(diags[0].message.contains("recv expects a channel"));
+    }
+
+    #[test]
+    fn resolve_channel_type() {
+        let source = r#"
+(defn make-chan [] : (Channel Int)
+  (channel Int))
+"#;
+        let (module, diags) = check_source(source);
+        assert!(diags.is_empty(), "{:?}", diags);
+        if let hir::TopForm::Defn { return_type, .. } = &module.top_forms[0] {
+            assert_eq!(*return_type, VexType::Channel(Box::new(VexType::Int)));
+        } else {
+            panic!("expected defn");
+        }
     }
 }

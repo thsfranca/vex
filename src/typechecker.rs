@@ -70,6 +70,7 @@ impl Checker {
                 field,
                 span,
             } => self.check_field_access(object, field, *span),
+            ast::Expr::Match { .. } => None,
         }
     }
 

@@ -50,6 +50,35 @@ pub struct CondClause {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Pattern {
+    Wildcard(Span),
+    Binding(String, Span),
+    Literal(Box<Expr>),
+    Constructor {
+        name: String,
+        args: Vec<Pattern>,
+        span: Span,
+    },
+}
+
+impl Pattern {
+    pub fn span(&self) -> Span {
+        match self {
+            Pattern::Wildcard(s) | Pattern::Binding(_, s) => *s,
+            Pattern::Literal(expr) => expr.span(),
+            Pattern::Constructor { span, .. } => *span,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchClause {
+    pub pattern: Pattern,
+    pub body: Expr,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Int(i64, Span),
     Float(f64, Span),
@@ -97,6 +126,12 @@ pub enum Expr {
         field: String,
         span: Span,
     },
+
+    Match {
+        scrutinee: Box<Expr>,
+        clauses: Vec<MatchClause>,
+        span: Span,
+    },
 }
 
 impl Expr {
@@ -114,7 +149,8 @@ impl Expr {
             | Expr::Let { span, .. }
             | Expr::Lambda { span, .. }
             | Expr::Call { span, .. }
-            | Expr::FieldAccess { span, .. } => *span,
+            | Expr::FieldAccess { span, .. }
+            | Expr::Match { span, .. } => *span,
         }
     }
 }
@@ -591,5 +627,59 @@ mod tests {
         assert!(matches!(&form, TopForm::Defunion { name, variants, .. }
             if name == "Option" && variants.len() == 2));
         assert_eq!(form.span(), span(0, 34));
+    }
+
+    #[test]
+    fn pattern_wildcard() {
+        let p = Pattern::Wildcard(span(0, 1));
+        assert_eq!(p.span(), span(0, 1));
+    }
+
+    #[test]
+    fn pattern_binding() {
+        let p = Pattern::Binding("x".into(), span(0, 1));
+        assert_eq!(p.span(), span(0, 1));
+    }
+
+    #[test]
+    fn pattern_constructor() {
+        let p = Pattern::Constructor {
+            name: "Some".into(),
+            args: vec![Pattern::Binding("x".into(), span(6, 7))],
+            span: span(0, 8),
+        };
+        assert_eq!(p.span(), span(0, 8));
+        if let Pattern::Constructor { name, args, .. } = &p {
+            assert_eq!(name, "Some");
+            assert_eq!(args.len(), 1);
+        }
+    }
+
+    #[test]
+    fn match_expr() {
+        let expr = Expr::Match {
+            scrutinee: Box::new(Expr::Symbol("x".into(), span(7, 8))),
+            clauses: vec![
+                MatchClause {
+                    pattern: Pattern::Constructor {
+                        name: "Some".into(),
+                        args: vec![Pattern::Binding("v".into(), span(15, 16))],
+                        span: span(10, 17),
+                    },
+                    body: Expr::Symbol("v".into(), span(18, 19)),
+                    span: span(10, 19),
+                },
+                MatchClause {
+                    pattern: Pattern::Wildcard(span(20, 21)),
+                    body: Expr::Nil(span(22, 25)),
+                    span: span(20, 25),
+                },
+            ],
+            span: span(0, 26),
+        };
+        assert_eq!(expr.span(), span(0, 26));
+        if let Expr::Match { clauses, .. } = &expr {
+            assert_eq!(clauses.len(), 2);
+        }
     }
 }

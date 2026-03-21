@@ -354,6 +354,12 @@ impl Generator {
                     self.write("}");
                 }
             }
+            hir::Expr::Spawn { .. }
+            | hir::Expr::Channel { .. }
+            | hir::Expr::Send { .. }
+            | hir::Expr::Recv { .. } => {
+                self.write("/* concurrency codegen not yet implemented */");
+            }
         }
     }
 
@@ -1129,6 +1135,21 @@ fn collect_builtin_calls_expr(expr: &hir::Expr, names: &mut Vec<String>) {
                 collect_builtin_calls_expr(arg, names);
             }
         }
+        hir::Expr::Spawn { body, .. } => {
+            collect_builtin_calls_expr(body, names);
+        }
+        hir::Expr::Channel { size, .. } => {
+            if let Some(s) = size {
+                collect_builtin_calls_expr(s, names);
+            }
+        }
+        hir::Expr::Send { channel, value, .. } => {
+            collect_builtin_calls_expr(channel, names);
+            collect_builtin_calls_expr(value, names);
+        }
+        hir::Expr::Recv { channel, .. } => {
+            collect_builtin_calls_expr(channel, names);
+        }
     }
 }
 
@@ -1307,6 +1328,7 @@ pub fn go_type(ty: &VexType) -> String {
         VexType::Union { name, .. } => vex_to_go_public_name(name),
         VexType::List(inner) => format!("[]{}", go_type(inner)),
         VexType::Map { key, value } => format!("map[{}]{}", go_type(key), go_type(value)),
+        VexType::Channel(inner) => format!("chan {}", go_type(inner)),
         VexType::Option(inner) => format!("vexrt.Option[{}]", go_type(inner)),
         VexType::Result { ok, err } => {
             format!("vexrt.Result[{}, {}]", go_type(ok), go_type(err))

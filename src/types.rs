@@ -37,6 +37,7 @@ pub enum VexType {
         key: Box<VexType>,
         value: Box<VexType>,
     },
+    Channel(Box<VexType>),
     Option(Box<VexType>),
     Result {
         ok: Box<VexType>,
@@ -67,6 +68,10 @@ impl VexType {
                     key: Box::new(key),
                     value: Box::new(value),
                 })
+            }
+            (VexType::Channel(inner_a), VexType::Channel(inner_b)) => {
+                let merged = VexType::types_compatible(inner_a, inner_b)?;
+                Some(VexType::Channel(Box::new(merged)))
             }
             (VexType::Option(inner_a), VexType::Option(inner_b)) => {
                 let merged = VexType::types_compatible(inner_a, inner_b)?;
@@ -102,6 +107,9 @@ impl VexType {
                     key: Box::new(ka.resolve_vars(kb)),
                     value: Box::new(va.resolve_vars(vb)),
                 }
+            }
+            (VexType::Channel(a), VexType::Channel(b)) => {
+                VexType::Channel(Box::new(a.resolve_vars(b)))
             }
             (VexType::Option(a), VexType::Option(b)) => {
                 VexType::Option(Box::new(a.resolve_vars(b)))
@@ -153,6 +161,7 @@ impl fmt::Display for VexType {
             VexType::Union { name, .. } => write!(f, "{}", name),
             VexType::List(inner) => write!(f, "(List {})", inner),
             VexType::Map { key, value } => write!(f, "(Map {} {})", key, value),
+            VexType::Channel(inner) => write!(f, "(Channel {})", inner),
             VexType::Option(inner) => write!(f, "(Option {})", inner),
             VexType::Result { ok, err } => write!(f, "(Result {} {})", ok, err),
             VexType::TypeVar(id) => write!(f, "?T{}", id),
@@ -620,5 +629,30 @@ mod tests {
         };
         let b = a.clone();
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn display_channel() {
+        let ty = VexType::Channel(Box::new(VexType::Int));
+        assert_eq!(format!("{}", ty), "(Channel Int)");
+    }
+
+    #[test]
+    fn channel_equality() {
+        let a = VexType::Channel(Box::new(VexType::Int));
+        let b = VexType::Channel(Box::new(VexType::Int));
+        let c = VexType::Channel(Box::new(VexType::String));
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn types_compatible_channel() {
+        let a = VexType::Channel(Box::new(VexType::TypeVar(0)));
+        let b = VexType::Channel(Box::new(VexType::Int));
+        assert_eq!(
+            VexType::types_compatible(&a, &b),
+            Some(VexType::Channel(Box::new(VexType::Int)))
+        );
     }
 }

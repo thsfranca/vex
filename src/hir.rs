@@ -112,6 +112,32 @@ pub enum Expr {
         span: Span,
         ty: VexType,
     },
+
+    Spawn {
+        body: Box<Expr>,
+        span: Span,
+        ty: VexType,
+    },
+
+    Channel {
+        element_type: VexType,
+        size: Option<Box<Expr>>,
+        span: Span,
+        ty: VexType,
+    },
+
+    Send {
+        channel: Box<Expr>,
+        value: Box<Expr>,
+        span: Span,
+        ty: VexType,
+    },
+
+    Recv {
+        channel: Box<Expr>,
+        span: Span,
+        ty: VexType,
+    },
 }
 
 impl Expr {
@@ -130,7 +156,11 @@ impl Expr {
             | Expr::FieldAccess { span, .. }
             | Expr::RecordConstructor { span, .. }
             | Expr::Match { span, .. }
-            | Expr::VariantConstructor { span, .. } => *span,
+            | Expr::VariantConstructor { span, .. }
+            | Expr::Spawn { span, .. }
+            | Expr::Channel { span, .. }
+            | Expr::Send { span, .. }
+            | Expr::Recv { span, .. } => *span,
         }
     }
 
@@ -149,7 +179,11 @@ impl Expr {
             | Expr::FieldAccess { ty, .. }
             | Expr::RecordConstructor { ty, .. }
             | Expr::Match { ty, .. }
-            | Expr::VariantConstructor { ty, .. } => ty,
+            | Expr::VariantConstructor { ty, .. }
+            | Expr::Spawn { ty, .. }
+            | Expr::Channel { ty, .. }
+            | Expr::Send { ty, .. }
+            | Expr::Recv { ty, .. } => ty,
         }
     }
 }
@@ -581,5 +615,60 @@ mod tests {
         assert!(
             matches!(&pattern, Pattern::Constructor { variant_name, .. } if variant_name == "Some")
         );
+    }
+
+    #[test]
+    fn spawn_type() {
+        let expr = Expr::Spawn {
+            body: Box::new(Expr::Nil(span(7, 10))),
+            span: span(0, 11),
+            ty: VexType::Unit,
+        };
+        assert_eq!(expr.ty(), &VexType::Unit);
+        assert_eq!(expr.span(), span(0, 11));
+    }
+
+    #[test]
+    fn channel_type() {
+        let chan_ty = VexType::Channel(Box::new(VexType::Int));
+        let expr = Expr::Channel {
+            element_type: VexType::Int,
+            size: Some(Box::new(Expr::Int(10, span(13, 15)))),
+            span: span(0, 16),
+            ty: chan_ty.clone(),
+        };
+        assert_eq!(expr.ty(), &chan_ty);
+        assert_eq!(expr.span(), span(0, 16));
+    }
+
+    #[test]
+    fn send_type() {
+        let expr = Expr::Send {
+            channel: Box::new(Expr::Var {
+                name: "ch".into(),
+                span: span(6, 8),
+                ty: VexType::Channel(Box::new(VexType::Int)),
+            }),
+            value: Box::new(Expr::Int(42, span(9, 11))),
+            span: span(0, 12),
+            ty: VexType::Unit,
+        };
+        assert_eq!(expr.ty(), &VexType::Unit);
+        assert_eq!(expr.span(), span(0, 12));
+    }
+
+    #[test]
+    fn recv_type() {
+        let expr = Expr::Recv {
+            channel: Box::new(Expr::Var {
+                name: "ch".into(),
+                span: span(6, 8),
+                ty: VexType::Channel(Box::new(VexType::Int)),
+            }),
+            span: span(0, 9),
+            ty: VexType::Int,
+        };
+        assert_eq!(expr.ty(), &VexType::Int);
+        assert_eq!(expr.span(), span(0, 9));
     }
 }

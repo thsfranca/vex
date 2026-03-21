@@ -384,9 +384,9 @@ fn mval_to_list_items(val: &MacroVal) -> Option<Vec<MacroVal>> {
 
 fn eval_macro_builtin(name: &str, args: Vec<MacroVal>) -> Result<MacroVal, String> {
     match name {
-        "syntax-list" => Ok(MacroVal::MList(args)),
+        "list" => Ok(MacroVal::MList(args)),
 
-        "syntax-cons" => {
+        "cons" => {
             if args.len() != 2 {
                 return Err("syntax-cons requires 2 arguments".into());
             }
@@ -399,7 +399,7 @@ fn eval_macro_builtin(name: &str, args: Vec<MacroVal>) -> Result<MacroVal, Strin
             }
         }
 
-        "syntax-first" => {
+        "first" => {
             if args.len() != 1 {
                 return Err("syntax-first requires 1 argument".into());
             }
@@ -409,7 +409,7 @@ fn eval_macro_builtin(name: &str, args: Vec<MacroVal>) -> Result<MacroVal, Strin
             }
         }
 
-        "syntax-rest" => {
+        "rest" => {
             if args.len() != 1 {
                 return Err("syntax-rest requires 1 argument".into());
             }
@@ -419,7 +419,7 @@ fn eval_macro_builtin(name: &str, args: Vec<MacroVal>) -> Result<MacroVal, Strin
             }
         }
 
-        "syntax-symbol?" => {
+        "symbol?" => {
             if args.len() != 1 {
                 return Err("syntax-symbol? requires 1 argument".into());
             }
@@ -430,7 +430,7 @@ fn eval_macro_builtin(name: &str, args: Vec<MacroVal>) -> Result<MacroVal, Strin
             ))))
         }
 
-        "syntax-list?" => {
+        "list?" => {
             if args.len() != 1 {
                 return Err("syntax-list? requires 1 argument".into());
             }
@@ -441,7 +441,7 @@ fn eval_macro_builtin(name: &str, args: Vec<MacroVal>) -> Result<MacroVal, Strin
             ))))
         }
 
-        "syntax-concat" => {
+        "concat" => {
             if args.len() != 2 {
                 return Err("syntax-concat requires 2 arguments".into());
             }
@@ -980,7 +980,7 @@ mod tests {
                     },
                 ],
                 body: vec![Expr::Call {
-                    func: Box::new(Expr::Symbol("syntax-list".into(), s)),
+                    func: Box::new(Expr::Symbol("list".into(), s)),
                     args: vec![
                         Expr::Quote {
                             expr: Box::new(Expr::Symbol("if".into(), s)),
@@ -1102,7 +1102,7 @@ mod tests {
                     bindings: vec![Binding {
                         name: "result".into(),
                         value: Expr::Call {
-                            func: Box::new(Expr::Symbol("syntax-list".into(), s)),
+                            func: Box::new(Expr::Symbol("list".into(), s)),
                             args: vec![
                                 Expr::Quote {
                                     expr: Box::new(Expr::Symbol("if".into(), s)),
@@ -1149,7 +1149,7 @@ mod tests {
                     span: s,
                 }],
                 body: vec![Expr::Call {
-                    func: Box::new(Expr::Symbol("syntax-list".into(), s)),
+                    func: Box::new(Expr::Symbol("list".into(), s)),
                     args: vec![
                         Expr::Quote {
                             expr: Box::new(Expr::Symbol("+".into(), s)),
@@ -1199,14 +1199,14 @@ mod tests {
                     span: s,
                 }],
                 body: vec![Expr::Call {
-                    func: Box::new(Expr::Symbol("syntax-list".into(), s)),
+                    func: Box::new(Expr::Symbol("list".into(), s)),
                     args: vec![
                         Expr::Quote {
                             expr: Box::new(Expr::Symbol("let".into(), s)),
                             span: s,
                         },
                         Expr::Call {
-                            func: Box::new(Expr::Symbol("syntax-list".into(), s)),
+                            func: Box::new(Expr::Symbol("list".into(), s)),
                             args: vec![
                                 Expr::Quote {
                                     expr: Box::new(Expr::Symbol("tmp".into(), s)),
@@ -1265,14 +1265,14 @@ mod tests {
                 name: "make-fn".into(),
                 params: vec![],
                 body: vec![Expr::Call {
-                    func: Box::new(Expr::Symbol("syntax-list".into(), s)),
+                    func: Box::new(Expr::Symbol("list".into(), s)),
                     args: vec![
                         Expr::Quote {
                             expr: Box::new(Expr::Symbol("fn".into(), s)),
                             span: s,
                         },
                         Expr::Call {
-                            func: Box::new(Expr::Symbol("syntax-list".into(), s)),
+                            func: Box::new(Expr::Symbol("list".into(), s)),
                             args: vec![Expr::Quote {
                                 expr: Box::new(Expr::Symbol("x".into(), s)),
                                 span: s,

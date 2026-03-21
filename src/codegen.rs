@@ -247,6 +247,7 @@ impl Generator {
             hir::Expr::RecordConstructor { name, args, ty, .. } => {
                 self.emit_record_constructor(name, args, ty);
             }
+            hir::Expr::Match { .. } => {}
         }
     }
 
@@ -482,6 +483,14 @@ fn collect_builtin_calls_expr(expr: &hir::Expr, names: &mut Vec<String>) {
         hir::Expr::RecordConstructor { args, .. } => {
             for arg in args {
                 collect_builtin_calls_expr(arg, names);
+            }
+        }
+        hir::Expr::Match {
+            scrutinee, clauses, ..
+        } => {
+            collect_builtin_calls_expr(scrutinee, names);
+            for clause in clauses {
+                collect_builtin_calls_expr(&clause.body, names);
             }
         }
     }

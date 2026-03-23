@@ -60,11 +60,11 @@ The `builtins.rs` registry declares fixed signatures: `range` takes `(Int, Int) 
 
 ### What state of the art looks like
 
-**Coalton** (the leading typed Lisp in production) uses full Hindley-Milner inference — users rarely write type annotations, and the system infers polymorphic types automatically.
+**Coalton** (the leading typed Lisp in production) uses Hindley-Milner inference. Coalton 0.2 (March 2026) moved from curried functions to fixed-arity functions specifically because HM inference produced confusing error messages with missing or extra arguments. The field is converging on explicit arities with local inference.
 
 **Rust** takes a different path — generic type parameters on function signatures are explicit, local variables inside bodies are inferred. No global inference across function boundaries.
 
-**Go** added generics in 1.18 with explicit type constraints and no inference of type parameters at call sites (the compiler infers from arguments in practice, but the mechanism is structural, not HM).
+**Go** added generics in 1.18 with explicit type constraints. Go 1.26 (2026) relaxed the recursive type parameter restriction, allowing self-referential constraints like `type Adder[A Adder[A]]`. This strengthens Vex's codegen path — more Vex type patterns can map directly to Go generics.
 
 ### Trade-off: inference vs. explicitness
 
@@ -105,7 +105,7 @@ The type checker resolves `a = Int` and `b = Int` from the concrete arguments at
 - **`types.rs`**: `VexType::TypeVar(u32)` already exists. Add a `TypeParam { name: String }` variant for named type variables in signatures (`a`, `b`), distinct from anonymous unification variables.
 - **`typechecker.rs`**: Add a unification/substitution pass that resolves `TypeParam` to concrete types at call sites. Remove `check_map`, `check_filter`, `check_each` — they become regular generic function calls.
 - **`builtins.rs`**: Declare `map`, `filter`, `each` with generic signatures: `(Fn [(List a) (Fn [a] b)] (List b))`.
-- **`codegen.rs`**: Go generics (1.18+) map directly — `func Map[A any, B any](lst []A, f func(A) B) []B`. Alternatively, generate monomorphized (type-erased) Go code with `interface{}` and type assertions if targeting Go < 1.18.
+- **`codegen.rs`**: Go generics (1.18+) map directly — `func Map[A any, B any](lst []A, f func(A) B) []B`. Go 1.26's recursive generics further reduce impedance mismatch for self-referential type patterns.
 - **Parser**: No syntax changes needed. `a` and `b` in type position are already parseable as identifiers — the type checker distinguishes them from concrete type names by checking whether they're defined types.
 
 ### What this unlocks
@@ -467,3 +467,320 @@ Unlike `try` (which expands to `match`) and `cond` (which expands to `if`), `tas
 - Context cancellation wiring that has no Vex-level equivalent today
 
 These are compiler-level concerns, not syntax transformations.
+
+---
+
+## 6. Formatter (`vex fmt`)
+
+### What Vex has today
+
+No formatting tool. The user decides indentation, alignment, and line breaks manually.
+
+### Why this matters
+
+Every modern language ships a formatter as a first-class tool:
+
+- **Go** — `gofmt` (2012, day one)
+- **Rust** — `rustfmt` (official tool, CI-enforced across the ecosystem)
+- **Gleam** — `gleam format` (ships with the compiler)
+- **Zig** — `zig fmt` (ships with the compiler)
+
+A formatter eliminates style discussions, makes code reviews focus on logic, and produces consistent output across projects. For a new language, a formatter signals maturity and reduces friction for new contributors.
+
+### Why this is simpler for Vex than for most languages
+
+S-expression formatting has fewer decisions than algol-style formatting:
+
+- No operator precedence ambiguity — everything is parenthesized
+- No semicolons, braces, or optional syntax — indentation follows nesting depth
+- No complex expression wrapping rules — a form either fits on one line or each subform gets its own line
+
+The core algorithm: indent each nesting level by two spaces, keep short forms on one line (under a configurable width), and break long forms with one subform per line. Special-case `defn`, `let`, `match`, `cond`, and `if` with conventional Lisp indentation rules (first argument on the same line as the head).
+
+### Recommended design
+
+Ship `vex fmt` as a CLI subcommand. Read `.vx` files, reformat in place (or to stdout with `--check` for CI). Use the existing lexer and parser to produce an AST, then pretty-print from the AST while preserving comments.
+
+### What changes in the compiler
+
+- **New file**: `formatter.rs` — AST pretty-printer with comment preservation
+- **`main.rs`**: Add `vex fmt` subcommand
+- **Lexer/Parser**: No changes, but comments must round-trip (the lexer already tracks comment positions via spans)
+
+### Constraints
+
+- Comments must survive formatting — the formatter attaches comments to the nearest AST node and re-emits them
+- `vex fmt` must be idempotent — running it twice produces the same output
+- The formatter reads from the parser's AST, not from raw text — this guarantees syntactically valid output
+
+---
+
+## 7. Source Location Mapping
+
+### What Vex has today
+
+The `--emit-go` flag writes generated Go source for manual inspection. No source location information connects generated Go back to `.vx` source.
+
+### Why this matters
+
+When a generated Go program panics, the stack trace shows Go file names, Go line numbers, and Go function names — none of which correspond to what the user wrote. Profiling tools (`pprof`, `go tool trace`) report Go-level locations. Without source mapping, debugging and performance analysis require mentally reverse-engineering the codegen.
+
+### What state of the art looks like
+
+- **Go** supports `//line` directives: `//line filename:line` changes the reported source location for subsequent lines in the Go file. The Go compiler, `go vet`, runtime panic traces, and `pprof` all respect these directives.
+- **TypeScript** emits `.map` files for JavaScript source mapping
+- **Gleam** generates Erlang with source location attributes
+
+### Recommended design
+
+Emit `//line` directives in generated Go code. Every HIR node carries a `Span` that maps to the original `.vx` source. The codegen phase resolves each span to a `filename:line` pair and emits a `//line` directive before the corresponding Go code.
+
+```go
+//line main.vx:5
+func HandleSearch(params ToolParams) vexrt.Result[any, error] {
+//line main.vx:6
+    validated := Validate(params)
+```
+
+### What changes in the compiler
+
+- **`codegen.rs`**: Before emitting each Go statement or declaration, emit a `//line` directive using the HIR node's span resolved through the `SourceMap`
+- **`lib.rs`**: Pass the `SourceMap` to the codegen phase (currently only the diagnostics formatter uses it)
+
+### Trade-offs
+
+- Generated Go becomes harder to read with `//line` directives scattered throughout. The `--emit-go` output for debugging purposes should have an option to suppress directives (`--emit-go --no-line-directives`).
+- Go's `//line` directive syntax changed slightly between versions. Target the format supported by Go 1.21+ (Vex's minimum Go version).
+
+---
+
+## 8. Go Toolchain Detection
+
+### What Vex has today
+
+`vex build` invokes `go build` and assumes Go is installed and on `PATH`. If Go is missing, the user sees a raw OS error ("command not found" or similar).
+
+### Why this matters
+
+Vex's build pipeline requires a Go toolchain. Every Vex user must have Go installed. This is a hard dependency that the installer and CLI should handle gracefully:
+
+- New users who install Vex via Homebrew or a binary release may not have Go
+- The error when Go is missing should explain what is needed and how to get it
+- The required Go version (1.21+) should be validated, not assumed
+
+### What state of the art looks like
+
+- **Zig** — bundles a C compiler, eliminating the external dependency entirely
+- **Gleam** — detects Erlang/Elixir installation and prints clear instructions when missing
+- **Dart** — ships a full toolchain in a single SDK download
+
+Bundling Go is possible (the Go toolchain is a single directory with no global state) but adds ~150MB to the distribution. The lighter approach: detect, validate, and guide.
+
+### Recommended design
+
+On `vex build` (before any compilation):
+
+1. Check if `go` is on `PATH`
+2. If missing, print:
+   ```
+   error: Go toolchain not found
+
+   Vex compiles to Go source code and requires the Go toolchain to produce binaries.
+
+   Install Go: https://go.dev/dl/
+     macOS:   brew install go
+     Linux:   sudo apt install golang  (or download from go.dev)
+     Windows: winget install GoLang.Go
+   ```
+3. If found, run `go version` and parse the output
+4. If the version is below 1.21, print:
+   ```
+   error: Go 1.21 or later required (found go1.18.3)
+
+   Update Go: https://go.dev/dl/
+   ```
+
+### What changes in the compiler
+
+- **`main.rs`**: Add a `check_go_toolchain()` function that runs before compilation. Call it at the start of `build` and `run` subcommands.
+- No changes to the compiler core — this is a CLI concern.
+
+---
+
+## 9. Summary Extraction Phase
+
+### What Vex has today
+
+The compiler pipeline processes one file at a time: lex → parse → expand → type-check → codegen. Multi-file compilation (planned in `docs/dependency-management.md`) will compile dependency modules before the main module, but the pipeline has no explicit step to extract a module's public interface (types and function signatures) separately from type-checking function bodies.
+
+### Why this matters
+
+The per-file independence constraint (§0) says each file can be "summarized (exported types and signatures extracted) without reading any other file." But the architecture does not formalize summary extraction as a pipeline phase.
+
+matklad's "Against Query Based Compilers" (February 2026) describes the map-reduce architecture that Vex's constraints are designed to enable:
+
+> In parallel, a "summary" is extracted from each file, which is essentially just a list of types and signatures, with function bodies empty.
+>
+> Sequentially, a "signature evaluation" phase is run on this set of summaries, which turns type references in signatures into actual types, dealing with mutual dependencies between files. This phase is re-run whenever a summary of a file changes. Conversely, changes to the body of any function do not invalidate resolved signatures.
+>
+> In parallel, every function's body is type-checked.
+
+This architecture gives two properties:
+
+- **Parallelism** — function bodies type-check independently once signatures are resolved
+- **Incremental invalidation** — changing a function body does not invalidate other files (only signature changes propagate)
+
+Without a formalized summary phase, multi-file compilation and the future LSP will need to reinvent this boundary ad hoc.
+
+### Recommended design
+
+Add a **summary extraction** step between macro expansion and type checking:
+
+```
+expanded AST → extract_summary() → ModuleSummary
+```
+
+A `ModuleSummary` contains:
+
+- Module name
+- Exported type definitions (`deftype`, `defunion`) with field/variant types as unresolved `TypeExpr`
+- Exported function signatures (name, parameter types, return type) as unresolved `TypeExpr`
+- No function bodies
+
+For single-file compilation, this phase is a no-op pass-through. For multi-file compilation, the pipeline becomes:
+
+1. Parse + expand all files (parallel, per-file)
+2. Extract summaries from all files (parallel, per-file)
+3. Resolve signatures across summaries (sequential, cross-file)
+4. Type-check function bodies (parallel, per-file, using resolved signatures)
+5. Codegen (parallel, per-file)
+
+### What changes in the compiler
+
+- **New type**: `ModuleSummary` in `types.rs` or a new `summary.rs` — holds exported names, type definitions, and function signatures
+- **`lib.rs`**: Insert `extract_summary()` between `expand()` and `check()` in the pipeline
+- **`typechecker.rs`**: Accept a set of `ModuleSummary` values for imported modules when type-checking a file
+
+### When to implement
+
+Not needed for single-file compilation. Implement when multi-file compilation begins (`docs/dependency-management.md` §8) — this is the natural point where the summary boundary becomes load-bearing.
+
+---
+
+## 10. LSP Architecture
+
+### What Vex has today
+
+No IDE support beyond syntax highlighting (if the user configures a generic Lisp mode). The compiler runs as a batch process.
+
+### Why this matters
+
+Gleam v1.14-1.15 (December 2025 — March 2026) shows what drives adoption for a young language: type-directed autocompletion, context-aware compilation, code actions ("add missing type parameter," "merge case branches"), and hover documentation. These features require a language server.
+
+The per-file independence constraint (§0) and summary extraction phase (§9) exist specifically to enable an LSP without forcing Vex into a query-based architecture.
+
+### What state of the art looks like
+
+matklad's "Against Query Based Compilers" (February 2026) recommends pushing queries as late as possible and using direct approaches first. Vex's language properties — explicit imports, no cross-file macros, no glob imports — align with the map-reduce model:
+
+1. **Per-file work** (parallel): parse, expand macros, extract summary, lower to IR
+2. **Cross-file merge** (sequential): resolve signatures from summaries
+3. **Per-file work** (parallel): type-check bodies using resolved signatures
+
+On file change: re-run step 1 for the changed file, diff the new summary against the old one. If the summary changed, re-run steps 2-3. If only the body changed, re-run step 3 for that file only.
+
+The Ori language (2025-2026) distributes its LSP as a CLI subcommand (`ori lsp`), ensuring version consistency between compiler and language server. Vex should follow this pattern: `vex lsp` launches the language server, using the same compiler binary.
+
+### Recommended capabilities (ordered by value)
+
+1. **Diagnostics** — stream type errors and warnings on file save. Requires resilient parsing (§0) and the batch type checker.
+2. **Hover** — show resolved types for expressions and function signatures. Requires the HIR with type annotations.
+3. **Go to definition** — resolve symbols to their definition site. Requires the type checker's symbol table.
+4. **Completions** — suggest names in scope. Requires the type environment at the cursor position.
+5. **Formatter** — format on save via `vex fmt` (§6).
+
+### What changes in the compiler
+
+- **New file**: `lsp.rs` — LSP server using `tower-lsp` and `lsp-types` crates
+- **`main.rs`**: Add `vex lsp` subcommand
+- **`lib.rs`**: The `compile()` pipeline already returns diagnostics. The LSP calls the same pipeline functions and streams diagnostics to the editor.
+- **Resilient parsing** (§0 constraint): required before the LSP can provide useful results on incomplete code
+
+### When to implement
+
+After resilient parsing and summary extraction. The LSP does not need every capability on day one — diagnostics-only is already valuable and validates the architecture.
+
+---
+
+## 11. Tree-sitter Grammar
+
+### What Vex has today
+
+No editor syntax highlighting support. Users who want highlighting must configure a generic Lisp mode.
+
+### Why this matters
+
+Syntax highlighting is the minimum bar for editor integration. Without it, Vex code looks like plain text. Tree-sitter grammars provide highlighting in Neovim, Helix, Zed, Emacs (tree-sitter mode), and VS Code (via extensions). A tree-sitter grammar gives Vex instant editor support across all major editors with a single implementation.
+
+### Why this is trivial for Vex
+
+S-expression syntax maps directly to tree-sitter's grammar DSL. The entire grammar has roughly three rules:
+
+- **Program** → list of forms
+- **Form** → atom | `(` form* `)` | `[` form* `]` | `{` form* `}`
+- **Atom** → symbol | keyword | string | number | boolean | nil
+
+Special forms (`defn`, `let`, `match`, `deftype`, `defunion`, `defmacro`) need field annotations for accurate highlighting (function names, type names, parameter names), adding ~10-15 rules.
+
+### Recommended design
+
+Create a `tree-sitter-vex` repository with the grammar definition (`grammar.js`), highlight queries (`queries/highlights.scm`), and installation instructions for each editor.
+
+### What changes in the compiler
+
+Nothing — the tree-sitter grammar is an external artifact. It references the same token and syntax rules from `docs/language-design.md` §7 but does not depend on compiler code.
+
+### When to implement
+
+Anytime. No dependencies on other roadmap items. High value-to-effort ratio — a few hours of work gives highlighting across all tree-sitter-enabled editors.
+
+---
+
+## 12. Unused Bindings and Import Warnings
+
+### Why it matters
+
+Every modern statically typed language warns on unused variables and imports: Rust, Go (errors on unused imports), Gleam, Elm. Without these warnings, dead code accumulates silently:
+
+- Unused imports inflate the dependency graph and confuse readers
+- Unused bindings hide logic errors — a typo in a variable name creates a new binding while the intended one goes unused
+- Refactoring becomes uncertain — removing a function or type requires manual search to confirm nothing references it
+
+For a language that targets MCP server development — where handlers evolve rapidly and prototype code is common — catching dead references early prevents production surprises.
+
+### State of the art
+
+- **Go** — unused imports and declared-but-not-used variables are compile **errors**, not warnings
+- **Rust** — `#[warn(unused)]` is on by default; unused variables, imports, and functions produce warnings
+- **Gleam** — warns on unused variables, unused function arguments, unused imports
+- **Elm** — warns on unused imports and unused top-level definitions
+
+Vex should warn (not error) on unused bindings and imports. Warnings keep the developer informed without blocking compilation during exploratory coding.
+
+### What to implement
+
+1. **Unused `let` bindings** — after type-checking a function body, report bindings that were never read. Convention: a leading `_` suppresses the warning (matches Rust/Go)
+2. **Unused `import` names** — after macro expansion, report imported names that appear nowhere in the expanded AST
+3. **Unused function parameters** — report parameters that are never referenced in the body. Convention: `_` name suppresses the warning
+
+### Compiler changes required
+
+- `diagnostics.rs` — add `Severity::Warning` if not already present
+- `typechecker.rs` — add a `used: bool` flag to each binding in `Scope`. After checking a body, sweep unused entries and emit warnings. Skip `_`-prefixed names
+- A post-macro-expansion pass (or an addition to `typechecker.rs`) — cross-reference imported names against names used in the checked module
+
+### Trade-offs
+
+- **Warning vs error**: warnings keep the development loop fast during prototyping. A future `--deny-warnings` flag can promote them to errors in CI
+- **False positives in macros**: macro-generated code may reference bindings the user cannot see. Suppressing warnings for compiler-generated names (gensym bindings) avoids noise
+- **Performance**: the `used` flag adds one boolean per binding — negligible cost

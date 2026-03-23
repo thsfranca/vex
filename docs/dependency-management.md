@@ -278,11 +278,12 @@ When `vex build` runs, the compiler resolves dependencies in this order:
 1. **Read `vex.mod`** — parse the manifest to find all `require`, `go`, and `replace` entries
 2. **Apply replacements** — for each `replace` directive, use the local path instead of the cache
 3. **Locate Vex dependencies** — find each required Vex package in the global cache. If missing, error with a message suggesting `vex deps` or `vex get`
-4. **Compile Vex dependencies** — compile each dependency module before the main module (existing `compile_single` flow in `lib.rs`)
-5. **Collect Go dependencies** — merge the `go` section from `vex.mod` with any Go dependencies declared by Vex package dependencies (transitive)
-6. **Generate `go.mod`** — produce a `go.mod` with all Go `require` directives
-7. **Run `go mod download`** — download Go dependencies before `go build`
-8. **Build** — run `go build` as usual
+4. **Extract summaries** — extract type signatures and exports from each dependency (future: summary extraction phase, see `roadmap-rationale.md` §9). Until summary extraction is implemented, the compiler compiles each dependency fully
+5. **Compile Vex dependencies** — compile each dependency module before the main module (existing `compile_single` flow in `lib.rs`)
+6. **Collect Go dependencies** — merge the `go` section from `vex.mod` with any Go dependencies declared by Vex package dependencies (transitive)
+7. **Generate `go.mod`** — produce a `go.mod` with all Go `require` directives
+8. **Run `go mod download`** — download Go dependencies before `go build`
+9. **Build** — run `go build` as usual
 
 ### Pipeline Diagram
 
@@ -476,3 +477,4 @@ This means every existing Vex program compiles without changes.
 | Private repository authentication | Relies on Git credentials (SSH keys, credential helpers) already configured on the machine |
 | Workspaces / multi-module projects | Can be addressed with `replace` directives for now |
 | Dependency graph visualization | Nice-to-have, not needed for v0.1.0 |
+| `vex tidy` (remove unused deps) | Can be added once dependency resolution and import tracking are stable |

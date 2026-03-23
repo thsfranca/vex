@@ -24,6 +24,8 @@
 12. [Platform Support](#12-platform-support)
 13. [Example Programs](#13-example-programs)
 14. [Design Decisions](#14-design-decisions)
+- [Appendix A: Prior Art](#appendix-a-prior-art)
+- [Appendix B: Glossary](#appendix-b-glossary)
 
 ---
 
@@ -756,9 +758,9 @@ The Vex compiler is written in Rust. It outputs Go source code, which the Go too
 
 #### Known limitations
 
-- Go's generics may not fully express Vex's type system in generated code
+- Go 1.26 (2026) relaxed recursive type parameter constraints, reducing the generics impedance mismatch — but some Vex type combinations still require `any` in generated code
 - GC pauses are small but not zero
-- Transpiled code is harder to debug than natively compiled code
+- Transpiled code is harder to debug than natively compiled code — `//line` directives (see `roadmap-rationale.md` §7) mitigate this
 
 #### Why Go is the only backend
 
@@ -815,6 +817,18 @@ Source (.vx)
 
 Lightweight tasks and channels, inspired by Go's goroutines and CSP.
 
+### Primitives
+
+| Vex | Go | Description |
+|-----|-----|-------------|
+| `(spawn expr)` | `go func() { expr }()` | Fire-and-forget goroutine |
+| `(channel T)` | `make(chan T)` | Unbuffered channel |
+| `(channel T size)` | `make(chan T, size)` | Buffered channel |
+| `(send ch val)` | `ch <- val` | Send a value to a channel |
+| `(recv ch)` | `<-ch` | Receive a value from a channel |
+
+### Example
+
 ```
 (let [ch (channel Int 10)]
   (spawn
@@ -824,10 +838,22 @@ Lightweight tasks and channels, inspired by Go's goroutines and CSP.
     (fn [_] (println (recv ch)))))
 ```
 
-- `spawn` → goroutine
-- `channel` → Go channel
+### `select`
 
-This gives Vex a battle-tested concurrent runtime for free.
+`select` multiplexes across multiple channel operations. The runtime picks whichever operation is ready first. If none is ready and a `:default` clause exists, the default executes immediately. Without `:default`, `select` blocks.
+
+```
+(select
+  [(recv ch1) msg (println (str "got: " msg))]
+  [(send ch2 value) (println "sent")]
+  [:default (println "nothing ready")])
+```
+
+Each clause is a bracketed triple: a channel operation, a binding (for `recv`) or nothing (for `send`), and a body. The generated Go is a direct `select { ... }` statement.
+
+### Structured concurrency (planned)
+
+`spawn` is fire-and-forget — no mechanism to wait for completion, collect results, or cancel on failure. `task-group` (see `roadmap-rationale.md` §5) adds scoped concurrency: all tasks in a group must complete before the group exits, and errors cancel remaining tasks.
 
 ---
 
@@ -1045,6 +1071,71 @@ Distributed as a native Rust binary per platform:
 - `Syntax` is a built-in union type (like `Option` and `Result`) representing Vex syntax as data
 - Macros are erased after expansion — `defmacro` forms do not appear in the HIR or generated Go output
 
+### 12. Mutability — rebinding only, no mutation
+
+- All `let` bindings are reassignable with `set!`:
+
+```
+(let [x 1]
+  (set! x 2)
+  x)  ;; => 2
+```
+
+- No separate `let mut` form — every binding is reassignable
+- Compound data (records, lists, maps) is persistent: `set!` rebinds the name, it does not mutate the structure
+- This trades per-binding mutation control for simplicity and aligns with Clojure's value semantics
+- Go variables are mutable, so `set!` compiles to a plain reassignment
+
+### 13. Closure capture — by value
+
+- Closures capture bindings by value (Go's default for non-pointer types)
+- Closures see the value of a binding at the time of capture, not at the time of call
+- No aliasing hazards between a closure and its enclosing scope after capture
+- Hygienic macros also prevent accidental capture: macro-introduced bindings do not leak into the expansion site unless explicitly spliced
+
+### 14. Error type — message-only
+
+- `Error` is a built-in opaque type that wraps a message string
+- It is the error branch of `Result`:
+
+```
+(deftype Result [T]
+  (Ok T)
+  (Err Error))
+```
+
+- `Error` carries only a message — no structured fields, no error codes, no stack trace
+- MCP servers map errors to JSON-RPC error responses (code + message pair)
+- Richer structured errors (error chains, source locations) are planned as DX improvements (see `compiler-architecture.md` §13)
+
+### 15. JsonValue — dynamic JSON at protocol boundaries
+
+`JsonValue` is the dynamic JSON type used at MCP protocol boundaries:
+
+| Variant | Meaning |
+|---------|---------|
+| `JsonNull` | JSON `null` |
+| `JsonBool Bool` | JSON boolean |
+| `JsonNumber Float` | JSON number |
+| `JsonString String` | JSON string |
+| `JsonArray (List JsonValue)` | JSON array |
+| `JsonObject (Map String JsonValue)` | JSON object |
+
+- `JsonValue` exists because MCP tool inputs and outputs are arbitrary JSON
+- Typed functions convert to/from `JsonValue` at protocol boundaries; internal code uses concrete types
+
+### 16. Runtime failure behavior — panics for programmer errors
+
+Some operations fail at runtime despite passing type checking:
+
+- `(/ x 0)` — division by zero panics (Go `panic`)
+- `(recv ch)` on a closed channel — panics
+- `(get m key)` on a missing key — returns the zero value (Go map semantics)
+
+- Vex does not recover from panics — a panic in a `spawn`-ed task crashes the process
+- MCP servers are short-lived request handlers, and an unrecoverable error should surface immediately
+- Structured error handling (`Result`/`match`) covers all expected failure modes; panics signal programmer errors
+
 ---
 
 ## Appendix A: Prior Art
@@ -1057,6 +1148,8 @@ Distributed as a native Rust binary per platform:
 | **Hy** | Lisp transpiled to Python |
 | **Fennel** | Lisp transpiled to Lua |
 | **Elm** | ML-family, Result types, no runtime exceptions |
+| **Gleam** | Statically typed, functional, compiles to Erlang/JS; exhaustive pattern matching, `Result`-based errors, no exceptions |
+| **Coalton** | Statically typed Lisp on Common Lisp; explicit type annotations, fixed-arity functions (dropped currying in 0.2), typeclass polymorphism |
 | **Go** | Target language, concurrency model inspiration |
 
 ## Appendix B: Glossary

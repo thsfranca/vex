@@ -53,6 +53,39 @@ The type system has generic containers (`List(Box<VexType>)`, `Map { key, value 
 
 ---
 
+## Error Handling
+
+| Item | Status | Rationale reference |
+|------|--------|---------------------|
+| Error propagation (`try` / `catch`) | Not Started | `roadmap-rationale.md` §2 |
+| Pattern match exhaustiveness checking | Not Started | `roadmap-rationale.md` §3 |
+
+### Error Propagation — Summary
+
+Vex has `Result` and `Option` types but no propagation mechanism. Every fallible call requires a full `match` with boilerplate `(Err e) (Err e)` arms. MCP handlers chain 3-5 fallible operations, creating deep nesting.
+
+A `try` / `catch` macro solves this with two forms:
+
+- **Block form** — takes a binding list and a `catch` clause, expands into nested `match`:
+  `(try [x (op1) y (op2 x)] (Ok y) (catch e (Err e)))`
+- **Expression form** — single operation with recovery:
+  `(try (parse-int s) (catch e 0))`
+
+**Compiler changes required:**
+
+- `stdlib/prelude.vx` — add the `try` macro definition
+- No AST, type checker, or codegen changes needed
+
+### Exhaustiveness Checking — Summary
+
+`match` does not verify that all variants of a union, `Option`, or `Result` are covered. Missing variants cause runtime failures that the compiler has enough information to catch at compile time.
+
+**Compiler changes required:**
+
+- `typechecker.rs` — add ~30-50 lines at the end of `check_match` to compare covered constructors against the scrutinee type's variant set
+
+---
+
 ## Developer Experience
 
 Items from `docs/compiler-architecture.md` §13 that are not yet implemented.

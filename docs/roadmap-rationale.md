@@ -113,7 +113,6 @@ The type checker resolves `a = Int` and `b = Int` from the concrete arguments at
 - User-defined generic functions and data structures
 - Collection operations as regular functions, not compiler special cases
 - Reduction in type checker complexity (estimated 200-400 lines removed)
-- Foundation for type classes / traits if Vex ever needs constrained polymorphism (e.g., `Numeric` constraint for `+`)
 
 ---
 
@@ -153,52 +152,104 @@ Every modern language with Result-based error handling provides a propagation me
 - **Gleam** — `use` expression: `use rows <- result.try(db.query(validated))`
 - **Go** — `if err != nil { return err }` — verbose but explicit
 
-### Recommended design
+### Why a simple `try` macro doesn't work
 
-A `try` macro in the prelude, alongside `cond`, `and`, and `or`:
-
-```vex
-(defmacro try [expr]
-  (list (quote match) expr
-    (list (quote Ok) (quote __try_val)) (quote __try_val)
-    (list (quote Err) (quote __try_err)) (list (quote Err) (quote __try_err))))
-```
-
-The handler becomes:
+The obvious design — `(try expr)` expanding to `(match expr (Ok val) val (Err e) (Err e))` — breaks inside `let` bindings. If `expr` returns `Err`, the match evaluates to `(Err e)`, which gets **bound to the variable** instead of returning from the function. Execution continues with an error value where a normal value was expected.
 
 ```vex
-(defn handle-search [params: ToolParams] -> (Result JsonValue Error)
-  (let [validated (try (validate params))
-        rows      (try (db.query validated))
-        json      (try (json.encode rows))]
-    (Ok json)))
+;; BROKEN — (Err e) gets bound to `validated`, then db.query receives it
+(let [validated (try (validate params))
+      rows      (try (db.query validated))]
+  (Ok rows))
 ```
 
-Flat, readable, and the happy path reads top to bottom.
+Without early return semantics, an expression-level `try` cannot propagate errors through `let` bindings. Rust's `?` works because the compiler inserts a `return` — a macro cannot synthesize a `return` that exits the enclosing function.
 
-### Why a macro and not a special form
+### Recommended design: `try` / `catch`
 
-- **The macro system already supports this.** The prelude defines `cond`, `and`, and `or` as macros that expand to `if` and `let`. `try` expands to `match` — the macro expander already handles `match` in expanded output (lines 288-297 of `macro_expand.rs`). The type checker already handles `Ok`/`Err` patterns in `check_pattern`.
-- **No compiler changes needed.** `try` is a purely syntactic transformation: `(try expr)` → `(match expr (Ok val) val (Err e) (Err e))`. No new AST nodes, no new type checker logic, no new codegen.
-- **Consistent with the design philosophy.** `cond`, `and`, `or`, and `try` are all control-flow macros that expand to primitive forms. The compiler core stays small.
+A `try` macro that takes a binding list and a `catch` clause, expanding into nested `match`:
 
-### Trade-off: early return semantics
+```vex
+(try [validated (validate params)
+      rows      (db.query validated)
+      json      (json.encode rows)]
+  (Ok json)
+  (catch e (Err e)))
+```
 
-The `try` macro as shown above works only in `let` bindings where the surrounding function returns `Result`. It does **not** provide Rust-style `?` that can appear anywhere in an expression (e.g., `(+ (try x) (try y))`), because the macro expands to a `match` that needs to be the tail expression of its scope to propagate the `Err`.
+The macro expands this into nested `match`, one level per binding:
 
-This is acceptable for Vex's use case:
-- MCP handlers are sequences of steps (validate, query, transform, respond) — a `let`-binding chain is the natural structure
-- Forcing `try` into `let` bindings keeps the early-return points visible, consistent with "explicit over clever"
-- Rust's `?` works in arbitrary positions because it's a language-level operator with special desugaring, not a macro — that level of integration adds compiler complexity
+```vex
+(match (validate params)
+  (Err e) (Err e)
+  (Ok validated)
+    (match (db.query validated)
+      (Err e) (Err e)
+      (Ok rows)
+        (match (json.encode rows)
+          (Err e) (Err e)
+          (Ok json) (Ok json))))
+```
+
+If any operation returns `Err`, the `catch` handler executes immediately — no variable binding, no continuation. The macro has access to all bindings, the body, and the catch clause, so it can restructure the entire form.
+
+### Why `try` / `catch` over alternatives
+
+Three approaches solve the propagation problem without early return:
+
+1. **`try-let`** — a combined form that fuses `try` and `let`. Not idiomatic. Lisp favors orthogonal primitives that compose. Fusing two concerns into one compound form means you can't use error propagation outside of `let`, and you can't combine `let` with other effects.
+
+2. **Gleam-style `use`** — a continuation-capturing form where `use x <- result.try(expr)` rewrites the rest of the block into a callback. More general than `try`/`catch`, but introduces a new syntactic concept (`use`) that Vex users would need to learn.
+
+3. **Monadic `do` notation** — the fully general solution, works for any monad (`Result`, `Option`, `IO`). Requires higher-kinded types and type classes — heavy prerequisites that Vex doesn't need and isn't planning.
+
+`try`/`catch` wins because:
+
+- Every programmer knows the pattern. No new concepts to learn.
+- The `catch` clause makes error handling explicit — the reader sees exactly what happens on failure, consistent with "explicit over clever."
+- The `catch` clause gives flexibility that Rust's `?` does not:
+
+```vex
+;; Propagate
+(catch e (Err e))
+
+;; Propagate with context
+(catch e (Err (wrap-error e "validation failed")))
+
+;; Recover with a default
+(catch e default-value)
+
+;; Log and recover
+(catch e (log-error e) empty-list)
+```
+
+### Single-expression form
+
+For single fallible operations, `try`/`catch` also works as an expression:
+
+```vex
+(try (parse-int input)
+  (catch e 0))
+```
+
+Expands to:
+
+```vex
+(match (parse-int input)
+  (Ok val) val
+  (Err e) 0)
+```
+
+This form works anywhere — in `let` bindings, function arguments, anywhere an expression fits — because the `catch` clause transforms the `Err` case into a non-`Result` value. The variable receives `0`, not `(Err e)`.
 
 ### What changes in the compiler
 
-- **`stdlib/prelude.vx`**: Add the `try` macro definition (5 lines)
-- **Nothing else.** The macro expander, type checker, and codegen already handle every construct that `try` expands to.
+- **`stdlib/prelude.vx`**: Add the `try` macro definition. The macro inspects its arguments: if the first argument is a binding list, expand into nested `match`; if it's a single expression, expand into a flat `match`. The `catch` clause is destructured to extract the error binding name and handler body.
+- **No AST, type checker, or codegen changes.** The macro expands to `match` with `Ok`/`Err` patterns — constructs the compiler already handles.
 
-### Open question: hygiene of `__try_val` and `__try_err`
+### Open question: macro complexity
 
-The bindings `__try_val` and `__try_err` in the macro expansion are introduced by the macro. Vex's hygienic macro system automatically renames macro-introduced bindings to unique names, so these won't conflict with user code. The names shown above are for readability — the actual expanded code uses compiler-generated unique identifiers.
+The binding-list form requires the macro to iterate over pairs and build nested `match` expressions. This is more complex than `cond` (which iterates and nests `if`) but follows the same structural pattern. The single-expression form is trivial — a direct `match` expansion.
 
 ---
 
@@ -293,3 +344,126 @@ This handles Vex's current pattern matching but does not cover:
 - **Literal coverage** — `(match x 1 "one" 2 "two")` on `Int` requires a wildcard; no attempt to enumerate integers
 
 If Vex later adds nested constructor patterns, the set-difference approach extends naturally: at each nesting level, collect the covered constructors and check against the type's variant set. The full Maranget usefulness algorithm becomes necessary only with or-patterns or guard-dependent exhaustiveness.
+
+---
+
+## 4. Removal of Traits / Protocols
+
+### What the design doc had
+
+§5.4 defined `deftrait` and `impl` syntax. The grammar included `deftrait-form` and `impl-form` as top-level forms. Design principle #2 referenced "algebraic data types and traits."
+
+### Why traits were removed
+
+Traits solve the problem of attaching type-specific behavior to types without modifying the type definition — the Expression Problem. This is an object-oriented concern. Functional programming solves the same cases with tools Vex already has:
+
+- **Higher-order functions** — pass behavior as a function argument instead of requiring the type to implement an interface. `(defn save [item: T to-string: (Fn [T] String)] ...)` lets the caller decide how to serialize without any trait declaration.
+- **Union types + pattern matching** — when you control the set of types, model them as variants and match. The exhaustiveness checker (§3) ensures every variant is handled.
+- **Parametric polymorphism** (§1) — generic functions that work on any type without constraints. Collection operations like `map` and `filter` don't need trait bounds — the type parameter is unconstrained.
+
+The concrete use cases from the design doc don't need traits:
+
+- **Serialization** (`Serializable` trait) — Vex targets Go, where `encoding/json` handles serialization structurally via reflection. A built-in `json.encode` that works on records and unions covers the MCP use case without a trait system.
+- **Operator overloading** — Vex has two numeric types (`Int`, `Float`). The compiler handles overloading with a finite dispatch table in `resolve_call_type`. MCP servers don't write generic numeric algorithms.
+- **Interface abstraction** — Go uses structural interfaces. Any Go type with the right methods automatically satisfies the interface. Vex can lean on this through `import-go` rather than building a separate nominal trait system.
+
+The complexity cost of traits is high:
+
+- Trait resolution algorithm (which impl applies at each call site?)
+- Coherence / orphan rules (can module A implement a trait for module B's type?)
+- Interaction with type inference (ambiguous type variables when multiple impls exist)
+- Go codegen impedance mismatch (Go interfaces are structural, traits are nominal — the mapping is awkward)
+
+Gleam chose not to have type classes and is a successful production language. Vex follows the same path: if a concrete use case that cannot be solved with higher-order functions or pattern matching arises, traits can be reconsidered from that specific need.
+
+### What changed
+
+- **`language-design.md`**: Removed §5.4 (Traits / Protocols), `deftrait-form` and `impl-form` from the grammar, trait references from §2 and §5.1
+- **Compiler**: No changes — `deftrait` and `impl` were never implemented in the parser, AST, type checker, or codegen
+
+---
+
+## 5. Structured Concurrency (`task-group`)
+
+### What Vex has today
+
+Vex has two concurrency primitives: `spawn` (fire-and-forget goroutine) and `channel` (Go channel). `spawn` maps directly to `go func() { ... }()` in the generated Go code. There is no mechanism to wait for spawned tasks to complete, propagate errors from child tasks, or scope a set of concurrent tasks to a lifetime.
+
+The design doc's concurrency section (§10) is four lines of example code and "spawn → goroutine" as the entire model.
+
+### Why this matters
+
+The `mcp-go` project (a Go MCP SDK) had a goroutine leak bug in its SSE implementation — when clients disconnected, goroutines waiting on channel sends accumulated until the server exhausted memory. The fix required `context.WithCancel`, `sync.WaitGroup`, and explicit cleanup. This is the class of bug that structured concurrency prevents.
+
+MCP request handlers commonly fan out concurrent work:
+
+```vex
+(defn handle-query [params: QueryParams] -> (Result Response Error)
+  (spawn (fetch-user (. params user-id)))
+  (spawn (fetch-orders (. params user-id)))
+  ;; how do we wait for both? how do we get their results?
+  ;; how do we cancel both if one fails?
+  )
+```
+
+With raw `spawn`, there is no answer to any of those questions. The spawned goroutines are detached — the function returns before they complete, and their results are inaccessible.
+
+### What state of the art looks like
+
+Every major language has added structured concurrency alongside fire-and-forget:
+
+- **Kotlin** — `coroutineScope { launch { ... } }` as the default, `GlobalScope.launch` for detached (discouraged)
+- **Swift** — `TaskGroup` for scoped work, `Task.detached` for background work
+- **Java (JDK 26)** — `StructuredTaskScope` with `fork()` and `join()`
+- **Python 3.11** — `asyncio.TaskGroup` in the standard library
+- **Go** — `errgroup.Group` as a library (not a language feature)
+
+None of these removed fire-and-forget. They added structured concurrency as the recommended path for request-scoped work, while keeping detached tasks available for legitimate background work (file watchers, periodic cleanup, long-running listeners).
+
+### Recommended design
+
+Keep `spawn` as fire-and-forget. Add `task-group` as a scoped concurrency construct.
+
+```vex
+(defn handle-query [params: QueryParams] -> (Result Response Error)
+  (task-group [g]
+    (let [user   (spawn g (fetch-user (. params user-id)))
+          orders (spawn g (fetch-orders (. params user-id)))]
+      (Ok (build-response (try user) (try orders))))))
+```
+
+`task-group` provides:
+
+- **Scoped lifetime** — all tasks spawned into `g` must complete before the `task-group` body exits
+- **Error propagation** — if any task returns `Err`, the group cancels remaining tasks and returns the error
+- **Result collection** — spawned tasks return futures that `try` can unwrap
+
+`spawn` without a group argument remains fire-and-forget for background work:
+
+```vex
+(spawn (watch-file-changes config))
+```
+
+### What changes in the compiler
+
+- **`ast.rs`**: Add `TaskGroup` expression node with a group binding name and body
+- **`parser.rs`**: Parse `(task-group [name] body)` as a new special form
+- **`typechecker.rs`**: Type-check the group body, track that `spawn` with a group argument returns a future type
+- **`codegen.rs`**: Generate `errgroup.Group` with `context.WithCancel`. `spawn g expr` generates `g.Go(func() error { ... })`. The group body ends with an implicit `g.Wait()`.
+- **`hir.rs`**: Add corresponding HIR node
+
+### Trade-off: complexity vs. safety
+
+This is more compiler work than the `try` macro (which required zero compiler changes). It adds a new AST node, a new HIR node, a new special form in the parser, type checker logic for futures, and Go codegen for `errgroup`. It's a real feature, not syntactic sugar.
+
+The question is whether the MCP use case justifies it now. MCP servers in practice handle one request at a time with a small number of concurrent operations. The goroutine leak risk is real but manageable with careful use of channels. This feature becomes more valuable as Vex servers scale to handle concurrent sessions with fan-out patterns.
+
+### Why not a macro
+
+Unlike `try` (which expands to `match`) and `cond` (which expands to `if`), `task-group` cannot be implemented as a macro. It requires:
+
+- A new expression type that the type checker understands (futures with typed results)
+- Codegen that produces `errgroup.Group` initialization and `g.Wait()` at scope exit
+- Context cancellation wiring that has no Vex-level equivalent today
+
+These are compiler-level concerns, not syntax transformations.

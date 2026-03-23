@@ -49,7 +49,7 @@ Vex is a statically typed, Lisp-based language for building networked services �
 ## 2. Design Principles
 
 1. **Explicitness over magic** — types are inferred where unambiguous but always expressible; no hidden coercions
-2. **Composition over inheritance** — algebraic data types and traits, not class hierarchies
+2. **Composition over inheritance** — algebraic data types and higher-order functions, not class hierarchies
 3. **Errors are values** — Result types instead of exceptions; errors must be handled or explicitly propagated
 4. **Concurrency is structural** — lightweight tasks and channels built into the language, not a library bolt-on
 5. **Interop is practical** — direct Go package imports for ecosystem access; JSON and HTTP in the standard library
@@ -289,7 +289,6 @@ The type system includes:
 
 - **Algebraic Data Types** — sum types (`defunion`) and product types (`deftype`)
 - **Parametric polymorphism** — explicit type variables in function signatures (planned; see roadmap §1)
-- **Traits / Protocols** — ad-hoc polymorphism (planned)
 - **Result types** — error handling via `(Result T E)`
 - **Option types** — nullable values via `(Option T)`
 
@@ -317,25 +316,12 @@ The type system includes:
 | Record (product type)  | `(deftype Name (field1 T1) ...)`    |
 | Union (sum type)       | `(defunion Name (Variant1 T1) ...)` |
 
-### 5.4 Traits / Protocols
-
-```
-(deftrait Serializable
-  (serialize [self] : String)
-  (deserialize [s : String] : (Result Self Error)))
-
-(impl Serializable for ToolInput
-  (defn serialize [self] (json.encode self))
-  (defn deserialize [s] (json.decode s)))
-```
-
-### 5.5 Type Inference
+### 5.4 Type Inference
 
 - `let` bindings infer their type from the initializer expression
 - Return types infer from the function body when the annotation is omitted (e.g., a body ending in `println` infers to `Unit`)
 - Explicit annotations are **required** on:
   - All function parameter types (`defn` and `fn`/lambda)
-  - Trait implementations
 
 ---
 
@@ -602,8 +588,6 @@ top-form       = module-decl
                | defn-form
                | deftype-form
                | defunion-form
-               | deftrait-form
-               | impl-form
                | defmacro-form
                | expression ;
 
@@ -623,10 +607,6 @@ deftype-form   = "(" "deftype" SYMBOL { field-decl } ")" ;
 
 defunion-form  = "(" "defunion" SYMBOL { variant-decl } ")" ;
 
-deftrait-form  = "(" "deftrait" SYMBOL { trait-method } ")" ;
-
-impl-form      = "(" "impl" SYMBOL "for" SYMBOL { defn-form } ")" ;
-
 defmacro-form  = "(" "defmacro" SYMBOL param-list body ")" ;
 
 param-list     = "[" { param } "]" ;
@@ -636,8 +616,6 @@ param          = SYMBOL [ ":" type ] ;
 field-decl     = "(" SYMBOL type ")" ;
 
 variant-decl   = "(" SYMBOL { type } ")" ;
-
-trait-method   = "(" SYMBOL param-list ":" type ")" ;
 
 type-ann       = ":" type ;
 

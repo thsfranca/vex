@@ -188,6 +188,25 @@ The per-file independence constraint (§0) and summary extraction phase enable a
 
 ---
 
+## Installation and Distribution
+
+Getting Vex onto a user's machine and making it work from the terminal. Full design in `docs/installation.md`. Rationale in `roadmap-rationale.md` §13.
+
+
+| Item                          | Priority | Status      | Description                                                                                      |
+| ----------------------------- | -------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| CLI version and help flags    | P0       | Not Started | `--version`, `-V`, `--help`, `-h`, and `vex version` subcommand                                 |
+| Go toolchain detection        | P0       | Not Started | Validate Go installation and version (>= 1.21) before compilation with clear error messages      |
+| Release pipeline              | P0       | Not Started | GitHub Actions workflow that cross-compiles 5 targets on tag push and creates a GitHub Release    |
+| Installer script              | P0       | Not Started | `curl \| sh` installer that downloads the binary, installs to `~/.vex/bin/`, auto-configures PATH |
+| Homebrew formula              | P2       | Not Started | Homebrew tap for `brew install vex` on macOS                                                      |
+| APT / RPM packages            | P3       | Not Started | Native Linux packages with Go as a declared dependency                                            |
+| Scoop / WinGet manifests      | P3       | Not Started | Windows package manager support                                                                   |
+| Shell completions             | P3       | Not Started | `vex completions bash/zsh/fish` subcommand for tab completion                                     |
+
+
+---
+
 ## MCP Framework
 
 The end goal of Vex. These items build on top of the language-level features above.

@@ -896,12 +896,15 @@ All targets are supported via Go's `GOOS`/`GOARCH` cross-compilation from a sing
 
 ### Compiler Distribution
 
-Distributed as a native Rust binary per platform:
+Distributed as a native Rust binary per platform. The primary installation method is a `curl | sh` installer script that downloads the correct binary, installs to `~/.vex/bin/`, and auto-configures PATH.
 
-- GitHub Releases
-- Homebrew (macOS)
-- APT/RPM (Linux)
-- Scoop or WinGet (Windows)
+Distribution channels (see `docs/installation.md` for the full design):
+
+- **Installer script** — `curl -fsSL https://raw.githubusercontent.com/thsfranca/vex/main/install.sh | sh`
+- **GitHub Releases** — pre-built archives for all primary targets
+- **Homebrew** (macOS) — planned
+- **APT/RPM** (Linux) — planned
+- **Scoop or WinGet** (Windows) — planned
 
 ---
 

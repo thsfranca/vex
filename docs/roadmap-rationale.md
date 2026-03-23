@@ -784,3 +784,81 @@ Vex should warn (not error) on unused bindings and imports. Warnings keep the de
 - **Warning vs error**: warnings keep the development loop fast during prototyping. A future `--deny-warnings` flag can promote them to errors in CI
 - **False positives in macros**: macro-generated code may reference bindings the user cannot see. Suppressing warnings for compiler-generated names (gensym bindings) avoids noise
 - **Performance**: the `used` flag adds one boolean per binding — negligible cost
+
+---
+
+## 13. Installation and Distribution
+
+### What Vex has today
+
+No installation mechanism. Users clone the repository and run `cargo build` to produce the compiler binary. There is no release pipeline, no pre-built binaries, and no installer. The CLI has no `--version` flag, no `--help` flag, and no Go toolchain validation — if Go is missing, `vex build` fails with a raw OS error.
+
+### Why this matters
+
+A language that cannot be installed in one command cannot attract users. Every modern language ships a frictionless installation path:
+
+- **Rust** — `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` installs `rustc`, `cargo`, and `rustup` in one step, auto-configures PATH
+- **Deno** — `curl -fsSL https://deno.land/install.sh | sh` downloads a single binary
+- **Bun** — `curl -fsSL https://bun.sh/install | bash` downloads and auto-configures PATH
+- **Go** — official installer at go.dev, plus `brew install go` on macOS
+- **Gleam** — `brew install gleam` or pre-built binaries from GitHub Releases
+
+Vex requires two toolchains (Rust for the compiler, Go for the backend). A user who hears about Vex and wants to try it faces: clone repo → install Rust → `cargo build` → figure out where the binary is → add to PATH → discover they need Go → install Go. Each step is a potential dropout point.
+
+### Installation design
+
+The full design lives in `docs/installation.md`. The key components:
+
+1. **Release pipeline** — a GitHub Actions workflow cross-compiles for 5 targets (macOS x86_64, macOS ARM64, Linux x86_64, Linux ARM64, Windows x86_64) on tag push and publishes a GitHub Release with all artifacts
+2. **Installer script** — a POSIX shell script at the repo root that detects OS/arch, downloads the correct binary, installs to `~/.vex/bin/`, and auto-configures PATH
+3. **Go toolchain detection** — the CLI validates Go presence and version before compilation with clear error messages
+4. **CLI version and help** — `--version`, `-V`, `--help`, `-h`, and `vex version` subcommand
+
+### Automatic PATH modification
+
+The installer automatically adds `~/.vex/bin` to the user's shell profile (`.zshrc`, `.bashrc`/`.bash_profile`, or `config.fish`). This is the standard approach for developer toolchains:
+
+| Installer | Auto-modifies PATH? | How |
+|-----------|---------------------|-----|
+| **rustup** | Yes (default) | Sources an `env` file from shell rc files |
+| **Bun** | Yes (default) | Appends `export PATH` line to rc file |
+| **Deno** | No | Prints manual instructions (persistent usability complaint) |
+
+The pattern is clear: auto-setup with opt-out (`--no-modify-path`) reduces friction for new users without blocking advanced users who manage PATH manually.
+
+The write is idempotent — the installer checks for `.vex/bin` in the target file before appending.
+
+### `~/.vex/bin/` as the install directory
+
+User-local installation (no `sudo`) follows the convention set by rustup (`~/.cargo/bin/`), Deno (`~/.deno/bin/`), and Bun (`~/.bun/bin/`). The `~/.vex/` root co-locates the binary with the global dependency cache (`~/.vex/cache/`, see `dependency-management.md` §6).
+
+### Go as an explicit dependency
+
+Three approaches exist for handling the Go toolchain requirement:
+
+1. **Bundle Go** — ship the Go toolchain inside the Vex distribution (~150MB). Zig does this with its bundled C compiler. Eliminates a separate install step but increases download size dramatically and creates version management complexity (which Go version? how to update it?).
+
+2. **Detect and guide** — check for Go at build time, print clear error messages with platform-specific install instructions. Gleam follows this pattern for Erlang. Keeps the Vex binary small (~5MB) and lets users manage Go through their preferred method.
+
+3. **Download on demand** — the first `vex build` automatically downloads Go if missing. Adds significant complexity to the CLI (download progress, version selection, storage location) for a one-time convenience.
+
+Vex uses option 2: detect and guide. Go has a single canonical installer at go.dev and is available through every major package manager. The barrier is telling the user what they need, not automating the download.
+
+### Linux static linking
+
+Linux binaries compile against musl (not glibc) to produce fully static executables. glibc version mismatches cause "GLIBC_2.XX not found" errors on older distributions — the most common class of "the binary doesn't work on my machine" reports for Linux-distributed tools. musl eliminates this entirely at no meaningful performance cost for a compiler binary.
+
+### Future distribution channels
+
+These are planned but not yet implemented:
+
+- **Homebrew** (macOS) — a tap repository with a formula that depends on Go
+- **APT / RPM** (Linux) — native packages for Debian/Ubuntu and Fedora/RHEL
+- **Scoop / WinGet** (Windows) — package manager manifests
+- **Shell completions** — `vex completions bash/zsh/fish` subcommand
+
+Each channel becomes feasible after the release pipeline produces artifacts. The installer script is the primary channel; package managers are convenience wrappers around the same binaries.
+
+### Artifact naming convention
+
+Release artifacts use Go-style `os-arch` naming (`darwin-arm64`, `linux-amd64`) rather than Rust triples (`aarch64-apple-darwin`, `x86_64-unknown-linux-musl`). Vex targets Go developers — the Go naming is familiar to the audience and produces shorter, more readable artifact names on the release page.

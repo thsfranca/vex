@@ -106,6 +106,7 @@ See [`docs/roadmap.md`](docs/roadmap.md) for planned features: parametric polymo
 | [`dependency-management.md`](docs/dependency-management.md) | `vex.mod` manifest, `vex get`, global cache, Go module integration |
 | [`roadmap.md`](docs/roadmap.md) | Feature roadmap with priorities and status |
 | [`roadmap-rationale.md`](docs/roadmap-rationale.md) | Design analysis and trade-offs behind roadmap items |
+| [`installation.md`](docs/installation.md) | Installation process, release pipeline, distribution channels |
 | [`mvp.md`](docs/mvp.md) | MVP definition and success criteria |
 
 ## Development

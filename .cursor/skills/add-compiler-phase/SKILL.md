@@ -81,4 +81,4 @@ Unit tests in `#[cfg(test)] mod tests` within the file:
 - No mutable statics or global state
 - Receive `&mut Vec<Diagnostic>` to push errors, or return `Vec<Diagnostic>` alongside output
 - The caller (`lib.rs`) decides whether to continue after errors
-- Keep the file under ~500 lines; split only if exceeded
+- Each file owns one concept; split when a file owns two independent concerns, not by line count

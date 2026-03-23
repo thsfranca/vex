@@ -2,15 +2,11 @@
 
 [![CI](https://github.com/thsfranca/vex/actions/workflows/ci.yml/badge.svg)](https://github.com/thsfranca/vex/actions/workflows/ci.yml)
 
-A statically typed Lisp for building MCP servers. The compiler is written in Rust and transpiles to Go source code.
+A statically typed Lisp for building [MCP](https://modelcontextprotocol.io/) servers. The compiler is written in Rust and transpiles to Go source code, which `go build` compiles to a native binary.
 
 **This is a study project.**
 
-## Overview
-
-Vex combines S-expression syntax with compile-time type checking, targeting networked services — especially [MCP](https://modelcontextprotocol.io/) servers. The compiler pipeline produces Go source that `go build` compiles to a native binary. An alternative path runs code directly through a tree-walking interpreter for the REPL.
-
-## Examples
+## Quick Look
 
 ```lisp
 (defn main []
@@ -28,61 +24,49 @@ Vex combines S-expression syntax with compile-time type checking, targeting netw
 ```
 
 ```lisp
-(deftype Point (x Float) (y Float))
-
-(defn distance [p : Point] : String
-  (str "(" (. p x) ", " (. p y) ")"))
+(defmacro unless [test body]
+  (list (quote if) test (quote nil) body))
 
 (defn main []
-  (let [origin (Point 0.0 0.0)
-        target (Point 3.0 4.0)]
-    (println (str "origin = " (distance origin)))
-    (println (str "target = " (distance target)))))
+  (unless (> 1 10)
+    (println "1 is not greater than 10")))
 ```
 
-## Usage
+More examples in [`examples/`](examples/).
+
+## Features
+
+- **Type system** — `Int`, `Float`, `String`, `Bool`, `Option`, `Result`, records (`deftype`), unions (`defunion`)
+- **Functions** — `defn`, `def`, `fn` (lambdas), higher-order functions, closures
+- **Control flow** — `if`, `cond`, `match` (pattern matching), `and`, `or`, `let`
+- **Macros** — `defmacro` with `quote`/`unquote`/`splice`, automatic hygiene, self-hosted prelude
+- **Collections** — `List`, `Map`, `each`, `range`, `map`, `filter`
+- **Modules** — `module`, `export`, `import`, Go interop (`import-go`)
+- **Concurrency** — `spawn`, `channel`, `send`, `recv`, `select`
+- **REPL** — interactive `vex repl` with multi-line input and persistent state
+
+## Getting Started
+
+### Prerequisites
+
+- [Rust](https://www.rust-lang.org/tools/install) (stable)
+- [Go](https://go.dev/dl/) (1.21+)
+
+### Build the compiler
+
+```bash
+cargo build --release
+```
+
+### Compile and run a program
 
 ```bash
 vex build hello.vx              # Compile to ./hello binary
 vex build hello.vx -o server    # Custom output name
-vex build hello.vx --emit-go .  # Also write generated Go source
 vex run hello.vx                # Build and run immediately
 vex repl                        # Interactive REPL
+vex build hello.vx --emit-go .  # Write generated Go source for inspection
 ```
-
-## Current Status
-
-All compiler phases are implemented and pass 551 tests. The self-hosted macro system (`defmacro`) supports user-defined compile-time macros with automatic hygiene.
-
-### Compiler Phases
-
-| Phase | Status |
-|-------|--------|
-| `source.rs` — FileId, Span, SourceMap | Done |
-| `diagnostics.rs` — Diagnostic, Severity, formatting | Done |
-| `lexer.rs` — Tokenizer | Done |
-| `ast.rs` — Untyped AST types | Done |
-| `parser.rs` — Recursive descent parser | Done |
-| `types.rs` / `hir.rs` / `builtins.rs` — Type system | Done |
-| `macro_expand.rs` — Compiler macros + self-hosted `defmacro` with hygiene | Done |
-| `typechecker.rs` — AST → HIR | Done |
-| `codegen.rs` — HIR → Go source | Done |
-| `interpreter.rs` — HIR → Value (tree-walking eval) | Done |
-| `lib.rs` / `main.rs` — Full pipeline, CLI | Done |
-
-### Language Features
-
-- **Primitives:** integers, floats, strings, booleans, nil
-- **Functions:** `defn`, `def`, `fn` (lambdas), higher-order functions
-- **Control flow:** `if`, `cond`, `and`, `or`, `let`, pattern matching (`match`)
-- **Macros:** `defmacro`, `quote`, `unquote`, `splice`, macro helpers, automatic hygiene via `gensym`
-- **Data types:** records (`deftype`), field access (`.`), unions (`defunion`)
-- **Built-in types:** `Option`, `Result`, `List`, `Map`
-- **Collections:** `each`, `range`, `map`, `filter`
-- **Modules:** `module`, `export`, `import`, Go interop (`import-go`)
-- **Concurrency:** `spawn`, `channel`, `send`, `recv`
-- **REPL:** interactive `vex repl` with multi-line input and persistent state
-- **Built-in functions:** `println`, `str`, `mod`, arithmetic and comparison operators
 
 ## Architecture
 
@@ -91,18 +75,47 @@ Source → Lexer → Parser → Macro Expand → Type Checker → Codegen → go
                                                       → Interpreter (REPL)
 ```
 
+Each compiler phase is a pure function: data in, data out, plus diagnostics. No global state, no singletons.
+
+| Phase | File | Description |
+|-------|------|-------------|
+| Source tracking | `source.rs` | `FileId`, `Span`, `SourceMap` |
+| Diagnostics | `diagnostics.rs` | Error/warning accumulation and formatting |
+| Lexer | `lexer.rs` | Source text → token stream |
+| AST | `ast.rs` | Untyped syntax tree types |
+| Parser | `parser.rs` | Recursive descent, tokens → AST |
+| Macro expansion | `macro_expand.rs` | AST → AST, prelude + `defmacro` with hygiene |
+| Type system | `types.rs`, `hir.rs`, `builtins.rs` | Semantic types, typed HIR, built-in registry |
+| Type checker | `typechecker.rs` | AST → HIR with type inference |
+| Code generation | `codegen.rs` | HIR → Go source |
+| Interpreter | `interpreter.rs` | HIR → Value (tree-walking, for REPL) |
+| Pipeline | `lib.rs`, `main.rs` | Full compiler pipeline and CLI |
+
+## Current Status
+
+All compiler phases are implemented and pass 551 tests. The pipeline compiles Vex source to working Go binaries end-to-end. The self-hosted macro system (`defmacro`) supports user-defined compile-time macros with automatic hygiene.
+
+See [`docs/roadmap.md`](docs/roadmap.md) for planned features: parametric polymorphism, error propagation macros, exhaustiveness checking, structured concurrency, formatter, LSP, and the MCP framework.
+
 ## Documentation
 
-- [`docs/language-design.md`](docs/language-design.md) — syntax, type system, grammar, backend strategy, design decisions
-- [`docs/compiler-architecture.md`](docs/compiler-architecture.md) — pipeline, file structure, phase contracts, testing strategy
-- [`docs/dependency-management.md`](docs/dependency-management.md) — `vex.mod` manifest, `vex get`, global cache, Go module integration
-- [`docs/mvp.md`](docs/mvp.md) — MVP definition and success criteria
+| Document | Contents |
+|----------|----------|
+| [`language-design.md`](docs/language-design.md) | Syntax, type system, grammar, backend strategy, design decisions |
+| [`compiler-architecture.md`](docs/compiler-architecture.md) | Pipeline, file structure, phase contracts, testing strategy |
+| [`dependency-management.md`](docs/dependency-management.md) | `vex.mod` manifest, `vex get`, global cache, Go module integration |
+| [`roadmap.md`](docs/roadmap.md) | Feature roadmap with priorities and status |
+| [`roadmap-rationale.md`](docs/roadmap-rationale.md) | Design analysis and trade-offs behind roadmap items |
+| [`installation.md`](docs/installation.md) | Installation process, release pipeline, distribution channels |
+| [`mvp.md`](docs/mvp.md) | MVP definition and success criteria |
 
 ## Development
 
 ```bash
-cargo build
-cargo test
+cargo build           # Build the compiler
+cargo test            # Run all 551 tests
+cargo clippy          # Lint
+cargo fmt             # Format
 ```
 
 ## License

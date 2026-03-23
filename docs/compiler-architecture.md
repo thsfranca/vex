@@ -50,6 +50,11 @@ Source (.vx)
 └────────┬────────┘
          │
          ▼
+┌───────────────────────┐
+│ Summary Extraction    │    Vec<ast::TopForm> → ModuleSummary (future, see roadmap §9)
+└───────────┬───────────┘
+            │
+            ▼
 ┌──────────────┐
 │ Type Checker │    &[ast::TopForm] → hir::Module
 └──────┬───────┘
@@ -86,7 +91,7 @@ Macro expansion sits between Parser and Type Checker:
 
 ## 2. File Structure
 
-Flat files. No directories for modules until a file exceeds ~500 lines. Each file owns one concept.
+Each file owns one concept. Split when a file owns two independent concerns that don't share state — not by line count. See `docs/roadmap-rationale.md` §0 for the rationale behind this constraint.
 
 ```
 src/
@@ -562,7 +567,7 @@ func (McpMessage_Notification) isMcpMessage() {}
 ```
 
 - The Vex type checker validates all types at the Vex level
-- The Go interface is not generic — it uses `any` where Vex type parameters appear — because Go's generics cannot express the full Vex type system
+- The Go interface uses `any` where Vex type parameters appear in union variants. Go 1.26 (2026) relaxed recursive type parameter constraints, reducing the impedance mismatch for many patterns — but some Vex type combinations still fall back to `any`
 - This is acceptable since the generated code is correct by construction after type checking
 
 ### Concurrency Primitives
@@ -682,11 +687,21 @@ These are tools the Vex compiler and toolchain provide, independent of any frame
 | P0 | Error diagnostics | Compiler (`diagnostics.rs`) | Span-based errors with source snippets, line numbers, and underlines. The single most important DX feature for a new language. |
 | P0 | REPL | Interpreter (`interpreter.rs`) | Tree-walking evaluation of typed HIR. Instant feedback, no compile cycle. The primary development workflow for a Lisp. |
 | P0 | `--emit-go` | CLI (`main.rs`) | Write the generated Go module to a directory instead of deleting it. Essential for understanding and debugging codegen output. |
+| P1 | `vex fmt` (formatter) | CLI + `formatter.rs` | Opinionated code formatter for `.vx` files. Table stakes for modern languages. See `roadmap-rationale.md` §6. |
 | P1 | `vex dev` (hot reload) | CLI | File watcher that recompiles and restarts on source changes. Sub-second reload is more productive than any debugger for server development. |
 | P1 | Structured logging | Stdlib (`vex.log`) | Key-value structured log output. The server developer's primary diagnostic tool in production and development. |
+| P1 | Source location mapping | Codegen (`codegen.rs`) | Emit `//line` directives in generated Go so stack traces and profiling tools point to `.vx` source. See `roadmap-rationale.md` §7. |
+| P1 | Go toolchain detection | CLI (`main.rs`) | Validate Go installation and version before compilation with clear error messages. See `roadmap-rationale.md` §8. |
 | P2 | Connected REPL | Toolchain | REPL that connects to a running `vex dev` process (nREPL model). Evaluate expressions in the server's context, redefine functions without restarting, inspect live state. |
 | P2 | Error chain traces | Runtime / stdlib | When a `Result` error propagates through multiple functions, display the full chain with source locations. Makes error flows debuggable without a traditional stack trace debugger. |
 | P3 | Test framework | Stdlib (`vex.test`) | Assertions, test discovery, test runner. General-purpose, not framework-specific. |
+
+### Editor tooling
+
+| Priority | Tool | Rationale |
+|----------|------|-----------|
+| P1 | Tree-sitter grammar | Syntax highlighting across Neovim, Helix, Zed, Emacs, VS Code. Trivial for s-expression syntax. See `roadmap-rationale.md` §11. |
+| P2 | `vex lsp` (LSP) | Language server as a CLI subcommand. Map-reduce architecture enabled by per-file independence. See `roadmap-rationale.md` §10. |
 
 ### What belongs in the MCP framework, not the language
 
@@ -706,7 +721,6 @@ The following serve MCP server authors specifically and will be part of the futu
 |---------|-----------|
 | **String interning** | Use `String` everywhere. Optimize later if profiling shows it matters. |
 | **Arena allocation** | Use `Box` and `Vec`. Swap for arenas later if needed. |
-| **User-defined macros (`defmacro`)** | Implemented. All macros — including core control flow (`cond`, `and`, `or`) defined in the self-hosted prelude — execute via a dedicated AST evaluator with automatic hygiene. See `language-design.md` §4.5 and §14.11. |
 | **Multi-file compilation** | `SourceMap` supports `FileId` from day one, but the pipeline processes one file at a time. |
-| **Error recovery in parser** | Stop at first error initially. Accumulate multiple errors later. |
-| **LSP / incremental compilation** | Not a concern at this stage. |
+| **Error recovery in parser** | Planned — see `roadmap.md` "Resilient parsing". Stop at first error for now. |
+| **LSP / incremental compilation** | Planned — see `roadmap-rationale.md` §9 (summary extraction) and §10 (LSP). Not needed until multi-file support exists. |

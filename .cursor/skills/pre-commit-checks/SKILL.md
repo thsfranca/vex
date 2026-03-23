@@ -20,3 +20,5 @@ cargo clippy -- -D warnings
 Only create the commit after both commands succeed with no errors.
 
 3. **README trigger check** — before committing, actively verify whether any of the **update-readme** skill triggers have been reached by comparing the staged changes against the trigger conditions in that skill. If any trigger is met, run the **update-readme** skill and stage the updated `README.md` before committing. This check is mandatory on every commit, not optional.
+
+4. **Roadmap review** — before committing, run the **update-roadmap** skill. Compare the staged changes against the roadmap items in `docs/roadmap.md`. If any item's status changed (work started, feature completed, new gap identified), update the roadmap and stage it before committing. This check is mandatory on every commit, not optional.

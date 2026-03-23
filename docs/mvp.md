@@ -1,6 +1,6 @@
 # Vex MVP Definition
 
-**Status:** Active
+**Status:** Complete
 **Date:** 2026-03-21
 
 ---

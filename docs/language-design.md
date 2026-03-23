@@ -24,6 +24,8 @@
 12. [Platform Support](#12-platform-support)
 13. [Example Programs](#13-example-programs)
 14. [Design Decisions](#14-design-decisions)
+- [Appendix A: Prior Art](#appendix-a-prior-art)
+- [Appendix B: Glossary](#appendix-b-glossary)
 
 ---
 
@@ -49,7 +51,7 @@ Vex is a statically typed, Lisp-based language for building networked services �
 ## 2. Design Principles
 
 1. **Explicitness over magic** — types are inferred where unambiguous but always expressible; no hidden coercions
-2. **Composition over inheritance** — algebraic data types and traits, not class hierarchies
+2. **Composition over inheritance** — algebraic data types and higher-order functions, not class hierarchies
 3. **Errors are values** — Result types instead of exceptions; errors must be handled or explicitly propagated
 4. **Concurrency is structural** — lightweight tasks and channels built into the language, not a library bolt-on
 5. **Interop is practical** — direct Go package imports for ecosystem access; JSON and HTTP in the standard library
@@ -279,13 +281,16 @@ For example, the `or` macro in the prelude introduces a temporary binding. With 
 
 ## 5. Type System
 
-### 5.1 Approach: Hindley-Milner with Extensions
+### 5.1 Approach: Explicit Types with Local Inference
 
-Based on Hindley-Milner type inference (ML, Haskell, Typed Racket), extended with:
+Function signatures require explicit type annotations on parameters. The compiler infers types locally within function bodies — `let` bindings infer from their initializer, return types infer from the body when the annotation is omitted. No global inference across function boundaries.
 
-- **Algebraic Data Types** — sum and product types
-- **Parametric polymorphism** — generics
-- **Traits / Protocols** — ad-hoc polymorphism
+This follows Rust and Go's direction: the programmer states the contract (function signature), and the compiler handles the bookkeeping inside the body. Hindley-Milner was considered and rejected — full HM infers principal types globally, which conflicts with "explicit over clever" (§2.1): type errors surface at unification points far from the actual mistake, and code becomes unreadable without LSP tooling that Vex does not have.
+
+The type system includes:
+
+- **Algebraic Data Types** — sum types (`defunion`) and product types (`deftype`)
+- **Parametric polymorphism** — explicit type variables in function signatures (planned; see roadmap §1)
 - **Result types** — error handling via `(Result T E)`
 - **Option types** — nullable values via `(Option T)`
 
@@ -313,27 +318,12 @@ Based on Hindley-Milner type inference (ML, Haskell, Typed Racket), extended wit
 | Record (product type)  | `(deftype Name (field1 T1) ...)`    |
 | Union (sum type)       | `(defunion Name (Variant1 T1) ...)` |
 
-### 5.4 Traits / Protocols
+### 5.4 Type Inference
 
-```
-(deftrait Serializable
-  (serialize [self] : String)
-  (deserialize [s : String] : (Result Self Error)))
-
-(impl Serializable for ToolInput
-  (defn serialize [self] (json.encode self))
-  (defn deserialize [s] (json.decode s)))
-```
-
-### 5.5 Type Inference
-
-- Types are inferred in most local contexts
-- Return types are inferred from the function body when omitted (e.g., a body ending in `println` infers to `Unit`)
-- Return type annotations are only needed when the compiler can't infer unambiguously
+- `let` bindings infer their type from the initializer expression
+- Return types infer from the function body when the annotation is omitted (e.g., a body ending in `println` infers to `Unit`)
 - Explicit annotations are **required** on:
-  - Top-level function parameter types
-  - Trait implementations
-  - Ambiguous expressions
+  - All function parameter types (`defn` and `fn`/lambda)
 
 ---
 
@@ -600,8 +590,6 @@ top-form       = module-decl
                | defn-form
                | deftype-form
                | defunion-form
-               | deftrait-form
-               | impl-form
                | defmacro-form
                | expression ;
 
@@ -621,10 +609,6 @@ deftype-form   = "(" "deftype" SYMBOL { field-decl } ")" ;
 
 defunion-form  = "(" "defunion" SYMBOL { variant-decl } ")" ;
 
-deftrait-form  = "(" "deftrait" SYMBOL { trait-method } ")" ;
-
-impl-form      = "(" "impl" SYMBOL "for" SYMBOL { defn-form } ")" ;
-
 defmacro-form  = "(" "defmacro" SYMBOL param-list body ")" ;
 
 param-list     = "[" { param } "]" ;
@@ -634,8 +618,6 @@ param          = SYMBOL [ ":" type ] ;
 field-decl     = "(" SYMBOL type ")" ;
 
 variant-decl   = "(" SYMBOL { type } ")" ;
-
-trait-method   = "(" SYMBOL param-list ":" type ")" ;
 
 type-ann       = ":" type ;
 
@@ -776,9 +758,9 @@ The Vex compiler is written in Rust. It outputs Go source code, which the Go too
 
 #### Known limitations
 
-- Go's generics may not fully express Vex's type system in generated code
+- Go 1.26 (2026) relaxed recursive type parameter constraints, reducing the generics impedance mismatch — but some Vex type combinations still require `any` in generated code
 - GC pauses are small but not zero
-- Transpiled code is harder to debug than natively compiled code
+- Transpiled code is harder to debug than natively compiled code — `//line` directives (see `roadmap-rationale.md` §7) mitigate this
 
 #### Why Go is the only backend
 
@@ -835,6 +817,18 @@ Source (.vx)
 
 Lightweight tasks and channels, inspired by Go's goroutines and CSP.
 
+### Primitives
+
+| Vex | Go | Description |
+|-----|-----|-------------|
+| `(spawn expr)` | `go func() { expr }()` | Fire-and-forget goroutine |
+| `(channel T)` | `make(chan T)` | Unbuffered channel |
+| `(channel T size)` | `make(chan T, size)` | Buffered channel |
+| `(send ch val)` | `ch <- val` | Send a value to a channel |
+| `(recv ch)` | `<-ch` | Receive a value from a channel |
+
+### Example
+
 ```
 (let [ch (channel Int 10)]
   (spawn
@@ -844,10 +838,22 @@ Lightweight tasks and channels, inspired by Go's goroutines and CSP.
     (fn [_] (println (recv ch)))))
 ```
 
-- `spawn` → goroutine
-- `channel` → Go channel
+### `select`
 
-This gives Vex a battle-tested concurrent runtime for free.
+`select` multiplexes across multiple channel operations. The runtime picks whichever operation is ready first. If none is ready and a `:default` clause exists, the default executes immediately. Without `:default`, `select` blocks.
+
+```
+(select
+  [(recv ch1) msg (println (str "got: " msg))]
+  [(send ch2 value) (println "sent")]
+  [:default (println "nothing ready")])
+```
+
+Each clause is a bracketed triple: a channel operation, a binding (for `recv`) or nothing (for `send`), and a body. The generated Go is a direct `select { ... }` statement.
+
+### Structured concurrency (planned)
+
+`spawn` is fire-and-forget — no mechanism to wait for completion, collect results, or cancel on failure. `task-group` (see `roadmap-rationale.md` §5) adds scoped concurrency: all tasks in a group must complete before the group exits, and errors cancel remaining tasks.
 
 ---
 
@@ -890,12 +896,15 @@ All targets are supported via Go's `GOOS`/`GOARCH` cross-compilation from a sing
 
 ### Compiler Distribution
 
-Distributed as a native Rust binary per platform:
+Distributed as a native Rust binary per platform. The primary installation method is a `curl | sh` installer script that downloads the correct binary, installs to `~/.vex/bin/`, and auto-configures PATH.
 
-- GitHub Releases
-- Homebrew (macOS)
-- APT/RPM (Linux)
-- Scoop or WinGet (Windows)
+Distribution channels (see `docs/installation.md` for the full design):
+
+- **Installer script** — `curl -fsSL https://raw.githubusercontent.com/thsfranca/vex/main/install.sh | sh`
+- **GitHub Releases** — pre-built archives for all primary targets
+- **Homebrew** (macOS) — planned
+- **APT/RPM** (Linux) — planned
+- **Scoop or WinGet** (Windows) — planned
 
 ---
 
@@ -1065,6 +1074,71 @@ Distributed as a native Rust binary per platform:
 - `Syntax` is a built-in union type (like `Option` and `Result`) representing Vex syntax as data
 - Macros are erased after expansion — `defmacro` forms do not appear in the HIR or generated Go output
 
+### 12. Mutability — rebinding only, no mutation
+
+- All `let` bindings are reassignable with `set!`:
+
+```
+(let [x 1]
+  (set! x 2)
+  x)  ;; => 2
+```
+
+- No separate `let mut` form — every binding is reassignable
+- Compound data (records, lists, maps) is persistent: `set!` rebinds the name, it does not mutate the structure
+- This trades per-binding mutation control for simplicity and aligns with Clojure's value semantics
+- Go variables are mutable, so `set!` compiles to a plain reassignment
+
+### 13. Closure capture — by value
+
+- Closures capture bindings by value (Go's default for non-pointer types)
+- Closures see the value of a binding at the time of capture, not at the time of call
+- No aliasing hazards between a closure and its enclosing scope after capture
+- Hygienic macros also prevent accidental capture: macro-introduced bindings do not leak into the expansion site unless explicitly spliced
+
+### 14. Error type — message-only
+
+- `Error` is a built-in opaque type that wraps a message string
+- It is the error branch of `Result`:
+
+```
+(deftype Result [T]
+  (Ok T)
+  (Err Error))
+```
+
+- `Error` carries only a message — no structured fields, no error codes, no stack trace
+- MCP servers map errors to JSON-RPC error responses (code + message pair)
+- Richer structured errors (error chains, source locations) are planned as DX improvements (see `compiler-architecture.md` §13)
+
+### 15. JsonValue — dynamic JSON at protocol boundaries
+
+`JsonValue` is the dynamic JSON type used at MCP protocol boundaries:
+
+| Variant | Meaning |
+|---------|---------|
+| `JsonNull` | JSON `null` |
+| `JsonBool Bool` | JSON boolean |
+| `JsonNumber Float` | JSON number |
+| `JsonString String` | JSON string |
+| `JsonArray (List JsonValue)` | JSON array |
+| `JsonObject (Map String JsonValue)` | JSON object |
+
+- `JsonValue` exists because MCP tool inputs and outputs are arbitrary JSON
+- Typed functions convert to/from `JsonValue` at protocol boundaries; internal code uses concrete types
+
+### 16. Runtime failure behavior — panics for programmer errors
+
+Some operations fail at runtime despite passing type checking:
+
+- `(/ x 0)` — division by zero panics (Go `panic`)
+- `(recv ch)` on a closed channel — panics
+- `(get m key)` on a missing key — returns the zero value (Go map semantics)
+
+- Vex does not recover from panics — a panic in a `spawn`-ed task crashes the process
+- MCP servers are short-lived request handlers, and an unrecoverable error should surface immediately
+- Structured error handling (`Result`/`match`) covers all expected failure modes; panics signal programmer errors
+
 ---
 
 ## Appendix A: Prior Art
@@ -1077,6 +1151,8 @@ Distributed as a native Rust binary per platform:
 | **Hy** | Lisp transpiled to Python |
 | **Fennel** | Lisp transpiled to Lua |
 | **Elm** | ML-family, Result types, no runtime exceptions |
+| **Gleam** | Statically typed, functional, compiles to Erlang/JS; exhaustive pattern matching, `Result`-based errors, no exceptions |
+| **Coalton** | Statically typed Lisp on Common Lisp; explicit type annotations, fixed-arity functions (dropped currying in 0.2), typeclass polymorphism |
 | **Go** | Target language, concurrency model inspiration |
 
 ## Appendix B: Glossary
@@ -1086,7 +1162,7 @@ Distributed as a native Rust binary per platform:
 | **S-expression** | Symbolic expression — nested list notation `(op arg1 arg2)` |
 | **Homoiconicity** | Code-as-data; the program's syntax tree is a data structure in the language |
 | **ADT** | Algebraic Data Type — sum types (tagged unions) + product types (records) |
-| **HM** | Hindley-Milner — a type inference algorithm that can infer types without annotations |
+| **HM** | Hindley-Milner — a type inference algorithm that infers types without annotations; Vex does not use HM (see §5.1) |
 | **MCP** | Model Context Protocol — open protocol for LLM-tool integration |
 | **JSON-RPC** | Remote procedure call protocol encoded in JSON |
 | **TCO** | Tail Call Optimization — converting recursive tail calls into loops |

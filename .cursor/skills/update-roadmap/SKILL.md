@@ -35,7 +35,8 @@ Before updating, read these sources to determine what has changed:
    - **In Progress** → **Done** when merged to main with tests passing
 3. If a completed item is not yet in the "Completed Milestones" section, move it there with the current date
 4. If new work reveals a gap not on the roadmap, add it to the appropriate section
-5. Update the **Last reviewed** date at the top of the document to today's date
+5. Cross-check `docs/roadmap-rationale.md` and `docs/language-design.md` for items, features, or gaps not yet tracked in the roadmap — add any missing items to the appropriate section with status **Not Started**
+6. Update the **Last reviewed** date at the top of the document to today's date
 
 ## What to Check
 

@@ -114,3 +114,182 @@ The type checker resolves `a = Int` and `b = Int` from the concrete arguments at
 - Collection operations as regular functions, not compiler special cases
 - Reduction in type checker complexity (estimated 200-400 lines removed)
 - Foundation for type classes / traits if Vex ever needs constrained polymorphism (e.g., `Numeric` constraint for `+`)
+
+---
+
+## 2. Error Propagation (`try` Macro)
+
+### What Vex has today
+
+Vex's design principle #3 says "Errors are values — Result types instead of exceptions; errors must be handled or explicitly propagated." The language has `Result` and `Option` types with `match` for destructuring. But there is no propagation mechanism — every `Result`-returning call requires a full `match` to unwrap.
+
+A typical MCP handler chains multiple fallible operations:
+
+```vex
+(defn handle-search [params: ToolParams] -> (Result JsonValue Error)
+  (match (validate params)
+    (Ok validated) (match (db.query validated)
+                     (Ok rows) (match (json.encode rows)
+                                  (Ok json) (Ok json)
+                                  (Err e) (Err e))
+                     (Err e) (Err e))
+    (Err e) (Err e)))
+```
+
+Three levels of nesting for three fallible calls. Every `(Err e) (Err e)` arm is pure boilerplate — it re-wraps the error and returns it unchanged. MCP servers are almost entirely I/O, so every handler looks like this.
+
+### Why this matters
+
+- **MCP handlers chain 3-5 fallible operations minimum** (parse request, validate input, query/fetch, transform, serialize response). Without propagation, nesting depth grows linearly with the number of fallible calls.
+- **The boilerplate obscures the happy path.** The actual logic (`validate → query → encode`) is buried inside match arms. The reader has to mentally filter out identical error-forwarding branches to understand what the function does.
+- **Vex's own design principle promises explicit propagation** but does not deliver it.
+
+### What state of the art looks like
+
+Every modern language with Result-based error handling provides a propagation mechanism:
+
+- **Rust** — `?` operator: `let rows = db.query(validated)?;`
+- **Zig** — `try` keyword: `const rows = try db.query(validated);`
+- **Gleam** — `use` expression: `use rows <- result.try(db.query(validated))`
+- **Go** — `if err != nil { return err }` — verbose but explicit
+
+### Recommended design
+
+A `try` macro in the prelude, alongside `cond`, `and`, and `or`:
+
+```vex
+(defmacro try [expr]
+  (list (quote match) expr
+    (list (quote Ok) (quote __try_val)) (quote __try_val)
+    (list (quote Err) (quote __try_err)) (list (quote Err) (quote __try_err))))
+```
+
+The handler becomes:
+
+```vex
+(defn handle-search [params: ToolParams] -> (Result JsonValue Error)
+  (let [validated (try (validate params))
+        rows      (try (db.query validated))
+        json      (try (json.encode rows))]
+    (Ok json)))
+```
+
+Flat, readable, and the happy path reads top to bottom.
+
+### Why a macro and not a special form
+
+- **The macro system already supports this.** The prelude defines `cond`, `and`, and `or` as macros that expand to `if` and `let`. `try` expands to `match` — the macro expander already handles `match` in expanded output (lines 288-297 of `macro_expand.rs`). The type checker already handles `Ok`/`Err` patterns in `check_pattern`.
+- **No compiler changes needed.** `try` is a purely syntactic transformation: `(try expr)` → `(match expr (Ok val) val (Err e) (Err e))`. No new AST nodes, no new type checker logic, no new codegen.
+- **Consistent with the design philosophy.** `cond`, `and`, `or`, and `try` are all control-flow macros that expand to primitive forms. The compiler core stays small.
+
+### Trade-off: early return semantics
+
+The `try` macro as shown above works only in `let` bindings where the surrounding function returns `Result`. It does **not** provide Rust-style `?` that can appear anywhere in an expression (e.g., `(+ (try x) (try y))`), because the macro expands to a `match` that needs to be the tail expression of its scope to propagate the `Err`.
+
+This is acceptable for Vex's use case:
+- MCP handlers are sequences of steps (validate, query, transform, respond) — a `let`-binding chain is the natural structure
+- Forcing `try` into `let` bindings keeps the early-return points visible, consistent with "explicit over clever"
+- Rust's `?` works in arbitrary positions because it's a language-level operator with special desugaring, not a macro — that level of integration adds compiler complexity
+
+### What changes in the compiler
+
+- **`stdlib/prelude.vx`**: Add the `try` macro definition (5 lines)
+- **Nothing else.** The macro expander, type checker, and codegen already handle every construct that `try` expands to.
+
+### Open question: hygiene of `__try_val` and `__try_err`
+
+The bindings `__try_val` and `__try_err` in the macro expansion are introduced by the macro. Vex's hygienic macro system automatically renames macro-introduced bindings to unique names, so these won't conflict with user code. The names shown above are for readability — the actual expanded code uses compiler-generated unique identifiers.
+
+---
+
+## 3. Pattern Match Exhaustiveness Checking
+
+### What Vex has today
+
+`check_match` in `typechecker.rs` validates that clause bodies have compatible types, but it does not check whether the clauses cover all variants of the scrutinee type. This compiles without any warning or error:
+
+```vex
+(defunion Shape
+  (Circle Float)
+  (Square Float)
+  (Triangle Float Float))
+
+(defn describe [s: Shape] -> String
+  (match s
+    (Circle r) (str "circle with radius " r)
+    (Square s) (str "square with side " s)))
+```
+
+If `s` is a `Triangle` at runtime, the generated Go code hits an unmatched case — either a panic or silent wrong behavior, depending on the codegen.
+
+### Why this matters
+
+- **Refactoring becomes unsafe.** Adding a variant to a union should make the compiler flag every match that doesn't handle it. Without exhaustiveness checking, the new variant silently falls through at runtime.
+- **It defeats the purpose of static typing.** The type system knows the exact set of variants. Failing to use that information at match sites is leaving value on the table — the compiler has the information to catch the bug and doesn't.
+- **`Option` and `Result` are the most common match targets.** Every `(match opt (Some x) ...)` that forgets `None` is a runtime crash that the compiler could prevent.
+
+### What state of the art looks like
+
+Every statically typed language with algebraic data types checks exhaustiveness:
+
+- **Rust** — the `rustc_pattern_analysis` crate implements the full Maranget usefulness algorithm, handling nested patterns, or-patterns, guards, and GADTs
+- **Gleam** — uses a decision-tree approach based on Jules Jacobs's pattern matching algorithm, with a dedicated `exhaustiveness.rs` module
+- **Elm** — reports missing patterns with concrete examples of unhandled values
+- **Zig** — checks exhaustiveness for switch statements on tagged unions and enums
+
+### Why Vex's case is simpler
+
+Vex's type system has a property that makes this much easier than in Rust or Gleam: the set of matchable types with known variants is small and fixed.
+
+Three types have known constructor sets:
+
+1. **User-defined unions** (`defunion`) — variants declared in the type definition
+2. **`Option`** — exactly `Some` and `None`
+3. **`Result`** — exactly `Ok` and `Err`
+
+There are no GADTs, no nested constructor patterns, no or-patterns, no guard-dependent exhaustiveness. Patterns are flat — a constructor pattern binds variables, it doesn't nest constructors inside constructors.
+
+### Recommended algorithm
+
+A set-difference check at the end of `check_match`, after all clauses are type-checked:
+
+1. Collect the set of constructor names covered by the clause patterns
+2. If any clause has a `Wildcard` or `Binding` pattern (catches everything), the match is exhaustive — done
+3. Get the full variant set from the scrutinee type:
+   - `VexType::Union { variants, .. }` → all variant names
+   - `VexType::Option(_)` → `{"Some", "None"}`
+   - `VexType::Result { .. }` → `{"Ok", "Err"}`
+   - Primitive types (`Int`, `String`, `Float`) → require a wildcard/binding (can't enumerate all values)
+   - `Bool` → `{"true", "false"}` (could be special-cased, but requiring a wildcard is sufficient)
+4. Compute `missing = full_set - covered_set`
+5. If `missing` is non-empty, emit a diagnostic:
+   - For unions: `"non-exhaustive match: missing variant Triangle of Shape"`
+   - For `Option`: `"non-exhaustive match: missing None"`
+   - For `Result`: `"non-exhaustive match: missing Err"`
+
+### Example diagnostic
+
+```
+error: non-exhaustive match: missing variant Triangle of Shape
+  --> src/main.vx:7:3
+   |
+ 7 | (match s
+   |  ^^^^^
+   |
+   = help: add a (Triangle _ _) clause or a wildcard (_) pattern
+```
+
+### What changes in the compiler
+
+- **`typechecker.rs`**: Add ~30-50 lines at the end of `check_match`, after the existing clause loop. Walk the checked clauses, collect covered constructor names, compare against the scrutinee type's variant set.
+- **No AST, HIR, parser, or codegen changes.** The check runs entirely within the type checker on already-validated pattern information.
+
+### Limitations of this approach
+
+This handles Vex's current pattern matching but does not cover:
+
+- **Nested patterns** — `(Some (Ok x))` matching on `(Option (Result Int String))` would require tracking coverage at each nesting level
+- **Or-patterns** — multiple patterns per clause (not in Vex today)
+- **Literal coverage** — `(match x 1 "one" 2 "two")` on `Int` requires a wildcard; no attempt to enumerate integers
+
+If Vex later adds nested constructor patterns, the set-difference approach extends naturally: at each nesting level, collect the covered constructors and check against the type's variant set. The full Maranget usefulness algorithm becomes necessary only with or-patterns or guard-dependent exhaustiveness.

@@ -279,13 +279,17 @@ For example, the `or` macro in the prelude introduces a temporary binding. With 
 
 ## 5. Type System
 
-### 5.1 Approach: Hindley-Milner with Extensions
+### 5.1 Approach: Explicit Types with Local Inference
 
-Based on Hindley-Milner type inference (ML, Haskell, Typed Racket), extended with:
+Function signatures require explicit type annotations on parameters. The compiler infers types locally within function bodies — `let` bindings infer from their initializer, return types infer from the body when the annotation is omitted. No global inference across function boundaries.
 
-- **Algebraic Data Types** — sum and product types
-- **Parametric polymorphism** — generics
-- **Traits / Protocols** — ad-hoc polymorphism
+This follows Rust and Go's direction: the programmer states the contract (function signature), and the compiler handles the bookkeeping inside the body. Hindley-Milner was considered and rejected — full HM infers principal types globally, which conflicts with "explicit over clever" (§2.1): type errors surface at unification points far from the actual mistake, and code becomes unreadable without LSP tooling that Vex does not have.
+
+The type system includes:
+
+- **Algebraic Data Types** — sum types (`defunion`) and product types (`deftype`)
+- **Parametric polymorphism** — explicit type variables in function signatures (planned; see roadmap §1)
+- **Traits / Protocols** — ad-hoc polymorphism (planned)
 - **Result types** — error handling via `(Result T E)`
 - **Option types** — nullable values via `(Option T)`
 
@@ -327,13 +331,11 @@ Based on Hindley-Milner type inference (ML, Haskell, Typed Racket), extended wit
 
 ### 5.5 Type Inference
 
-- Types are inferred in most local contexts
-- Return types are inferred from the function body when omitted (e.g., a body ending in `println` infers to `Unit`)
-- Return type annotations are only needed when the compiler can't infer unambiguously
+- `let` bindings infer their type from the initializer expression
+- Return types infer from the function body when the annotation is omitted (e.g., a body ending in `println` infers to `Unit`)
 - Explicit annotations are **required** on:
-  - Top-level function parameter types
+  - All function parameter types (`defn` and `fn`/lambda)
   - Trait implementations
-  - Ambiguous expressions
 
 ---
 
@@ -1086,7 +1088,7 @@ Distributed as a native Rust binary per platform:
 | **S-expression** | Symbolic expression — nested list notation `(op arg1 arg2)` |
 | **Homoiconicity** | Code-as-data; the program's syntax tree is a data structure in the language |
 | **ADT** | Algebraic Data Type — sum types (tagged unions) + product types (records) |
-| **HM** | Hindley-Milner — a type inference algorithm that can infer types without annotations |
+| **HM** | Hindley-Milner — a type inference algorithm that infers types without annotations; Vex does not use HM (see §5.1) |
 | **MCP** | Model Context Protocol — open protocol for LLM-tool integration |
 | **JSON-RPC** | Remote procedure call protocol encoded in JSON |
 | **TCO** | Tail Call Optimization — converting recursive tail calls into loops |
